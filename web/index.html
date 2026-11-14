@@ -1,7 +1,14 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#163e34"><title>Sound Studio · Core-aura</title><link rel="manifest" href="/app.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png"><link rel="stylesheet" href="/studio.css"></head>
-<body><header><strong>◉ &nbsp; Core-aura</strong><div class="release"><span>v0.5.0</span> <a href="/update.html" id="update">Update app</a></div></header><nav aria-label="Practice"><a href="#studio" aria-current="page">Sound Studio</a><a href="#chakra">Chakra Healing</a></nav><main>
-<section class="practice" id="practice" hidden><div><p class="eyebrow">Guided listening</p><h2>Chakra Healing</h2><p>A seven-part spiritual meditation. Choose a focus and a sound. The pitches are editable musical choices for this practice.</p></div><div><label for="chakra">Meditation focus</label><select id="chakra"></select><p id="reflection"></p></div></section>
+<body><header><strong>◉ &nbsp; Core-aura</strong><div class="release"><span>v0.6.0</span> <a href="/update.html" id="update">Update app</a></div></header><nav aria-label="Practice"><a href="#studio" aria-current="page">Sound Studio</a><a href="#chakra">Chakra Healing</a></nav><main>
+<section id="chakra-panel" hidden>
+<div class="chakra-intro"><h1>Chakra Healing</h1><p>Modern Solfeggio meditation mapping. Choose individual sounds, select a combination, or play all seven together.</p>
+<details><summary>About these frequencies</summary><p>These pitches follow a contemporary spiritual practice. Chakra frequency mappings vary between traditions. Use them for personal meditation.</p></details></div>
+<div class="chakra-mixer"><label>Session length<select id="chakra-duration"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select></label>
+<label>Mix volume <output id="chakra-level">15%</output><input type="range" id="chakra-volume" min="0" max="100" value="15"></label>
+<div class="group-controls"><button data-action="selected">Play selected</button><button data-action="all">Play all 7</button><button data-action="pause">Pause all</button><button data-action="stop">Stop all</button></div><p id="chakra-message" role="status"></p></div>
+<div id="chakra-cards"></div></section>
+<div hidden><section id="practice"><select id="chakra"></select><p id="reflection"></p></section></div>
 <section class="display" aria-labelledby="tone"><p class="eyebrow" id="mode-label">Sound Studio</p><h1 id="tone">Pure tone</h1><div class="reading"><output id="readout">432</output> <small>Hz</small></div><p id="note"></p><label for="dial">Tune pitch</label><input type="range" id="dial" aria-label="Tune pitch">
 <canvas aria-label="Live audio waveform"></canvas><output id="clock" aria-label="Session time remaining"></output><p id="status" role="status">Ready to play</p></section>
 <form><h2>Session controls</h2><label for="instrument">Sound</label><select id="instrument"></select><p id="raga-info" hidden>Hindustani flute study. Listen for lower Ni–Re–Ga. The drone follows your Sa.</p><label for="freq" id="tuning">Frequency (Hz)</label><input id="freq" type="number" min="20" max="12000" step="any" required value="432"><div class="presets"><button type="button" data-hz="220">220 Hz</button><button type="button" data-hz="432">432 Hz</button><button type="button" data-hz="440">440 Hz</button></div>
@@ -15,4 +22,4 @@
 <label for="name">Session name</label><input id="name" type="text" maxlength="60" placeholder="Evening bansuri">
 <button id="save">Save settings</button>
 <label for="saved">On this device</label><select id="saved"></select>
-<button id="load">Load session</button><button id="remove">Delete session</button><p id="notice" role="status"></p></section></main><footer>Core-aura · v0.5.0</footer><script type="module" src="/studio.js"></script></body></html>
+<button id="load">Load session</button><button id="remove">Delete session</button><p id="notice" role="status"></p></section></main><footer>Core-aura · v0.6.0</footer><script type="module" src="/studio.js"></script></body></html>

@@ -1,3 +1,4 @@
+import {player as chakraPlayer, stopChakras} from './chakra.js';
 import {playVoice, instruments} from './engine.js';
 const $ = selector => document.querySelector(selector);
 const freq = $('#freq'), volume = $('#volume'), duration = $('#duration');
@@ -196,7 +197,7 @@ $('#remove').onclick = () => {
 refresh();
 
 $('#update').onclick = event => {
-  if ($('#play').disabled) {
+  if ($('#play').disabled || chakraPlayer.voices.size) {
     event.preventDefault();
     $('#status').textContent = 'Stop the session before updating.';
   }
@@ -239,7 +240,10 @@ function openPractice(name, applyPreset = true) {
   }
   activePractice = name;
   const chakra = name === 'chakra';
-  $('#practice').hidden = !chakra;
+  $('#chakra-panel').hidden = !chakra;
+  for (const selector of ['.display', 'form', '.library']) $(selector).hidden = chakra;
+  if (!chakra) stopChakras().catch(() => {});
+
   $('#mode-label').textContent = chakra ? 'Chakra meditation' : 'Sound Studio';
   document.body.classList.toggle('chakra', chakra);
   for (const link of document.querySelectorAll('nav a')) {
@@ -247,7 +251,7 @@ function openPractice(name, applyPreset = true) {
     else link.removeAttribute('aria-current');
   }
   history.replaceState(null, '', '#' + name);
-  if (chakra) showFocus(applyPreset);
+
 }
 $('#chakra').onchange = () => showFocus(true);
 for (const link of document.querySelectorAll('nav a')) {

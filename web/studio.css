@@ -19,3 +19,32 @@ main{padding-top:20px;align-items:start}
 .chakra .display{background:radial-gradient(ellipse at 92% 0%,#786456,#473b46 75%)}
 #note,#clock{font-variant-numeric:tabular-nums}
 @media(max-width:660px){header{padding:14px 0}nav{position:sticky;top:0;z-index:2;margin-top:8px}.practice{grid-template-columns:1fr;gap:8px}.display{min-height:0;padding:20px}.display h1{font-size:32px}.reading{font-size:46px}.display label{margin-top:10px}main{gap:12px;padding-top:12px}.release{gap:6px}.release a{padding:10px}.library,form{padding:20px}}
+
+[hidden]{display:none!important}
+header,main,footer,nav{max-width:1040px}
+#chakra-panel{grid-column:1/-1}
+.chakra-intro h1{font:normal 32px Georgia,serif;margin:6px 0 10px}.chakra-intro p{line-height:1.5;max-width:650px}
+.chakra-intro details{font-size:14px;margin:12px 0 20px}.chakra-intro summary{cursor:pointer}
+.chakra-mixer{background:#fffdfa;padding:18px;border:1px solid #d5d9ce;border-radius:16px;margin-bottom:14px}
+.chakra-mixer label{margin:0 0 12px}
+.group-controls{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+#chakra-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chakra-card{border:1px solid #d5d9ce;border-left:5px solid var(--chakra-color);background:#fffdfa;border-radius:16px;padding:16px}
+.chakra-title{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.chakra-title label{display:flex;align-items:center;gap:8px;margin:0;font-size:18px}
+.chakra-title input{width:22px;height:22px;accent-color:var(--chakra-color)}
+.chakra-title strong{font-size:22px;white-space:nowrap}.chakra-title small{font-size:13px}
+.chakra-card>label{font-size:13px;margin-top:14px}.chakra-card select{margin-top:6px}
+.transport{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.transport output{grid-column:1/-1;font-size:13px;color:#52675e;text-transform:capitalize}
+.is-playing{box-shadow:0 0 0 2px var(--chakra-color)}
+button,input,select,.release a{min-height:44px}
+@media(max-width:660px){
+ body{background:#f3f2ec}header,main,footer,nav{width:calc(100% - 24px)}
+ header strong{font-size:20px}header{gap:8px}.release span{font-size:12px}.release a{font-size:13px}
+ nav{box-shadow:0 3px 10px #163e3412}.display h1{font-size:28px}.display{min-height:0;gap:3px}.display canvas{height:48px}
+ form h2,.library h2{font-size:24px}form label{margin-top:12px}
+ #chakra-cards{grid-template-columns:1fr}.group-controls{grid-template-columns:1fr 1fr}
+ .chakra-title label{font-size:17px}.chakra-card{padding:14px}
+ .chakra-mixer{position:relative}.reading{font-size:42px}
+ #dial{min-height:48px}.display #note{font-size:13px}.display #status{font-size:14px}
+}
