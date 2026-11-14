@@ -1,4 +1,4 @@
-const cacheKey = 'core-aura-v0.2.0';
+const cacheKey = 'core-aura-v0.3.0';
 const assets = ['/', '/studio.css', '/studio.js', '/engine.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(cacheKey).then(cache => cache.addAll(assets)));

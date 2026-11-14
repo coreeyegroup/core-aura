@@ -31,6 +31,7 @@ export const instruments = {
 };
 
 export function renderInstrument(id, sampleRate) {
+  if (id === "tanpura") return renderDrone(sampleRate);
   const spec = instruments[id];
   const samples = new Float32Array(Math.round(sampleRate * spec.period));
   for (let i = 0; i < samples.length; i++) {
@@ -80,4 +81,22 @@ export function playVoice(context, id, hz, volume, seconds) {
     source, gain, envelope,
     tune(value) { pitch.setTargetAtTime(value / reference, context.currentTime, 0.012); }
   };
+}
+
+// A four-pluck cycle. The reference Sa is 432 Hz, and the last string is low Sa.
+function renderDrone(sampleRate) {
+  const spacing = 0.85;
+  const ratios = [0.75, 1, 1, 0.5];
+  const samples = new Float32Array(Math.round(sampleRate * spacing * ratios.length));
+  for (const [string, ratio] of ratios.entries()) {
+    const offset = Math.round(string * spacing * sampleRate);
+    for (let i = 0; i < samples.length; i++) {
+      const time = i / sampleRate;
+      const phase = 2 * Math.PI * 432 * ratio * time;
+      const shape = Math.min(1, time / 0.018, (samples.length - 1 - i) / (sampleRate * 0.08));
+      const body = Math.sin(phase) + 0.38 * Math.sin(2 * phase) + 0.2 * Math.sin(3 * phase);
+      samples[(offset + i) % samples.length] += 0.29 * shape * Math.exp(-1.75 * time) * body;
+    }
+  }
+  return samples;
 }
