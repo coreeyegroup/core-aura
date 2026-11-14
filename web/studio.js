@@ -42,15 +42,33 @@ function updateFrequency() {
     if (drone) drone.tune(hz);
   }
   if (tone) tone.tune(hz);
+  const dial = $('#dial');
+  dial.min = freq.min; dial.max = freq.max; dial.step = '0.1'; dial.value = hz;
+  const midi = 69 + 12 * Math.log2(hz / 440);
+  const nearest = Math.round(midi);
+  const names = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+  const cents = Math.round((midi - nearest) * 100);
+  $('#note').textContent = names[nearest % 12] + (Math.floor(nearest / 12) - 1) +
+    ' · ' + (cents > 0 ? '+' : '') + cents + ' cents · set pitch';
+  if (!tone) drawWave();
+}
+let scope, samples, frame;
+function drawWave() {
   const canvas = $('canvas'), pen = canvas.getContext('2d');
-  canvas.width = 800; canvas.height = 120;
+  if (canvas.width !== 800) { canvas.width = 800; canvas.height = 120; }
+  pen.clearRect(0, 0, canvas.width, canvas.height);
+  if (scope) scope.getFloatTimeDomainData(samples);
+  let peak = 0.02;
+  if (scope) for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
   pen.beginPath(); pen.strokeStyle = '#c8dfa5'; pen.lineWidth = 3;
   for (let x = 0; x < canvas.width; x++) {
-    const y = 60 + 42 * Math.sin(x / 800 * 2 * Math.PI * (2 + Math.log2(hz / 20)));
+    const y = 60 - (scope ? 48 * samples[Math.floor(x * samples.length / 800)] / peak : 0);
     if (x === 0) pen.moveTo(x,y); else pen.lineTo(x,y);
   }
   pen.stroke();
+  if (scope) frame = requestAnimationFrame(drawWave);
 }
+$('#dial').oninput = () => { freq.value = $('#dial').value; updateFrequency(); };
 freq.oninput = updateFrequency;
 for (const preset of document.querySelectorAll('[data-hz]')) {
   preset.onclick = () => { freq.value = preset.dataset.hz; updateFrequency(); };
@@ -62,7 +80,7 @@ volume.oninput = () => {
 $('form').onsubmit = async event => {
   event.preventDefault();
   if ($('#play').disabled) return;
-  $('#play').disabled = true;
+  $('#play').disabled = true; $('#chakra').disabled = true;
   try {
     context ??= new AudioContext();
     await context.resume();
@@ -70,6 +88,12 @@ $('form').onsubmit = async event => {
     if (droneToggle.checked) {
       drone = playVoice(context, 'tanpura', sa.valueAsNumber, mix.valueAsNumber / 100, Number(duration.value));
     }
+    scope = context.createAnalyser();
+    scope.fftSize = 2048;
+    samples = new Float32Array(scope.fftSize);
+    tone.envelope.connect(scope);
+    if (drone) drone.envelope.connect(scope);
+    drawWave();
     const end = context.currentTime + Number(duration.value);
     const tick = () => {
       const remaining = Math.max(0, Math.ceil(end - context.currentTime));
@@ -86,11 +110,13 @@ $('form').onsubmit = async event => {
         voice.source.disconnect(); voice.gain.disconnect(); voice.envelope.disconnect();
       }
       tone = null; drone = null;
+      cancelAnimationFrame(frame);
+      scope.disconnect(); scope = null; drawWave();
       clearInterval(clockTimer);
       $('#clock').textContent = '';
       droneToggle.disabled = false;
       refresh();
-      instrument.disabled = false; duration.disabled = false; $('#play').disabled = false; $('#stop').disabled = true;
+      instrument.disabled = false; duration.disabled = false; $('#play').disabled = false; $('#chakra').disabled = false; $('#stop').disabled = true;
       $('#status').textContent = 'Session ended';
     };
   } catch {
@@ -99,7 +125,7 @@ $('form').onsubmit = async event => {
     }
     tone = null; drone = null;
     $('#status').textContent = 'Audio could not start. Check browser audio support and try again.';
-    $('#play').disabled = false;
+    $('#play').disabled = false; $('#chakra').disabled = false;
   }
 };
 $('#stop').onclick = () => {
@@ -137,7 +163,7 @@ $('#save').onclick = () => {
     const rows = sessions();
     const existing = rows.find(row => row.name === name);
     if (existing && !confirm('Replace the settings for ' + name + '?')) return;
-    const settings = {name, instrument: instrument.value, hz: freq.value, volume: volume.value,
+    const settings = {name, practice: activePractice, chakra: $('#chakra').value, instrument: instrument.value, hz: freq.value, volume: volume.value,
       seconds: duration.value, drone: droneToggle.checked, sa: sa.value, mix: mix.value};
     localStorage.setItem(key, JSON.stringify([...rows.filter(row => row.name !== name), settings]));
     refresh(name); notice.textContent = 'Saved on this device.';
@@ -147,6 +173,11 @@ $('#load').onclick = () => {
   try {
     const row = sessions().find(row => row.name === saved.value);
     if (!row) { refresh(); return; }
+    openPractice(row.practice === 'chakra' ? 'chakra' : 'studio', false);
+    if (row.chakra && chakraNames.includes(row.chakra)) {
+      $('#chakra').value = row.chakra;
+      showFocus(false);
+    }
     instrument.value = row.instrument; instrument.onchange();
     freq.value = row.hz; updateFrequency();
     volume.value = row.volume; volume.oninput(); duration.value = row.seconds;
@@ -177,3 +208,49 @@ if (visited.searchParams.get('updated') === document.querySelector('.release spa
   visited.searchParams.delete('updated');
   history.replaceState(null, '', visited);
 }
+
+const chakraNames = ['Root', 'Sacral', 'Solar plexus', 'Heart', 'Throat', 'Third eye', 'Crown'];
+const cues = [
+  'Notice the contact between your feet and the floor.',
+  'Follow one easy breath as you listen.',
+  'Bring to mind one intention for today.',
+  'Bring someone you care about to mind.',
+  'Listen to the space after each sound.',
+  'Let your attention rest on one point.',
+  'Spend a few moments in quiet reflection.'
+];
+const steps = [0, 2, 4, 5, 7, 9, 11];
+let activePractice = 'studio';
+for (const name of chakraNames) $('#chakra').add(new Option(name,name));
+function showFocus(setPitch) {
+  const i = $('#chakra').selectedIndex;
+  $('#reflection').textContent = cues[i];
+  if (setPitch) {
+    instrument.value = 'sine'; instrument.onchange();
+    freq.value = (261.625565 * 2 ** (steps[i] / 12)).toFixed(2);
+    updateFrequency();
+  }
+}
+function openPractice(name, applyPreset = true) {
+  if ($('#play').disabled) {
+    $('#status').textContent = 'Stop playback to change practice.';
+    history.replaceState(null, '', '#' + activePractice);
+    return;
+  }
+  activePractice = name;
+  const chakra = name === 'chakra';
+  $('#practice').hidden = !chakra;
+  $('#mode-label').textContent = chakra ? 'Chakra meditation' : 'Sound Studio';
+  document.body.classList.toggle('chakra', chakra);
+  for (const link of document.querySelectorAll('nav a')) {
+    if (link.hash === '#' + name) link.setAttribute('aria-current','page');
+    else link.removeAttribute('aria-current');
+  }
+  history.replaceState(null, '', '#' + name);
+  if (chakra) showFocus(applyPreset);
+}
+$('#chakra').onchange = () => showFocus(true);
+for (const link of document.querySelectorAll('nav a')) {
+  link.onclick = event => { event.preventDefault(); openPractice(link.hash.slice(1)); };
+}
+openPractice(location.hash === '#chakra' ? 'chakra' : 'studio');

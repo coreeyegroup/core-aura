@@ -5,3 +5,17 @@
 input[type=checkbox]{width:auto}#clock{font-variant-numeric:tabular-nums}
 
 .release{display:flex;align-items:center;gap:12px}.release span{font-size:14px}.release a,.update-card a{display:inline-block;padding:10px 16px;border:1px solid #9aaea2;border-radius:8px;color:#163e34;text-decoration:none;background:#fffdfa}.update-card{max-width:520px;display:block}.update-card h1{font:normal 38px Georgia,serif}
+
+nav{width:min(100% - 36px,990px);margin:18px auto 0;display:flex;gap:4px;padding:4px;border-radius:14px;background:#e8e9df}
+nav a{flex:1;text-align:center;padding:12px 4px;color:#274a40;text-decoration:none;border-radius:11px;font-weight:600}
+nav a[aria-current]{background:#fffdfa;box-shadow:0 1px 4px #173a2e26}
+main{padding-top:20px;align-items:start}
+.display{background:radial-gradient(ellipse at 92% 0%,#345e51,#143b33 75%);min-height:390px}
+.eyebrow{font:600 12px system-ui;text-transform:uppercase;letter-spacing:.12em}
+.display label{color:#d8e5d1;font-size:14px}.display input{accent-color:#ccdfa3}
+.display canvas{background:repeating-linear-gradient(90deg,transparent 0 39px,#edffdf12 39px 40px);border-block:1px solid #e5f8d82c}
+.practice{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:24px;background:#eee6da;border-radius:20px;padding:24px}
+.practice[hidden]{display:none}.practice p{line-height:1.5}.practice h2{margin-bottom:6px}.practice label{margin-top:0}
+.chakra .display{background:radial-gradient(ellipse at 92% 0%,#786456,#473b46 75%)}
+#note,#clock{font-variant-numeric:tabular-nums}
+@media(max-width:660px){header{padding:14px 0}nav{position:sticky;top:0;z-index:2;margin-top:8px}.practice{grid-template-columns:1fr;gap:8px}.display{min-height:0;padding:20px}.display h1{font-size:32px}.reading{font-size:46px}.display label{margin-top:10px}main{gap:12px;padding-top:12px}.release{gap:6px}.release a{padding:10px}.library,form{padding:20px}}

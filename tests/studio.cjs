@@ -5,6 +5,18 @@ const assert = require('node:assert/strict');
   try {
     const page = await browser.newPage({viewport:{width:390,height:844}});
     await page.goto('http://localhost:8089');
+    await page.getByRole('link', {name:'Chakra Healing',exact:true}).click();
+    await page.locator('#chakra').selectOption('Heart');
+    assert.equal(await page.locator('#freq').inputValue(), '349.23');
+    await page.locator('#dial').evaluate(input => { input.value = '440'; input.dispatchEvent(new Event('input')); });
+    assert.match(await page.locator('#note').textContent(), /A4 · 0 cents/);
+    await page.locator('#name').fill('Heart practice');
+    await page.locator('#save').click();
+    await page.getByRole('link', {name:'Sound Studio',exact:true}).click();
+    await page.locator('#load').click();
+    assert.ok(await page.locator('#practice').isVisible());
+    assert.equal(await page.locator('#chakra').inputValue(), 'Heart');
+    await page.getByRole('link', {name:'Sound Studio',exact:true}).click();
     await page.getByRole('button',{name:'Play tone'}).click();
     await page.waitForFunction(() => document.querySelector('#status').textContent === 'Playing sine tone');
     await page.getByRole('button',{name:'Stop',exact:true}).click();
