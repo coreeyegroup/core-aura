@@ -1,6 +1,6 @@
 # Core-aura Sound Studio
 
-Version 0.6.0 is a local sound generator with pure tone and four synthesized instrument presets for desktop and mobile browsers. Select 20–12,000 Hz, adjust volume, choose a timer, and press Play. The web app can cache its player for offline use after the first successful online visit. See [the development blueprint](docs/core-aura-blueprint.md) for the instrument, raga, and native app roadmap.
+Version 0.6.1 is a local sound generator with pure tone and four synthesized instrument presets for desktop and mobile browsers. Select 20–12,000 Hz, adjust volume, choose a timer, and press Play. The web app can cache its player for offline use after the first successful online visit. See [the development blueprint](docs/core-aura-blueprint.md) for the instrument, raga, and native app roadmap.
 
 ## Ubuntu installation
 
@@ -16,7 +16,7 @@ if ! sudo grep -Fxq 'import /etc/caddy/sites/core-aura.caddy' /etc/caddy/Caddyfi
   printf '\nimport /etc/caddy/sites/core-aura.caddy\n' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
 fi
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
-bash ops/verify.sh 0.6.0
+bash ops/verify.sh 0.6.1
 ```
 
 DNS must route core-aura.coreeye.in to this server. After reload, allow time for certificate issuance and run the verifier again if needed. If you already defined the hostname in Caddy, update that site block from the supplied configuration. Keep one site definition for the hostname.
@@ -40,3 +40,9 @@ The Chakra Healing tab uses the modern Solfeggio mapping of Root 396, Sacral 417
 Each row supports sine or triangle wave, selection, play/resume, pause and stop. Play selected adds or resumes selected channels. Play all adds or resumes all seven. Stop all resets the mixer. Pausing suspends the channel audio clock, including its timer. Stop a channel before changing its sound type or duration. The combined oscillator gain is bounded for seven simultaneous channels. Returning to Sound Studio ends the chakra mix.
 
 Run node tests/chakra.mjs for isolated audio lifecycle checks. Device listening and mobile layout verification remain part of the release check.
+
+## Phone interface v0.6.1
+
+The default layout is one phone column. Sound Studio and Chakra Healing live in a fixed bottom navigation bar, above the device safe area. The active screen places its transport controls directly above that bar. Chakra rows contain selection, frequency, sound type, independent transport and playback status. The page reserves scroll space for both fixed bars. Large screens retain a centered app column.
+
+Browser checks cover overflow and dock placement at 320, 360, 390 and 430 pixel widths. Browser execution is pending where Chromium cannot launch.

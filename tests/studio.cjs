@@ -7,6 +7,17 @@ const assert = require('node:assert/strict');
     await page.goto('http://localhost:8089');
     await page.getByRole('link', {name:'Chakra Healing',exact:true}).click();
     assert.equal(await page.locator('.chakra-card').count(),7);
+    for (const width of [320, 360, 390, 430]) {
+      await page.setViewportSize({width, height:740});
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await page.locator('.chakra-card').last().scrollIntoViewIfNeeded();
+      const nav = await page.locator('.bottom-nav').boundingBox();
+      const dock = await page.locator('.group-controls').boundingBox();
+      assert.ok(nav.y + nav.height <= 741 && dock.y + dock.height <= nav.y + 1);
+      const crownStop = await page.locator('.chakra-card').last().locator('[data-stop]').boundingBox();
+      assert.ok(crownStop.width >= 44 && crownStop.height >= 44);
+    }
+    await page.setViewportSize({width:390,height:844});
     const root = page.locator('.chakra-card').first();
     await root.locator('[data-play]').click();
     await page.waitForFunction(() => document.querySelector('[data-state]').textContent === 'playing');

@@ -7,8 +7,8 @@ for (const [index,[name,hz,color]] of chakras.entries()) {
   card.className = 'chakra-card';
   card.style.setProperty('--chakra-color',color);
   card.innerHTML = `<div class="chakra-title"><label><input type="checkbox" data-select> ${name}</label><strong>${hz} <small>Hz</small></strong></div>
-    <label>Frequency type<select data-type aria-label="${name} frequency type"><option value="sine">Sine · pure tone</option><option value="triangle">Triangle · soft harmonics</option></select></label>
-    <div class="transport"><button data-play>Play</button><button data-pause disabled>Pause</button><button data-stop disabled>Stop</button><output data-state>Ready</output></div>`;
+    <label class="wave-type">Sound type<select data-type aria-label="${name} frequency type"><option value="sine">Sine · pure tone</option><option value="triangle">Triangle · soft harmonics</option></select></label>
+    <div class="transport" aria-label="${name} playback"><button data-play>Play</button><button data-pause disabled>Pause</button><button data-stop disabled>Stop</button><output data-state>Ready</output></div>`;
   cards.append(card);
   card.querySelector('[data-play]').onclick = () => run(() => start(index));
   card.querySelector('[data-pause]').onclick = () => run(() => player.pause(index));
