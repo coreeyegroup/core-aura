@@ -3,3 +3,5 @@
 .library{grid-column:1/-1;background:#fffdfa;border:1px solid #d5d9ce;border-radius:20px;padding:clamp(22px,4vw,42px)}
 .library input,.library select{max-width:34em;display:block}.library input{padding:10px;border-radius:8px;border:1px solid #bbc6ba}.library button{margin:8px 6px 0 0}
 input[type=checkbox]{width:auto}#clock{font-variant-numeric:tabular-nums}
+
+.release{display:flex;align-items:center;gap:12px}.release span{font-size:14px}.release a,.update-card a{display:inline-block;padding:10px 16px;border:1px solid #9aaea2;border-radius:8px;color:#163e34;text-decoration:none;background:#fffdfa}.update-card{max-width:520px;display:block}.update-card h1{font:normal 38px Georgia,serif}

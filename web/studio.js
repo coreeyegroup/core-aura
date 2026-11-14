@@ -101,7 +101,7 @@ $('#stop').onclick = () => {
   $('#stop').disabled = true;
 };
 updateFrequency();
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js', {updateViaCache: 'none'}).catch(() => {});
 
 const key = 'core-aura.sessions.v1';
 const saved = $('#saved'), notice = $('#notice');
@@ -151,3 +151,17 @@ $('#remove').onclick = () => {
   } catch { notice.textContent = 'Unable to delete this session.'; }
 };
 refresh();
+
+$('#update').onclick = event => {
+  if ($('#play').disabled) {
+    event.preventDefault();
+    $('#status').textContent = 'Stop the session before updating.';
+  }
+};
+
+const visited = new URL(location.href);
+if (visited.searchParams.get('updated') === document.querySelector('.release span').textContent.slice(1)) {
+  $('#status').textContent = 'App is up to date · ' + document.querySelector('.release span').textContent;
+  visited.searchParams.delete('updated');
+  history.replaceState(null, '', visited);
+}

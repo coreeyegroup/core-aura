@@ -1,10 +1,15 @@
-const cacheKey = 'core-aura-v0.3.0';
-const assets = ['/', '/studio.css', '/studio.js', '/engine.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
+const version = '0.3.1';
+const cacheKey = 'core-aura-v' + version;
+const assets = ['/', '/studio.css', '/studio.js', '/engine.js', '/update.html', '/updater.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(cacheKey).then(cache => cache.addAll(assets)));
+  event.waitUntil(caches.open(cacheKey).then(cache => cache.addAll(assets.map(path => new Request(path, {cache: "reload"})))));
+});
+self.addEventListener('message', event => {
+  if (event.data === 'VERSION') event.ports[0]?.postMessage(version);
+  if (event.data === 'APPLY_UPDATE') event.waitUntil(self.skipWaiting());
 });
 self.addEventListener('activate', event => {
-  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('core-aura-') && key !== cacheKey).map(key => caches.delete(key)))));
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('core-aura-') && key !== cacheKey).map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
