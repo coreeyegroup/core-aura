@@ -25,4 +25,12 @@ jobs:
           node tests/chakra.mjs
           node tests/yaman.mjs
           node tests/viewport.cjs
+          node tests/mobile.cjs
           node tests/studio.cjs
+
+      - name: Keep phone screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-verification
+          path: mobile-verification/
