@@ -1,0 +1,34 @@
+const {chromium} = require('playwright');
+const assert = require('node:assert/strict');
+(async () => {
+  const browser = await chromium.launch({executablePath: process.env.CHROMIUM_PATH || undefined, args:['--no-sandbox']});
+  try {
+    const page = await browser.newPage({viewport:{width:390,height:844}});
+    await page.goto('http://localhost:8089');
+    await page.getByRole('button',{name:'Play tone'}).click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent === 'Playing sine tone');
+    await page.getByRole('button',{name:'Stop',exact:true}).click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent === 'Session ended');
+    const hz = await page.evaluate(async () => {
+      const {createTone} = await import('/engine.js');
+      const ctx = new OfflineAudioContext(1,48000,48000);
+      createTone(ctx,432,0.5,1);
+      const wave = (await ctx.startRendering()).getChannelData(0);
+      let crossings = [];
+      for (let i=4801;i<43200;i++) if (wave[i-1]<=0 && wave[i]>0) crossings.push(i);
+      return (crossings.length-1)*48000/(crossings.at(-1)-crossings[0]);
+    });
+    assert.ok(Math.abs(hz-432)<0.1);
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    await page.context().setOffline(true);
+    await page.reload();
+    await page.getByRole('button',{name:'440 Hz'}).click();
+    assert.equal(await page.locator('#freq').inputValue(),'440');
+    await page.getByRole('button',{name:'Play tone'}).click();
+    await page.waitForFunction(() => document.querySelector('#status').textContent === 'Playing sine tone');
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    console.log('Play, stop, offline replay and mobile layout passed. Measured Hz:',hz);
+  } finally { await browser.close(); }
+})().catch(error => {console.error(error); process.exitCode=1;});

@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#163e34"><title>Sound Studio · Core-aura</title><link rel="manifest" href="/app.webmanifest"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png"><link rel="stylesheet" href="/studio.css"></head>
+<body><header><strong>◉ &nbsp; Core-aura</strong><span>Sound Studio</span></header><main>
+<section class="display" aria-labelledby="tone"><p>Sound Studio</p><h1 id="tone">Pure tone</h1><div class="reading"><output id="readout">432</output> <small>Hz</small></div><canvas aria-label="Sine wave illustration"></canvas><p id="status" role="status">Ready to play</p></section>
+<form><h2>Session controls</h2><label for="freq">Frequency (Hz)</label><input id="freq" type="number" min="20" max="12000" step="any" required value="432"><div class="presets"><button type="button" data-hz="220">220 Hz</button><button type="button" data-hz="432">432 Hz</button><button type="button" data-hz="440">440 Hz</button></div>
+<label for="volume">Volume <output id="level">15%</output></label><input id="volume" type="range" min="0" max="100" value="15">
+<label for="duration">Session length</label><select id="duration"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="600">10 minutes</option></select>
+<button class="play" type="submit" id="play">Play tone</button><button id="stop" type="button" disabled>Stop</button></form></main><footer>Core-aura · v0.1.0</footer><script type="module" src="/studio.js"></script></body></html>

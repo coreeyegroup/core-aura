@@ -1,0 +1,25 @@
+name: Sound Studio checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-save --package-lock=false playwright@1.56.1
+      - run: npx playwright install --with-deps chromium
+      - name: Test deployment and browser playback
+        run: |
+          export CORE_AURA_ROOT="$RUNNER_TEMP/core-aura"
+          bash ops/deploy.sh HEAD
+          bash ops/deploy.sh HEAD
+          python3 -m http.server 8089 --directory "$CORE_AURA_ROOT/current" &
+          server=$!
+          trap 'kill "$server"' EXIT
+          curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh "$(python3 -c 'import json; print(json.load(open("web/health.json"))["version"])')"
+          node tests/studio.cjs

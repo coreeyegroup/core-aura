@@ -1,0 +1,6 @@
+core-aura.coreeye.in {
+    root * /var/www/core-aura/current
+    encode zstd gzip
+    header Cache-Control "no-cache"
+    file_server
+}
