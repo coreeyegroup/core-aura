@@ -43,9 +43,14 @@ const fs = require('node:fs');
       await context.close();
     }
     // Desktop-style wide viewport with a phone-sized screen must recover to device width.
-    const context=await browser.newContext({viewport:{width:980,height:1800},screen:{width:393,height:852},
+    const context=await browser.newContext({viewport:{width:393,height:852},screen:{width:393,height:852},
       isMobile:true,hasTouch:true,deviceScaleFactor:1});
     const page=await context.newPage();
+    await page.route('http://localhost:8089/',async route => {
+      const response=await route.fetch();
+      const body=(await response.text()).replace('width=device-width,initial-scale=1,viewport-fit=cover','width=980,initial-scale=0.4,viewport-fit=cover');
+      await route.fulfill({response,body});
+    });
     await page.goto('http://localhost:8089');
     const recovered=await page.evaluate(()=>({width:innerWidth,scale:visualViewport.scale}));
     assert.equal(recovered.width,393);
