@@ -1,6 +1,6 @@
-const version = '0.3.1';
+const version = '0.4.0';
 const cacheKey = 'core-aura-v' + version;
-const assets = ['/', '/studio.css', '/studio.js', '/engine.js', '/update.html', '/updater.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
+const assets = ['/', '/studio.css', '/studio.js', '/engine.js', '/yaman.js', '/update.html', '/updater.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(cacheKey).then(cache => cache.addAll(assets.map(path => new Request(path, {cache: "reload"})))));
 });

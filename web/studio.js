@@ -5,8 +5,16 @@ const instrument = $('#instrument');
 for (const [id, spec] of Object.entries(instruments)) {
   instrument.add(new Option(spec.label, id));
 }
+instrument.value = 'sine';
 instrument.onchange = () => {
   const spec = instruments[instrument.value];
+  const raga = instrument.value === 'yaman';
+  $('#raga-info').hidden = !raga;
+  if (raga) {
+    freq.value = sa.validity.valid && sa.valueAsNumber >= 100 && sa.valueAsNumber <= 600 ? sa.value : 216;
+    droneToggle.checked = true;
+  }
+  droneToggle.onchange();
   freq.min = spec.min;
   freq.max = spec.max;
   if (!freq.validity.valid) freq.value = 432;
@@ -18,7 +26,7 @@ let context, tone, drone, clockTimer;
 const droneToggle = $('#drone'), sa = $('#sa'), mix = $('#mix');
 droneToggle.onchange = () => {
   $('#drone-controls').hidden = !droneToggle.checked;
-  sa.disabled = !droneToggle.checked;
+  sa.disabled = !droneToggle.checked || instrument.value === 'yaman';
 };
 sa.oninput = () => { if (drone && sa.validity.valid) drone.tune(sa.valueAsNumber); };
 mix.oninput = () => {
@@ -29,6 +37,10 @@ function updateFrequency() {
   if (!freq.validity.valid) return;
   const hz = freq.valueAsNumber;
   $('#readout').textContent = String(hz);
+  if (instrument.value === 'yaman') {
+    sa.value = freq.value;
+    if (drone) drone.tune(hz);
+  }
   if (tone) tone.tune(hz);
   const canvas = $('canvas'), pen = canvas.getContext('2d');
   canvas.width = 800; canvas.height = 120;

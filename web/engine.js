@@ -1,3 +1,4 @@
+import {playYaman} from './yaman.js';
 export function createTone(context, hz, volume, seconds) {
   const start = context.currentTime;
   const end = start + seconds;
@@ -19,6 +20,7 @@ export function createTone(context, hz, volume, seconds) {
 // Each row contains a frequency ratio, relative level and decay time in seconds.
 // These are original synthesis presets for the listening pilot.
 export const instruments = {
+  yaman: {label: 'Raga Yaman · phrase study', tuning: 'Melody tonic · Sa', min: 100, max: 600},
   sine: {label: 'Pure tone', tuning: 'Frequency', min: 20, max: 12000},
   flute: {label: 'Bansuri-style flute', tuning: 'Fundamental', min: 180, max: 1200, period: 3, attack: 0.12,
     modes: [[1, 0.76, Infinity], [2, 0.15, Infinity], [3, 0.065, Infinity]]},
@@ -50,6 +52,7 @@ export function renderInstrument(id, sampleRate) {
 }
 
 export function playVoice(context, id, hz, volume, seconds) {
+  if (id === 'yaman') return playYaman(context, hz, volume, seconds);
   let source, gain, envelope, pitch, reference;
   if (id === 'sine') {
     const tone = createTone(context, hz, volume, seconds);
