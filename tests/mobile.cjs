@@ -56,6 +56,28 @@ const fs = require('node:fs');
     assert.equal(recovered.width,393);
     assert.ok(recovered.scale>=0.99);
     results.push({recovered});
+
+    await context.close();
+    // Reproduce a browser that ignores meta viewport and reports desktop screen dimensions.
+    const ignoredContext=await browser.newContext({viewport:{width:980,height:2100},
+      screen:{width:980,height:2100},isMobile:false,hasTouch:true,deviceScaleFactor:1});
+    const ignoredPage=await ignoredContext.newPage();
+    await ignoredPage.goto('http://localhost:8089');
+    const fallback=await ignoredPage.evaluate(()=>({
+      width:innerWidth, zoom:Number(getComputedStyle(document.documentElement).zoom),
+      buttonHeight:document.querySelector('#play').getBoundingClientRect().height,
+      overflow:document.documentElement.scrollWidth
+    }));
+    assert.ok(Math.abs(fallback.zoom-980/360)<0.01);
+    assert.ok(fallback.buttonHeight*360/980>=47.9);
+    assert.ok(fallback.overflow<=980);
+    await ignoredPage.screenshot({path:'mobile-verification/ignored-viewport.png'});
+    await ignoredPage.locator('#phone-display').click();
+    assert.equal(await ignoredPage.locator('#phone-display').getAttribute('aria-pressed'),'true');
+    await ignoredPage.reload();
+    assert.equal(await ignoredPage.locator('#phone-display').getAttribute('aria-pressed'),'true');
+    results.push({fallback});
+    await ignoredContext.close();
     fs.writeFileSync('mobile-verification/measurements.json',JSON.stringify(results,null,2));
     console.log(JSON.stringify(results));
   } finally {await browser.close();}

@@ -52,3 +52,9 @@ Browser checks cover overflow and dock placement at 320, 360, 390 and 430 pixel 
 Studio, Chakras and Library are individual bottom-navigation destinations. Studio and chakra channels use a single Play/Pause/Resume control alongside Stop. The chakra mix has a Selected/All selector and the same transport behavior. Library retains existing saved studio sessions. The paused audio clock preserves session time.
 
 The touch layout uses the available width, including devices with a desktop-sized layout viewport. A head script requests the phone's screen width when a coarse pointer, phone-sized screen and oversized viewport are detected. User zoom remains enabled. Validate scaling on the actual device because desktop-site settings and embedded browsers vary.
+
+## Display recovery v0.7.2
+
+Touch browsers that report a desktop viewport receive document-level display compensation when the viewport request is ignored. A header A+ button enables a saved 360-pixel phone layout independently of touch detection, and toggles back to automatic sizing. Zooming by the user remains enabled. Display information records both CSS sizing and the display factor.
+
+The browser suite includes a 980 × 2100 touch context with desktop-sized screen values and ignored viewport semantics. It verifies that the visible button height corresponds to at least 48 pixels after display scaling, checks overflow, and verifies the persisted A+ preference.

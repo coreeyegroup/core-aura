@@ -1,4 +1,4 @@
-const version = '0.7.1';
+const version = '0.7.2';
 const cacheKey = 'core-aura-v' + version;
 const assets = ['/', '/viewport.js', '/studio.css', '/studio.js', '/chakra.js', '/chakra-audio.js', '/engine.js', '/yaman.js', '/update.html', '/updater.js', '/app.webmanifest', '/icon-192.png', '/icon-512.png'];
 self.addEventListener('install', event => {
