@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   studio:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -25,4 +25,12 @@ jobs:
           node tests/chakra.mjs
           node tests/yaman.mjs
           node tests/viewport.cjs
+          node tests/mobile.cjs
           node tests/studio.cjs
+
+      - name: Keep phone screenshots and measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-verification
+          path: mobile-verification/

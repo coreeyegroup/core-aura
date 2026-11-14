@@ -173,3 +173,6 @@ label{font-size:16px}
 @media(min-width:700px) and (pointer:fine){
   header,main,footer,.bottom-nav,.studio-transport,.group-controls{max-width:600px}
 }
+
+#display-measurements{display:block;white-space:pre-line;font-size:14px;line-height:1.7;color:var(--ink);padding:8px 0}
+#display-info summary{min-height:48px;font-size:14px;display:flex;align-items:center}

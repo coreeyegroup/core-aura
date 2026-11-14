@@ -2,13 +2,15 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const script = fs.readFileSync('web/viewport.js','utf8');
-function run(width, phone) {
+function run({touch=1,width=393,height=873,outer=393}={}) {
  const meta = {content:'width=device-width,initial-scale=1,viewport-fit=cover'};
- vm.runInNewContext(script, {document:{querySelector:()=>meta},matchMedia:()=>({matches:phone}),
- screen:{width:393,height:873}, innerWidth:width,addEventListener(){},setTimeout});
+ vm.runInNewContext(script,{document:{querySelector:()=>meta},navigator:{maxTouchPoints:touch},
+ screen:{width,height},window:{outerWidth:outer},addEventListener(){},setTimeout});
  return meta.content;
 }
-assert.equal(run(980,true),'width=393,initial-scale=1,viewport-fit=cover');
-assert.equal(run(393,true),'width=device-width,initial-scale=1,viewport-fit=cover');
-assert.equal(run(980,false),'width=device-width,initial-scale=1,viewport-fit=cover');
-console.log('Touch phone viewport recovery and normal zoom declaration checks passed.');
+assert.match(run(), /width=393/);
+assert.match(run({outer:980}), /width=393/);
+assert.match(run({width:873,height:393,outer:873}), /width=873/);
+assert.match(run({touch:0}), /width=device-width/);
+assert.match(run({width:1366,height:768,outer:1366}), /width=device-width/);
+console.log('Phone viewport, landscape, desktop pointer and tablet checks passed.');
