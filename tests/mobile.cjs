@@ -15,11 +15,13 @@ const fs = require('node:fs');
       const metrics=await page.evaluate(() => ({
         width:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth,
         bodyFont:parseFloat(getComputedStyle(document.body).fontSize),
-        labelFont:parseFloat(getComputedStyle(document.querySelector('label')).fontSize),
+        labelFont:parseFloat(getComputedStyle(document.querySelector('#tuning')).fontSize),
         button:document.querySelector('#play').getBoundingClientRect().toJSON(),
         scale:visualViewport.scale,
         nav:document.querySelector('.bottom-nav').getBoundingClientRect().toJSON()
       }));
+      console.log('Phone measurements',JSON.stringify({width,...metrics}));
+      await page.screenshot({path:'mobile-verification/studio-'+width+'.png'});
       assert.equal(metrics.width,width);
       assert.ok(metrics.overflow<=width);
       assert.ok(metrics.bodyFont>=16 && metrics.labelFont>=14);
