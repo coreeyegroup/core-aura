@@ -1,16 +1,15 @@
-const vm = require('node:vm');
-const fs = require('node:fs');
-const assert = require('node:assert/strict');
-const script = fs.readFileSync('web/viewport.js','utf8');
-function run({touch=1,width=393,height=873,outer=393}={}) {
- const meta = {content:'width=device-width,initial-scale=1,viewport-fit=cover'};
- vm.runInNewContext(script,{document:{querySelector:()=>meta},navigator:{maxTouchPoints:touch},
- screen:{width,height},window:{outerWidth:outer},addEventListener(){},setTimeout});
- return meta.content;
+const vm=require('node:vm'), fs=require('node:fs'), assert=require('node:assert/strict');
+const script=fs.readFileSync('web/viewport.js','utf8');
+function run({touch=1,width=393,height=873,outer=393,inner=393,innerHeight=873,mode='auto'}={}) {
+ const meta={content:''}, root={style:{},classList:{add(){},remove(){}}};
+ vm.runInNewContext(script,{document:{querySelector:()=>meta,documentElement:root},
+ localStorage:{getItem:()=>mode},navigator:{maxTouchPoints:touch,userAgent:''},
+ screen:{width,height},window:{outerWidth:outer,innerWidth:inner,innerHeight},addEventListener(){},setTimeout});
+ return {meta:meta.content,zoom:root.style.zoom};
 }
-assert.match(run(), /width=393/);
-assert.match(run({outer:980}), /width=393/);
-assert.match(run({width:873,height:393,outer:873}), /width=873/);
-assert.match(run({touch:0}), /width=device-width/);
-assert.match(run({width:1366,height:768,outer:1366}), /width=device-width/);
-console.log('Phone viewport, landscape, desktop pointer and tablet checks passed.');
+assert.equal(run().zoom,'1');
+assert.equal(run({inner:980}).zoom,String(980/393));
+assert.equal(run({width:980,height:2100,outer:980,inner:980,innerHeight:2100}).zoom,String(980/360));
+assert.equal(run({touch:0,width:1366,height:768,outer:1366,inner:1366}).zoom,'');
+assert.equal(run({touch:0,inner:980,mode:'phone'}).zoom,String(980/360));
+console.log('Ignored viewport, desktop-sized touch screen, normal phone and saved display override passed.');

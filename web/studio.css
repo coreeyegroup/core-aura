@@ -176,3 +176,14 @@ label{font-size:16px}
 
 #display-measurements{display:block;white-space:pre-line;font-size:14px;line-height:1.7;color:var(--ink);padding:8px 0}
 #display-info summary{min-height:48px;font-size:14px;display:flex;align-items:center}
+
+.phone-display header,.phone-display main,.phone-display footer,
+.phone-display .bottom-nav,.phone-display .studio-transport,.phone-display .group-controls{max-width:100%}
+#phone-display{min-width:48px;padding:8px;font-size:18px;flex-shrink:0}
+#phone-display[aria-pressed=true]{background:#194e3b;color:white}
+.release{gap:4px}.release span{display:none}
+@media(max-width:360px){
+ header strong{font-size:18px}
+ .release a{font-size:14px;padding-inline:4px}
+ header{gap:4px}
+}
