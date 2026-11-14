@@ -12,7 +12,7 @@ trap 'rm -rf -- "$stage"' EXIT
 if [[ ! -d "$root/releases/$commit" ]]; then
   mkdir "$stage/site"
   git_repo archive "$commit:web" | tar -x -C "$stage/site"
-  for asset in index.html health.json studio.js engine.js sw.js studio.css app.webmanifest icon-192.png icon-512.png; do
+  for asset in index.html health.json viewport.js chakra.js chakra-audio.js yaman.js update.html updater.js studio.js engine.js sw.js studio.css app.webmanifest icon-192.png icon-512.png; do
     test -s "$stage/site/$asset"
   done
   chmod -R a+rX "$stage/site"

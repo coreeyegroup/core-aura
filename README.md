@@ -1,6 +1,6 @@
 # Core-aura Sound Studio
 
-Version 0.6.1 is a local sound generator with pure tone and four synthesized instrument presets for desktop and mobile browsers. Select 20–12,000 Hz, adjust volume, choose a timer, and press Play. The web app can cache its player for offline use after the first successful online visit. See [the development blueprint](docs/core-aura-blueprint.md) for the instrument, raga, and native app roadmap.
+Version 0.7.0 is a local sound generator with pure tone and four synthesized instrument presets for desktop and mobile browsers. Select 20–12,000 Hz, adjust volume, choose a timer, and press Play. The web app can cache its player for offline use after the first successful online visit. See [the development blueprint](docs/core-aura-blueprint.md) for the instrument, raga, and native app roadmap.
 
 ## Ubuntu installation
 
@@ -16,7 +16,7 @@ if ! sudo grep -Fxq 'import /etc/caddy/sites/core-aura.caddy' /etc/caddy/Caddyfi
   printf '\nimport /etc/caddy/sites/core-aura.caddy\n' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
 fi
 sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
-bash ops/verify.sh 0.6.1
+bash ops/verify.sh 0.7.0
 ```
 
 DNS must route core-aura.coreeye.in to this server. After reload, allow time for certificate issuance and run the verifier again if needed. If you already defined the hostname in Caddy, update that site block from the supplied configuration. Keep one site definition for the hostname.
@@ -41,8 +41,14 @@ Each row supports sine or triangle wave, selection, play/resume, pause and stop.
 
 Run node tests/chakra.mjs for isolated audio lifecycle checks. Device listening and mobile layout verification remain part of the release check.
 
-## Phone interface v0.6.1
+## Phone interface v0.7.0
 
 The default layout is one phone column. Sound Studio and Chakra Healing live in a fixed bottom navigation bar, above the device safe area. The active screen places its transport controls directly above that bar. Chakra rows contain selection, frequency, sound type, independent transport and playback status. The page reserves scroll space for both fixed bars. Large screens retain a centered app column.
 
 Browser checks cover overflow and dock placement at 320, 360, 390 and 430 pixel widths. Browser execution is pending where Chromium cannot launch.
+
+## App screens v0.7.0
+
+Studio, Chakras and Library are individual bottom-navigation destinations. Studio and chakra channels use a single Play/Pause/Resume control alongside Stop. The chakra mix has a Selected/All selector and the same transport behavior. Library retains existing saved studio sessions. The paused audio clock preserves session time.
+
+The touch layout uses the available width, including devices with a desktop-sized layout viewport. A head script requests the phone's screen width when a coarse pointer, phone-sized screen and oversized viewport are detected. User zoom remains enabled. Validate scaling on the actual device because desktop-site settings and embedded browsers vary.

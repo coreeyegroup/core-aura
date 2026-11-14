@@ -127,3 +127,49 @@ summary{cursor:pointer;padding:6px 0}
   .bottom-nav,.studio-transport,.group-controls{max-width:560px}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+
+/* Screen structure and targets use phone dimensions as the default. */
+header,main,footer,.bottom-nav,.studio-transport,.group-controls{max-width:100%}
+header{padding-inline:16px}
+main{padding-inline:16px}
+body{font-size:16px}
+header strong{font-size:22px}
+button,.release a{min-height:48px;font-size:16px}
+.release a{display:flex;align-items:center}
+label{font-size:16px}
+.release span{font-size:12px}
+.display{padding:24px;border-radius:24px}
+.display h1{font-size:24px}
+.display .eyebrow{font-size:12px}
+.reading{font-size:64px}
+.display #note,.display #status{font-size:14px}
+.display label{font-size:14px}
+.display canvas{height:42px}
+.bottom-nav a{font-size:13px;min-height:72px}
+.session-options{font-size:16px;margin-top:16px}
+.session-options summary{min-height:48px;display:flex;align-items:center;font-weight:600}
+.library h1{grid-column:1/-1;font-size:28px;margin:0}
+.library-intro{grid-column:1/-1}
+.library-screen footer{padding-bottom:100px}
+.library-screen .bottom-nav{box-shadow:0 -3px 20px #163e340c}
+.transport{grid-template-columns:2fr 1fr}
+.transport button{font-size:15px;min-height:48px}
+.transport button[data-play]{background:#edf2e9}
+.wave-type{grid-template-columns:90px 1fr;font-size:14px}
+.wave-type select{height:48px;font-size:16px}
+.chakra-title label{font-size:18px}
+.chakra-title label:has(input){min-height:48px}
+.chakra-title strong{font-size:24px}
+.chakra-title input{flex-shrink:0}
+.chakra-card{padding:14px 16px}
+.group-controls{grid-template-columns:2fr 1fr;gap:8px}
+.mix-choice{grid-column:1/-1;display:flex;align-items:center;gap:12px}
+.mix-choice label{margin:0;font-size:14px}
+.mix-choice select{height:44px;font-size:15px}
+.group-controls button{min-height:48px}
+.group-controls button[data-action=toggle]{background:#194e3b;color:#fff}
+#chakra-message{line-height:1.5;font-size:14px}
+:root{--nav-height:72px}
+@media(min-width:700px) and (pointer:fine){
+  header,main,footer,.bottom-nav,.studio-transport,.group-controls{max-width:600px}
+}

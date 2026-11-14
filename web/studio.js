@@ -81,6 +81,18 @@ volume.oninput = () => {
 $('form').onsubmit = async event => {
   event.preventDefault();
   if ($('#play').disabled) return;
+  if (tone) {
+    $('#play').disabled = true;
+    try {
+      if (context.state === 'running') {
+        await context.suspend(); $('#play').textContent = 'Resume'; $('#status').textContent = 'Paused';
+      } else {
+        await context.resume(); $('#play').textContent = 'Pause'; $('#status').textContent = 'Playing ' + instruments[instrument.value].label;
+      }
+    } finally { $('#play').disabled = false; }
+    return;
+  }
+  if (!$('form').reportValidity()) return;
   $('#play').disabled = true; $('#chakra').disabled = true;
   try {
     context ??= new AudioContext();
@@ -105,6 +117,7 @@ $('form').onsubmit = async event => {
     droneToggle.disabled = true;
     $('#load').disabled = true;
     instrument.disabled = true; duration.disabled = true; $('#stop').disabled = false;
+    $('#play').disabled = false; $('#play').textContent = 'Pause';
     $('#status').textContent = instrument.value === 'sine' ? 'Playing sine tone' : 'Playing ' + instruments[instrument.value].label;
     tone.source.onended = () => {
       for (const voice of [tone, drone].filter(Boolean)) {
@@ -117,7 +130,7 @@ $('form').onsubmit = async event => {
       $('#clock').textContent = '';
       droneToggle.disabled = false;
       refresh();
-      instrument.disabled = false; duration.disabled = false; $('#play').disabled = false; $('#chakra').disabled = false; $('#stop').disabled = true;
+      instrument.disabled = false; duration.disabled = false; $('#play').disabled = false; $('#play').textContent = 'Play'; $('#chakra').disabled = false; $('#stop').disabled = true;
       $('#status').textContent = 'Session ended';
     };
   } catch {
@@ -126,11 +139,12 @@ $('form').onsubmit = async event => {
     }
     tone = null; drone = null;
     $('#status').textContent = 'Audio could not start. Check browser audio support and try again.';
-    $('#play').disabled = false; $('#chakra').disabled = false;
+    $('#play').disabled = false; $('#play').textContent = 'Play'; $('#chakra').disabled = false;
   }
 };
-$('#stop').onclick = () => {
+$('#stop').onclick = async () => {
   if (!tone) return;
+  await context.resume();
   const now = context.currentTime;
   for (const voice of [tone, drone].filter(Boolean)) {
     voice.envelope.gain.cancelScheduledValues(now);
@@ -174,7 +188,7 @@ $('#load').onclick = () => {
   try {
     const row = sessions().find(row => row.name === saved.value);
     if (!row) { refresh(); return; }
-    openPractice(row.practice === 'chakra' ? 'chakra' : 'studio', false);
+    openPractice('studio', false);
     if (row.chakra && chakraNames.includes(row.chakra)) {
       $('#chakra').value = row.chakra;
       showFocus(false);
@@ -197,7 +211,7 @@ $('#remove').onclick = () => {
 refresh();
 
 $('#update').onclick = event => {
-  if ($('#play').disabled || chakraPlayer.voices.size) {
+  if (tone || $('#play').disabled || chakraPlayer.voices.size) {
     event.preventDefault();
     $('#status').textContent = 'Stop the session before updating.';
   }
@@ -233,7 +247,7 @@ function showFocus(setPitch) {
   }
 }
 function openPractice(name, applyPreset = true) {
-  if ($('#play').disabled) {
+  if ((tone || $('#play').disabled) && name !== 'studio') {
     $('#status').textContent = 'Stop playback to change practice.';
     history.replaceState(null, '', '#' + activePractice);
     return;
@@ -241,7 +255,9 @@ function openPractice(name, applyPreset = true) {
   activePractice = name;
   const chakra = name === 'chakra';
   $('#chakra-panel').hidden = !chakra;
-  for (const selector of ['.display', 'form', '.library']) $(selector).hidden = chakra;
+  for (const selector of ['.display', 'form']) $(selector).hidden = name !== 'studio';
+  $('.library').hidden = name !== 'library';
+  document.body.classList.toggle('library-screen', name === 'library');
   if (!chakra) stopChakras().catch(() => {});
 
   $('#mode-label').textContent = chakra ? 'Chakra meditation' : 'Sound Studio';
@@ -257,4 +273,4 @@ $('#chakra').onchange = () => showFocus(true);
 for (const link of document.querySelectorAll('nav a')) {
   link.onclick = event => { event.preventDefault(); openPractice(link.hash.slice(1)); };
 }
-openPractice(location.hash === '#chakra' ? 'chakra' : 'studio');
+openPractice(['#chakra','#library'].includes(location.hash) ? location.hash.slice(1) : 'studio');

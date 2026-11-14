@@ -22,4 +22,7 @@ jobs:
           trap 'kill "$server"' EXIT
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
           CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh "$(python3 -c 'import json; print(json.load(open("web/health.json"))["version"])')"
+          node tests/chakra.mjs
+          node tests/yaman.mjs
+          node tests/viewport.cjs
           node tests/studio.cjs
