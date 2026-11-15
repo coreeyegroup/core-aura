@@ -171,7 +171,10 @@ const fs = require("node:fs");
       1,
     );
     await q.getByRole("button", { name: "Settings", exact: true }).click();
-    await q.getByRole("slider", { name: "Text size", exact: true }).fill("140");
+    await q.getByRole("slider", { name: "Text size", exact: true }).focus();
+    await q
+      .getByRole("slider", { name: "Text size", exact: true })
+      .press("End");
     await q.getByLabel("Spacing", { exact: true }).selectOption("comfortable");
     await q.getByRole("button", { name: "Close settings" }).click();
     await q.reload();

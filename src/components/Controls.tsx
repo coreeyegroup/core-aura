@@ -5,17 +5,19 @@ export function Transport({
   channels,
   states,
   onError,
+  compact = false,
 }: {
   channels: Channel[];
   states: VoiceState[];
   onError: (s: string) => void;
+  compact?: boolean;
 }) {
   const active = channels.some((c) => states.some((s) => s.id === c.id));
   const playing = channels.some((c) =>
     states.some((s) => s.id === c.id && s.status === "playing"),
   );
   return (
-    <div className="transport">
+    <div className={"transport" + (compact ? " compact-transport" : "")}>
       <button
         className="primary"
         onClick={() =>
@@ -31,13 +33,16 @@ export function Transport({
         aria-label={playing ? "Pause" : active ? "Resume" : "Play"}
       >
         {playing ? <Pause size={20} /> : <Play size={20} />}{" "}
-        {playing ? "Pause" : active ? "Resume" : "Play"}
+        <span className={compact ? "sr-only" : undefined}>
+          {playing ? "Pause" : active ? "Resume" : "Play"}
+        </span>
       </button>
       <button
         disabled={!active}
         onClick={() => channels.forEach((c) => engine.stop(c.id))}
       >
-        <Square size={18} /> Stop
+        <Square size={18} />{" "}
+        <span className={compact ? "sr-only" : undefined}>Stop</span>
       </button>
     </div>
   );

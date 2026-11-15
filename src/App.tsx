@@ -685,27 +685,30 @@ export default function App() {
                         <small> Hz</small>
                       </div>
                     </div>
-                    <label className="chakra-type">
-                      <span>Sound</span>
-                      <select
-                        aria-label={c.name + " sound type"}
-                        value={value.sound}
-                        disabled={Boolean(state)}
-                        onChange={(e) =>
-                          patch({ ...value, sound: e.target.value as Sound })
-                        }
-                      >
-                        <option value="sine">Pure sine tone</option>
-                        <option value="triangle">Soft triangle</option>
-                        <option value="bowl">Singing bowl</option>
-                      </select>
-                    </label>
-                    <div className="chakra-transport">
-                      <Transport
-                        channels={[{ ...value, seconds }]}
-                        states={states}
-                        onError={setMessage}
-                      />
+                    <div className="chakra-controls">
+                      <label className="chakra-type">
+                        <span>Sound</span>
+                        <select
+                          aria-label={c.name + " sound type"}
+                          value={value.sound}
+                          disabled={Boolean(state)}
+                          onChange={(e) =>
+                            patch({ ...value, sound: e.target.value as Sound })
+                          }
+                        >
+                          <option value="sine">Pure sine tone</option>
+                          <option value="triangle">Soft triangle</option>
+                          <option value="bowl">Singing bowl</option>
+                        </select>
+                      </label>
+                      <div className="chakra-transport">
+                        <Transport
+                          compact
+                          channels={[{ ...value, seconds }]}
+                          states={states}
+                          onError={setMessage}
+                        />
+                      </div>
                     </div>
                     <details>
                       <summary>
@@ -1006,6 +1009,7 @@ export default function App() {
               <label>
                 Spacing
                 <select
+                  aria-label="Spacing"
                   value={appearance.density}
                   onChange={(e) =>
                     changeAppearance({
@@ -1080,6 +1084,7 @@ export default function App() {
               Export duration
               <select
                 disabled={exportProgress !== null}
+                aria-label="Export duration"
                 value={exportSeconds}
                 onChange={(e) => setExportSeconds(Number(e.target.value))}
               >
