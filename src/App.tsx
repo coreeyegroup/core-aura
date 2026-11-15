@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
+import { deliverFile, cleanupExports, fileSharing } from "./files/deliver";
 import {
   Channel,
   Session,
@@ -108,6 +109,9 @@ export default function App() {
     () => (Capacitor.isNativePlatform() ? undefined : observePushReminders()),
     [],
   );
+  useEffect(() => {
+    void cleanupExports();
+  }, []);
   function openManifest(id: string) {
     try {
       const playing = manifestPlayer.snapshot();
@@ -144,6 +148,8 @@ export default function App() {
           document.visibilityState === "visible" &&
           location.hash !== "#admin" &&
           !unsaved &&
+          !document.querySelector("dialog[open], [role=dialog]") &&
+          !fileSharing() &&
           !["playing", "paused"].includes(playing) &&
           engine.snapshot().length === 0
         ) {
@@ -201,12 +207,6 @@ export default function App() {
   }
   function renderAudio() {
     if (!exporting || exportWorker.current) return;
-    if (Capacitor.isNativePlatform()) {
-      setExportError(
-        "Use the website or installed web app to download WAV files. Native file sharing is not available yet.",
-      );
-      return;
-    }
     try {
       const row = parseSession(exporting);
       setExportError("");
@@ -227,21 +227,17 @@ export default function App() {
         }
         if (typeof data.progress === "number") setExportProgress(data.progress);
         if (data.buffer) {
-          const url = URL.createObjectURL(
-            new Blob([data.buffer], { type: "audio/wav" }),
-          );
-          const link = document.createElement("a");
-          link.href = url;
-          link.download =
-            "core-aura-" +
-            row.name.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60) +
-            ".wav";
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          const blob = new Blob([data.buffer], { type: "audio/wav" }),
+            name =
+              "core-aura-" +
+              row.name.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60) +
+              ".wav";
           worker.terminate();
           exportWorker.current = null;
           setExportProgress(null);
-          setExportError("WAV file prepared. Check your downloads.");
+          void deliverFile(blob, name)
+            .then(setExportError)
+            .catch((e) => setExportError(e.message));
         }
       };
       worker.postMessage({
@@ -479,14 +475,12 @@ export default function App() {
     }
   }
   function exportSession(row: Session) {
-    const url = URL.createObjectURL(
+    void deliverFile(
       new Blob([JSON.stringify(row, null, 2)], { type: "application/json" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "core-aura-session.json";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+      "core-aura-session.json",
+    )
+      .then(setMessage)
+      .catch((e) => setMessage(e.message));
   }
   async function importSession(file?: File) {
     if (!file) return;
@@ -1401,7 +1395,7 @@ export default function App() {
               </>
             ) : (
               <button className="primary" onClick={renderAudio}>
-                Download WAV
+                {Capacitor.isNativePlatform() ? "Share WAV" : "Download WAV"}
               </button>
             )}
             {exportError && <p role="status">{exportError}</p>}

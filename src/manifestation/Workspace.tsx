@@ -23,13 +23,9 @@ import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
 import { PreviewButton, RecordSentence, PersonalVoices } from "./VoiceControls";
 import { withoutRecordings } from "./recordings";
 import { pushStatus, disablePushReminders } from "./push";
+import { deliverFile } from "../files/deliver";
 function download(text: string, name: string, type: string) {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return deliverFile(new Blob([text], { type }), name);
 }
 function labelTime(seconds: number) {
   return (
@@ -774,18 +770,37 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
           </button>
           <div className="saved-actions">
             <button
-              disabled={Capacitor.isNativePlatform()}
-              title={
-                Capacitor.isNativePlatform()
-                  ? "Native file sharing is pending; exports are available in web/PWA builds."
-                  : undefined
-              }
+              aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
+              onClick={() => {
+                try {
+                  if (state.plan?.id === plan.id && state.status === "playing")
+                    manifestPlayer.pause();
+                  else if (
+                    state.plan?.id === plan.id &&
+                    state.status === "paused"
+                  )
+                    manifestPlayer.resume();
+                  else manifestPlayer.start(plan);
+                } catch (e) {
+                  setMessage((e as Error).message);
+                }
+              }}
+            >
+              {state.plan?.id === plan.id && state.status === "playing"
+                ? "Pause"
+                : state.plan?.id === plan.id && state.status === "paused"
+                  ? "Resume"
+                  : "Play"}
+            </button>
+            <button
               onClick={() =>
                 download(
                   JSON.stringify(withoutRecordings(plan), null, 2),
                   "core-aura-practice.json",
                   "application/json",
                 )
+                  .then(setMessage)
+                  .catch((e) => setMessage(e.message))
               }
             >
               Export practice
@@ -1027,18 +1042,14 @@ function Schedules() {
             </button>
             <div className="saved-actions">
               <button
-                disabled={Capacitor.isNativePlatform()}
-                title={
-                  Capacitor.isNativePlatform()
-                    ? "Use native phone reminders; calendar export is available in web/PWA builds."
-                    : undefined
-                }
                 onClick={() =>
                   download(
                     calendarFile(r, name),
                     "core-aura-reminder.ics",
                     "text/calendar",
                   )
+                    .then(setMessage)
+                    .catch((e) => setMessage(e.message))
                 }
               >
                 Export calendar reminder
