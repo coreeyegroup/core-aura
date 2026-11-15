@@ -20,6 +20,15 @@ const { execFileSync } = require("node:child_process");
         sent.push({ method: r.method(), body: r.postDataJSON() });
     });
     await p.addInitScript(() => {
+      // Headless mobile Chromium can return granted from requestPermission while
+      // its static permission getter remains denied. Mock both permission APIs
+      // alongside the mock subscription; actual device permission needs acceptance.
+      window.__pushPermission = "granted";
+      Object.defineProperty(Notification, "permission", {
+        get: () => window.__pushPermission,
+        configurable: true,
+      });
+      Notification.requestPermission = async () => window.__pushPermission;
       const publicKey =
         "BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU";
       let sub;
@@ -76,12 +85,27 @@ const { execFileSync } = require("node:child_process");
     await p
       .getByText(/Closed-app reminders enabled · 1 active schedules/)
       .first()
-      .waitFor().catch(async e=>{
-        console.log('Reminder UI diagnostics:',await p.evaluate(()=>({text:document.body.innerText,permission:Notification.permission,settings:localStorage.getItem('core-aura.push.v1')?JSON.parse(localStorage.getItem('core-aura.push.v1')).enabled:null,subscription:localStorage.getItem('test-subscribed')})));
-        await p.screenshot({path:'mobile-verification/push-error.png',fullPage:true});throw e;
+      .waitFor()
+      .catch(async (e) => {
+        console.log(
+          "Reminder UI diagnostics:",
+          await p.evaluate(() => ({
+            text: document.body.innerText,
+            permission: Notification.permission,
+            settings: localStorage.getItem("core-aura.push.v1")
+              ? JSON.parse(localStorage.getItem("core-aura.push.v1")).enabled
+              : null,
+            subscription: localStorage.getItem("test-subscribed"),
+          })),
+        );
+        await p.screenshot({
+          path: "mobile-verification/push-error.png",
+          fullPage: true,
+        });
+        throw e;
       });
     let put = sent.filter((r) => r.method === "PUT").at(-1);
-    assert.equal(put.body.timezone, "Asia/Kolkata");
+    assert.ok(["Asia/Kolkata", "Asia/Calcutta"].includes(put.body.timezone));
     assert.equal(put.body.schedules.length, 1);
     assert.equal(put.body.schedules[0].name, "Push test practice");
     assert.ok(!JSON.stringify(put.body).includes("I care for"));
