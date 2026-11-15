@@ -1,4 +1,4 @@
-# Core-aura manifestation practices (0.12.0)
+# Core-aura manifestation practices (0.13.0)
 
 ## Build a practice
 
@@ -27,7 +27,7 @@ By default the schedule follows reminder → open practice → tap Play. An opti
 
 | Platform | Reminder behavior |
 | --- | --- |
-| Web or installed PWA | In-app reminders while open; optional notifications after permission. No server push delivery while closed. |
+| Web or installed PWA | In-app reminders while open; opt-in server push while closed after backend update and permission. |
 | Calendar export | Download an ICS reminder and import it into your calendar. Calendar permissions, settings and import support control delivery. |
 | New native Android/iOS build | Local device notifications after permission, including when the app UI is closed, subject to OS restrictions. Tap opens the saved practice. Physical delivery still needs device testing. |
 
@@ -49,6 +49,24 @@ Listener navigation has four destinations: Manifest, Sounds, Chakras and Library
 
 Unit tests cover sequence/each repetition, pause/cancellation, finite reading, maximum duration, input validation, local weekday calculations and notification IDs. Browser tests use a deterministic speech adapter to verify ordering and controls; they do not certify the sound or availability of a physical device voice. Browser checks also cover local reminders without autoplay, offline reading, imports/exports and phone layout.
 
-Native compilation checks are separate from device acceptance. Test installed voices, lock-screen behavior, calls, volume routes, permission denial, reboot/timezone changes and notification taps on actual devices before relying on reminders. Server push scheduling, cloud synchronization, recorded personal-voice affirmations and unattended closed-app playback remain unimplemented. Editor/reviewer account separation from the previous roadmap remains pending.
+Native compilation checks are separate from device acceptance. Test installed voices, lock-screen behavior, calls, volume routes, permission denial, reboot/timezone changes and notification taps on actual devices before relying on reminders. Cloud synchronization and unattended closed-app playback remain unimplemented. Personal voice and server push are described below. Editor/reviewer account separation from the previous roadmap remains pending.
 
 Implementation references: [Web Speech API](https://wicg.github.io/speech-api/), [Capacitor 7 local notifications](https://capacitorjs.com/docs/v7/apis/local-notifications), and [community text-to-speech](https://github.com/capacitor-community/text-to-speech).
+
+## 0.13.0: sentence previews, personal voice and web push
+
+Every library affirmation and selected sentence has Play. A preview speaks that one sentence once using the current device voice/rate/volume; it does not change the draft. Its button becomes Stop. Starting any preview stops the current practice. A selected sentence uses its attached personal recording when that option is enabled.
+
+Record voice opens a microphone dialog. Start recording requests permission, Finish recording stops the microphone, and the audio preview is available before Use recording saves. Cancel, leaving the app, errors and the 60-second cap stop microphone tracks. No audio is uploaded. Device storage supports 100 clips / 50 MB, each at most 5 MB. Editing a sentence detaches its old recording; it remains in Library → Affirmations → My voice recordings until deleted. Delete recording removes its reference from saved practices and the current draft. A missing clip surfaces an error rather than silently substituting different words.
+
+Voice & volume → Use my recordings when available enables personal audio for attached sentences, with device text-to-speech for the remainder. Rate applies only to text-to-speech. Pause/resume restarts the current recording from the beginning. Personal audio shares the main mixer and can accompany the chosen background sound. Practice JSON exports intentionally omit recording references; download each voice clip separately for an audio backup. Restoring/reattaching downloaded audio files is pending. Browser audio formats vary; physical Android/iOS recording and routing still need acceptance testing.
+
+Web/PWA → Schedule → Enable reminders now registers an opt-in server push subscription. The backend must be updated and the reminder worker healthy. The server stores the device timezone, enabled schedule IDs, practice IDs/names and push subscription; it never receives sentence text or microphone audio. Use a neutral practice name if lock-screen privacy matters. A random device token in browser storage controls that device's registration; it is sent in a header and stored hashed on the server. There is no account or cross-device practice synchronization.
+
+The persistent worker checks every 10 seconds. Deliveries have a stable date/time ID, durable database state, retry leases, a 15-minute expiry and notification tags. Network/429/5xx failures retry within that window. Expired subscriptions deactivate. Changed/deleted schedules cancel queued deliveries; an already in-flight push may still arrive. Delivery is at least once (a process failure after sending can cause a retry), with notification tags reducing duplicates. Outages longer than 15 minutes do not replay a backlog. DST nonexistent local times are skipped; a repeated local time uses its first occurrence.
+
+Supported endpoint services: Google FCM, Mozilla Push, Apple Web Push and Windows notification hosts. Other push providers are rejected. Browser permission, connectivity, OS power restrictions and the browser's continued subscription control delivery. iPhone/iPad web push requires an installed Home Screen web app. Native builds continue to use local notifications; they do not register a web push subscription. Neither delivery path wakes closed-app speech: tap opens the practice, then press Play.
+
+Disable closed-app reminders removes this device's server registration and unsubscribes its browser subscription. If offline, deletion is marked pending and retried on reconnect/reopen; avoid clearing browser storage before that completes. Saved schedule changes synchronize automatically while enabled. Foreground notification display is suppressed when server push is enabled, while the in-app reminder banner remains. Calendar events already imported must still be removed in the calendar separately.
+
+Verification adds microphone capture with Chromium's fake audio device, per-sentence preview controls, personal clip playback, text-change detachment, JSON export, deletion and denied permission. Push browser tests use a mocked subscription with the real API. Backend tests exercise actual encryption/signing against a mocked HTTP transport; no external devices receive test pushes. Real end-to-end device notification delivery remains an installation acceptance check.

@@ -1,4 +1,5 @@
 import { newPlan, parsePlan, parseReminders, Plan, Reminder } from "./model";
+import { withoutRecordings } from "./recordings";
 const key = "core-aura.manifestation.v1";
 type Data = {
   schemaVersion: 1;
@@ -89,11 +90,26 @@ export const manifestationStore = {
       draft: state.data.draft.id === id ? newPlan() : state.data.draft,
     }),
   import: (value: unknown) => {
-    const p = parsePlan(value);
+    const p = withoutRecordings(parsePlan(value));
     p.id = crypto.randomUUID();
     if (state.data.plans.length >= 100)
       throw Error("The library supports up to 100 practices.");
     commit({ ...state.data, plans: [...state.data.plans, p], draft: p });
+  },
+  detachRecording: (id: string) => {
+    const clean = (p: Plan) => ({
+      ...p,
+      lines: p.lines.map((l) => {
+        if (l.recordingId !== id) return l;
+        const { recordingId, recordedText, ...text } = l;
+        return text;
+      }),
+    });
+    commit({
+      ...state.data,
+      draft: clean(state.data.draft),
+      plans: state.data.plans.map(clean),
+    });
   },
   reminders: (rows: Reminder[]) =>
     commit({

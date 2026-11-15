@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.12.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.13.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -17,7 +17,7 @@ The build output is dist/. The production player needs HTTPS, including for its 
 
 ## Manifestation
 
-Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Closed-app automatic speech and web push are not implemented. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Every affirmation has a Play preview; selected sentences can use personal microphone recordings. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
 
 ## Screens
 
@@ -31,7 +31,7 @@ The master mixer uses one audio context. Pitch changes preserve the percussion p
 
 Use the named release and exact deployment commands in its handoff. ops/deploy.sh builds an archived source revision and switches the live directory atomically. ops/verify.sh verifies the public version. Existing PWA installations update through /update.html or Settings.
 
-The PostgreSQL/FastAPI catalog is optional for the current on-device player. See [operations](docs/operations.md) before starting it.
+The PostgreSQL/FastAPI catalog is optional for the on-device player and required for closed-app web push reminders. See [operations](docs/operations.md) before starting it.
 
 ## Sound packs
 

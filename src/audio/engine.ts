@@ -102,6 +102,53 @@ export class AudioEngine {
     this.recording = { id, buffer, offset: 0, startedAt: 0, gain };
     this.startRecording();
   }
+  async playOverlay(
+    load: () => Promise<ArrayBuffer>,
+    volume: number,
+    signal: AbortSignal,
+  ) {
+    signal.throwIfAborted();
+    await this.connect();
+    signal.throwIfAborted();
+    const buffer = await this.context!.decodeAudioData(await load());
+    signal.throwIfAborted();
+    if (buffer.duration > 65)
+      throw Error("Personal recordings must be at most 60 seconds.");
+    const context = this.context!,
+      source = context.createBufferSource(),
+      gain = context.createGain();
+    source.buffer = buffer;
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(
+      Math.max(0, Math.min(1, volume)) * 0.65,
+      context.currentTime + 0.02,
+    );
+    source.connect(gain);
+    gain.connect(this.analyser!);
+    return new Promise<void>((resolve, reject) => {
+      let done = false;
+      const abort = () => {
+        if (done) return;
+        done = true;
+        gain.gain.cancelScheduledValues(context.currentTime);
+        gain.gain.setTargetAtTime(0, context.currentTime, 0.006);
+        source.stop(context.currentTime + 0.035);
+        reject(new DOMException("Playback cancelled", "AbortError"));
+      };
+      source.onended = () => {
+        signal.removeEventListener("abort", abort);
+        source.disconnect();
+        gain.disconnect();
+        if (!done) {
+          done = true;
+          resolve();
+        }
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      source.start();
+      if (signal.aborted) abort();
+    });
+  }
   public master = 0.5;
   subscribe = (fn: () => void) => {
     this.listeners.add(fn);

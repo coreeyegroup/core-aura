@@ -42,3 +42,31 @@ class PackEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class ReminderDevice(Base):
+    __tablename__ = "reminder_devices"
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    subscription: Mapped[dict] = mapped_column(JSON)
+    schedules: Mapped[list] = mapped_column(JSON)
+    timezone: Mapped[str] = mapped_column(String(100))
+    active: Mapped[int] = mapped_column(Integer, default=1)
+    updated: Mapped[float] = mapped_column(Float)
+    error: Mapped[str] = mapped_column(String(80), default="")
+
+
+class ReminderDelivery(Base):
+    __tablename__ = "reminder_deliveries"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    device: Mapped[str] = mapped_column(String(64), index=True)
+    schedule: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    next_attempt: Mapped[float] = mapped_column(Float)
+    expires: Mapped[float] = mapped_column(Float)
+
+
+class ReminderWorker(Base):
+    __tablename__ = "reminder_worker"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    heartbeat: Mapped[float] = mapped_column(Float)

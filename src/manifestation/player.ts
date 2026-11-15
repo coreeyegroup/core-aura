@@ -91,9 +91,11 @@ export class ManifestPlayer {
     if (!p || token !== this.token || this.state.status !== "playing") return;
     const current = position(p, this.state.step);
     try {
-      if (p.mode === "speech")
-        await this.voice.speak(p.lines[current.line].text, p);
-      else
+      if (p.mode === "speech") {
+        if (this.voice.speakLine)
+          await this.voice.speakLine(p.lines[current.line], p);
+        else await this.voice.speak(p.lines[current.line].text, p);
+      } else
         await new Promise<void>((resolve) => {
           this.wait = setTimeout(resolve, p.readSeconds * 1000);
         });

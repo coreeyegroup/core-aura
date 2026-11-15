@@ -37,6 +37,7 @@ import { Admin } from "./admin/Admin";
 import { Manifestation, ManifestLibrary } from "./manifestation/Workspace";
 import { manifestationStore } from "./manifestation/store";
 import { manifestPlayer } from "./manifestation/player";
+import { observePushReminders } from "./manifestation/push";
 import { Due, observeReminders } from "./manifestation/reminders";
 import { readAppearance, saveAppearance, Appearance } from "./appearance";
 
@@ -103,10 +104,20 @@ export default function App() {
     manifestPlayer.subscribe,
     manifestPlayer.snapshot,
   );
+  useEffect(
+    () => (Capacitor.isNativePlatform() ? undefined : observePushReminders()),
+    [],
+  );
   function openManifest(id: string) {
     try {
-      manifestPlayer.stop();
-      manifestationStore.open(id);
+      const playing = manifestPlayer.snapshot();
+      if (
+        playing.plan?.id !== id ||
+        !["playing", "paused"].includes(playing.status)
+      ) {
+        manifestPlayer.stop();
+        manifestationStore.open(id);
+      }
       setTab("manifest");
       history.replaceState(null, "", "#manifest");
       setDue(null);

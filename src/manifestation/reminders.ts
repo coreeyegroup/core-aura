@@ -5,13 +5,13 @@ import {
 } from "@capacitor/local-notifications";
 import { manifestationStore } from "./store";
 import { occurrence, Reminder } from "./model";
+import {enablePushReminders,remoteRemindersEnabled,syncPushReminders} from "./push";
 const base = 310000;
 export function notificationIds(r: Reminder) {
   return r.days.map((day) => base + r.slot * 7 + day);
 }
 export async function syncPhoneReminders(requestPermission = false) {
-  if (!Capacitor.isNativePlatform())
-    return "Web reminders work while the app is open. Export a calendar reminder for use outside the app.";
+  if (!Capacitor.isNativePlatform()){await syncPushReminders(true);return remoteRemindersEnabled()?"Schedules saved; check the closed-app reminder status below.":"Schedule saved. Enable closed-app reminders or export a calendar reminder.";}
   const permission = requestPermission
     ? await LocalNotifications.requestPermissions()
     : await LocalNotifications.checkPermissions();
@@ -103,6 +103,7 @@ export function observeReminders(
         });
         if (
           !Capacitor.isNativePlatform() &&
+          !remoteRemindersEnabled() &&
           "Notification" in window &&
           Notification.permission === "granted" &&
           "serviceWorker" in navigator
@@ -171,12 +172,7 @@ export function observeReminders(
 }
 export async function enableReminders() {
   if (Capacitor.isNativePlatform()) return syncPhoneReminders(true);
-  if (!("Notification" in window))
-    return "This browser cannot show notifications. In-app reminders still work while open.";
-  const permission = await Notification.requestPermission();
-  return permission === "granted"
-    ? "Notifications enabled while the web app is open. Closed-app delivery requires a calendar reminder or the native app."
-    : "Permission was not granted. In-app reminders still work while open.";
+  return enablePushReminders();
 }
 export function calendarFile(r: Reminder, name: string, now = new Date()) {
   if (!r.days.length) throw Error("Choose at least one reminder day.");

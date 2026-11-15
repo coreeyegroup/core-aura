@@ -24,7 +24,7 @@ from .content import (
 )
 
 app = FastAPI(
-    title="Core-aura catalog", version="0.12.0", docs_url=None, redoc_url=None
+    title="Core-aura catalog", version="0.13.0", docs_url=None, redoc_url=None
 )
 
 app.add_middleware(
@@ -135,7 +135,7 @@ def health():
             db.execute(text("SELECT 1"))
     except Exception:
         raise HTTPException(503, "Database unavailable")
-    return {"status": "ok", "version": "0.12.0"}
+    return {"status": "ok", "version": "0.13.0"}
 
 
 @app.get("/api/catalog")
@@ -385,3 +385,8 @@ def history(pack_id: str):
                 for r in rows
             ]
         }
+
+
+from .push import router as reminder_router
+
+app.include_router(reminder_router)

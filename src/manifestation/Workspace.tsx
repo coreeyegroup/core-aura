@@ -11,6 +11,7 @@ import {
   affirmations,
   categories,
   Category,
+  Line,
   nextOccurrence,
   Plan,
   position,
@@ -19,6 +20,9 @@ import {
 import { manifestPlayer } from "./player";
 import { speech, Voice } from "./speech";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
+import { PreviewButton, RecordSentence, PersonalVoices } from "./VoiceControls";
+import { withoutRecordings } from "./recordings";
+import { pushStatus, disablePushReminders } from "./push";
 function download(text: string, name: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement("a");
@@ -82,6 +86,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
     [custom, setCustom] = useState(""),
     [message, setMessage] = useState(""),
     [voices, setVoices] = useState<Voice[]>([]);
+  const [recordLine, setRecordLine] = useState<Line>();
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
     const element = dock.current;
@@ -186,11 +191,12 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
             )}
             {state.error && <p role="status">{state.error}</p>}
           </div>
-          <fieldset disabled={active} className="manifest-fields">
+          <fieldset className="manifest-fields">
             <legend>Sentences ({p.lines.length}/50)</legend>
             <label>
               Practice name
               <input
+                disabled={active}
                 value={p.name}
                 maxLength={80}
                 onChange={(e) => change({ name: e.target.value })}
@@ -202,20 +208,36 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                   <label>
                     Sentence {i + 1}
                     <textarea
+                      aria-label={"Sentence " + (i + 1)}
+                      disabled={active}
                       value={line.text}
                       maxLength={300}
                       onChange={(e) =>
                         change({
                           lines: p.lines.map((l, n) =>
-                            n === i ? { ...l, text: e.target.value } : l,
+                            n === i ? { id: l.id, text: e.target.value } : l,
                           ),
                         })
                       }
                     />
                   </label>
                   <div className="line-actions">
+                    <PreviewButton
+                      line={line}
+                      id={line.id}
+                      recorded={p.useRecordings}
+                    />
                     <button
-                      disabled={i === 0}
+                      disabled={active || !line.text.trim()}
+                      onClick={() => setRecordLine(line)}
+                    >
+                      {line.recordingId ? "Record again" : "Record voice"}
+                    </button>
+                    {line.recordingId && (
+                      <span className="content-note">Personal voice saved</span>
+                    )}
+                    <button
+                      disabled={active || i === 0}
                       aria-label={"Move sentence " + (i + 1) + " up"}
                       onClick={() => {
                         const lines = [...p.lines];
@@ -226,7 +248,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                       ↑
                     </button>
                     <button
-                      disabled={i === p.lines.length - 1}
+                      disabled={active || i === p.lines.length - 1}
                       aria-label={"Move sentence " + (i + 1) + " down"}
                       onClick={() => {
                         const lines = [...p.lines];
@@ -237,6 +259,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                       ↓
                     </button>
                     <button
+                      disabled={active}
                       aria-label={"Remove sentence " + (i + 1)}
                       onClick={() =>
                         change({ lines: p.lines.filter((_, n) => n !== i) })
@@ -251,6 +274,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
             <label>
               Your own sentence
               <textarea
+                disabled={active}
                 value={custom}
                 maxLength={300}
                 placeholder="Write the words you want to repeat"
@@ -259,7 +283,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
             </label>
             <div className="admin-actions">
               <button
-                disabled={!custom.trim() || p.lines.length >= 50}
+                disabled={active || !custom.trim() || p.lines.length >= 50}
                 onClick={() => {
                   change({
                     lines: [
@@ -362,6 +386,21 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
             {p.mode === "speech" && (
               <details>
                 <summary>Voice &amp; volume</summary>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={!!p.useRecordings}
+                    onChange={(e) =>
+                      change({ useRecordings: e.target.checked })
+                    }
+                  />
+                  Use my recordings when available
+                </label>
+                <p className="content-note">
+                  Other sentences use the selected device voice. Speech speed
+                  applies to the device voice; personal recordings keep their
+                  original speed.
+                </p>
                 <label>
                   Voice
                   <select
@@ -522,6 +561,23 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
       ) : (
         <Schedules />
       )}
+      {recordLine && (
+        <RecordSentence
+          line={recordLine}
+          onClose={() => setRecordLine(undefined)}
+          onSave={(clip) => {
+            change({
+              useRecordings: true,
+              lines: p.lines.map((l) =>
+                l.id === recordLine.id
+                  ? { ...l, recordingId: clip.id, recordedText: l.text }
+                  : l,
+              ),
+            });
+            setRecordLine(undefined);
+          }}
+        />
+      )}
       <section
         ref={dock}
         className="player-dock manifest-player-dock"
@@ -581,7 +637,15 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
         ...data.draft,
         lines: selected
           ? data.draft.lines.filter((l) => l.text !== text)
-          : [...data.draft.lines, { id, text }],
+          : [
+              ...data.draft.lines,
+              {
+                id: data.draft.lines.some((l) => l.id === id)
+                  ? crypto.randomUUID()
+                  : id,
+                text,
+              },
+            ],
       });
       setMessage("");
     } catch (e) {
@@ -652,17 +716,21 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
               a.text.toLowerCase().includes(query.toLowerCase()),
           )
           .map((a) => (
-            <label className="affirmation-choice" key={a.id}>
-              <input
-                type="checkbox"
-                disabled={active}
-                checked={data.draft.lines.some((l) => l.text === a.text)}
-                onChange={() => select(a.id, a.text)}
-              />
-              <span>{a.text}</span>
-            </label>
+            <div className="affirmation-row" key={a.id}>
+              <label className="affirmation-choice">
+                <input
+                  type="checkbox"
+                  disabled={active}
+                  checked={data.draft.lines.some((l) => l.text === a.text)}
+                  onChange={() => select(a.id, a.text)}
+                />
+                <span>{a.text}</span>
+              </label>
+              <PreviewButton line={a} id={a.id} />
+            </div>
           ))}
       </div>
+      <PersonalVoices />
       <div className="section-heading">
         <h2>Saved practices</h2>
         <button onClick={() => input.current?.click()}>Import practice</button>
@@ -714,7 +782,7 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
               }
               onClick={() =>
                 download(
-                  JSON.stringify(plan, null, 2),
+                  JSON.stringify(withoutRecordings(plan), null, 2),
                   "core-aura-practice.json",
                   "application/json",
                 )
@@ -759,6 +827,10 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
   );
 }
 function Schedules() {
+  const pushMessage = useSyncExternalStore(
+    pushStatus.subscribe,
+    pushStatus.snapshot,
+  );
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
   const [planId, setPlanId] = useState(data.plans[0]?.id || ""),
     [time, setTime] = useState("07:00"),
@@ -806,15 +878,34 @@ function Schedules() {
       aria-label="Manifestation schedules"
     >
       <h2>Schedule your practice</h2>
+      {!Capacitor.isNativePlatform() && (
+        <>
+          <p role="status" className="content-note">
+            {pushMessage}
+          </p>
+          <button
+            disabled={busy}
+            onClick={() => {
+              setBusy(true);
+              void disablePushReminders()
+                .then(setMessage)
+                .finally(() => setBusy(false));
+            }}
+          >
+            Disable closed-app reminders
+          </button>
+        </>
+      )}
       <p className="content-note">
         Times follow this device’s timezone:{" "}
         {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a reminder or
         opt into automatic start while the app is visible and idle.
       </p>
       <p className="content-note">
-        Web/PWA reminders require the app to stay open. Use calendar export for
-        a reminder outside the app. The native app supports device notifications
-        after permission; timing may be delayed by device settings.
+        Enable closed-app reminders to receive web/PWA notifications while away.
+        Internet and browser permission are required. On iPhone, use the
+        installed Home Screen app. Native builds use device notifications.
+        Delivery timing depends on device settings.
       </p>
       <button
         disabled={busy}
@@ -822,9 +913,11 @@ function Schedules() {
           setBusy(true);
           void enableReminders()
             .then(setMessage)
-            .catch(() =>
+            .catch((e) =>
               setMessage(
-                "Notifications could not be enabled. Check device permissions.",
+                e instanceof Error
+                  ? e.message
+                  : "Notifications could not be enabled. Check device permissions.",
               ),
             )
             .finally(() => setBusy(false));

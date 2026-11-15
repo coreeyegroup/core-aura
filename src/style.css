@@ -1343,3 +1343,66 @@ textarea:focus-visible {
   padding: 4px 0 6px;
   overflow-wrap: anywhere;
 }
+
+/* Sentence previews remain within thumb reach without enlarging the whole card. */
+.affirmation-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--line, #d9dfd7);
+  padding: 0.4rem 0;
+}
+.affirmation-row .affirmation-choice {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  margin: 0;
+}
+.preview-button {
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.line-actions {
+  flex-wrap: wrap;
+}
+.voice-dialog {
+  width: min(100% - 2rem, 30rem);
+  max-height: 85dvh;
+  overflow: auto;
+  border: 1px solid #bdcbc2;
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--surface, #fffdf8);
+  color: var(--ink, #173e33);
+}
+.voice-dialog::backdrop {
+  background: #09251cb3;
+}
+.voice-dialog p {
+  overflow-wrap: anywhere;
+}
+.voice-dialog audio {
+  width: 100%;
+  margin: 0.5rem 0;
+}
+.personal-voices {
+  margin-block: 1rem;
+}
+@media (max-width: 380px) {
+  .affirmation-row {
+    align-items: flex-start;
+  }
+  .preview-button {
+    padding-inline: 0.6rem;
+  }
+}
+
+.preview-error {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+  color: #852c26;
+}
+.affirmation-row {
+  flex-wrap: wrap;
+}

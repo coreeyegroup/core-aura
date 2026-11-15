@@ -144,3 +144,21 @@ describe("manifestation practices and reminders", () => {
     player.dispose();
   });
 });
+
+describe("personal recording references", () => {
+  it("rejects a recording attached to different words and preserves legacy plans", () => {
+    const p = newPlan();
+    p.lines = [
+      {
+        id: "line",
+        text: "My words",
+        recordingId: "clip",
+        recordedText: "Old words",
+      },
+    ];
+    expect(() => parsePlan(p)).toThrow();
+    p.lines[0].recordedText = "My words";
+    p.useRecordings = true;
+    expect(parsePlan(p).lines[0].recordingId).toBe("clip");
+  });
+});

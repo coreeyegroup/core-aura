@@ -37,6 +37,9 @@ self.addEventListener('message',event=>{
 self.addEventListener('activate',event=>event.waitUntil(
   caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('core-aura-')&&k!==key).map(k=>caches.delete(k)))).then(()=>self.clients.claim())
 ));
+self.addEventListener('push',event=>{
+  event.waitUntil((async()=>{let data={};try{data=event.data?.json()||{};}catch{}const planId=typeof data.planId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(data.planId)?data.planId:'';await self.registration.showNotification('Manifestation practice',{body:typeof data.body==='string'?data.body.slice(0,80):'Time for your practice.',tag:typeof data.tag==='string'?data.tag.slice(0,64):'core-aura-practice',icon:'/icon-192.png',data:{planId}});})());
+});
 self.addEventListener('notificationclick',event=>{
   event.notification.close();const planId=event.notification.data?.planId;
   if(typeof planId!=='string') return;

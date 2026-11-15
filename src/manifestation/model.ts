@@ -74,7 +74,12 @@ export const affirmations = Object.entries(content).flatMap(
       category: category as Category,
     })),
 );
-export type Line = { id: string; text: string };
+export type Line = {
+  id: string;
+  text: string;
+  recordingId?: string;
+  recordedText?: string;
+};
 export type Plan = {
   schemaVersion: 1;
   id: string;
@@ -86,6 +91,7 @@ export type Plan = {
   readSeconds: number;
   mode: "speech" | "read";
   voice: string;
+  useRecordings?: boolean;
   rate: number;
   volume: number;
   seconds: number;
@@ -181,6 +187,18 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
       ))
   )
     throw Error("The background sound settings are unsupported.");
+  if (p.useRecordings !== undefined && typeof p.useRecordings !== "boolean")
+    throw Error("Invalid personal voice setting.");
+  if (
+    p.lines.some(
+      (l) =>
+        l.recordingId !== undefined &&
+        (typeof l.recordingId !== "string" ||
+          !/^[a-zA-Z0-9-]{1,100}$/.test(l.recordingId) ||
+          l.recordedText !== l.text),
+    )
+  )
+    throw Error("A personal recording no longer matches its sentence.");
   return structuredClone(p);
 }
 export function parseReminders(value: unknown, plans: Plan[]): Reminder[] {

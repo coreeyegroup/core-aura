@@ -1,6 +1,8 @@
 import { Capacitor } from "@capacitor/core";
 import { TextToSpeech } from "@capacitor-community/text-to-speech";
-import { Plan } from "./model";
+import { Line, Plan } from "./model";
+import { recording } from "./recordings";
+import { engine } from "../audio/engine";
 export type Voice = {
   name: string;
   lang: string;
@@ -11,8 +13,11 @@ export interface SpeechDriver {
   voices(): Promise<Voice[]>;
   speak(text: string, plan: Plan): Promise<void>;
   stop(): void;
+  speakLine?(line: Line, plan: Plan): Promise<void>;
 }
 let stopping = Promise.resolve();
+let generation = 0;
+let overlay: AbortController | undefined;
 export const speech: SpeechDriver = {
   async voices() {
     if (Capacitor.isNativePlatform())
@@ -22,15 +27,40 @@ export const speech: SpeechDriver = {
     return speechSynthesis.getVoices();
   },
   stop() {
+    generation++;
+    overlay?.abort();
+    overlay = undefined;
     if (Capacitor.isNativePlatform())
       stopping = stopping.then(() => TextToSpeech.stop()).catch(() => {});
     else if (typeof window !== "undefined" && "speechSynthesis" in window)
       speechSynthesis.cancel();
   },
+  async speakLine(line, plan) {
+    if (plan.useRecordings && line.recordingId) {
+      overlay?.abort();
+      const controller = new AbortController();
+      overlay = controller;
+      try {
+        const clip = await recording(line.recordingId);
+        if (clip.text !== line.text)
+          throw Error("Record this sentence again: its words changed.");
+        await engine.playOverlay(
+          () => clip.blob.arrayBuffer(),
+          plan.volume,
+          controller.signal,
+        );
+      } finally {
+        if (overlay === controller) overlay = undefined;
+      }
+    } else await speech.speak(line.text, plan);
+  },
   async speak(text, plan) {
+    const token = generation;
     if (Capacitor.isNativePlatform()) {
       await stopping;
+      if (token !== generation) return;
       const voices = (await TextToSpeech.getSupportedVoices()).voices;
+      if (token !== generation) return;
       const index = voices.findIndex((v) => v.voiceURI === plan.voice);
       await TextToSpeech.speak({
         text,
