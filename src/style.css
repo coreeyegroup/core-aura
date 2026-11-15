@@ -1150,3 +1150,89 @@ progress {
 [data-text-size="large"] .pack-track > span {
   grid-column: 1/-1;
 }
+
+textarea {
+  font: inherit;
+  width: 100%;
+  min-height: 80px;
+  padding: 10px;
+  background: #fffefb;
+  color: var(--ink);
+  border: 1px solid #c6d2c7;
+  border-radius: 12px;
+  resize: vertical;
+}
+textarea:focus-visible {
+  outline: 3px solid #3c79ae;
+  outline-offset: 3px;
+}
+.admin-panel,
+.admin-form,
+.admin-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.admin-panel {
+  gap: 16px;
+}
+.admin-fields {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+}
+.admin-fields legend {
+  font-weight: 650;
+  padding-inline: 4px;
+}
+.admin-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.admin-pack-list {
+  display: grid;
+  gap: 6px;
+}
+.admin-pack-list button {
+  align-items: start;
+  flex-direction: column;
+  text-align: left;
+}
+.admin-pack-list small {
+  color: var(--muted);
+}
+.admin-asset,
+.audit-event {
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 6px;
+}
+.audit-event p {
+  font-size: calc(13px * var(--text-scale));
+}
+.admin-panel pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: calc(12px * var(--text-scale));
+}
+.admin-form input[type="file"] {
+  min-height: 60px;
+}
+
+.admin-notice {
+  position: sticky;
+  top: 8px;
+  z-index: 15;
+}
+.admin-preview {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+[data-text-size="large"] .admin-preview {
+  grid-template-columns: repeat(3, 1fr);
+}
+[data-text-size="large"] .admin-preview > span {
+  grid-column: 1/-1;
+}

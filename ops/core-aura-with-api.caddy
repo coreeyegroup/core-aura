@@ -3,6 +3,9 @@ core-aura.coreeye.in {
     header Cache-Control "no-cache"
     @packfiles path /packs/*
     header @packfiles Access-Control-Allow-Origin "*"
+    handle /packs/uploads/* {
+        reverse_proxy 127.0.0.1:8793
+    }
     handle /api/* {
         reverse_proxy 127.0.0.1:8793
     }

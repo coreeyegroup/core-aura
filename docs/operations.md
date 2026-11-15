@@ -25,7 +25,7 @@ The startup script creates .env with independent database and admin credentials 
 
 Admin requests use Authorization with a Bearer token from CORE_AURA_ADMIN_TOKEN. Create content with POST /api/admin/packs/{id}. Review with PATCH /api/admin/packs/{id}/review and include expected_revision. Publishing requires a reviewed state. Concurrent stale reviews return HTTP 409.
 
-Creator, license, attribution and provenance are required. Only published records appear at GET /api/catalog. The API manages metadata. Recording uploads and listener account synchronization remain pending.
+Creator, license, attribution and provenance are required. Only published records appear at GET /api/catalog. The API manages manifests and uploaded WAV files. Listener account synchronization remains pending.
 
 ## Backup and restore
 
@@ -59,10 +59,18 @@ The release build generates /catalog-packs.json and content-addressed /packs/cor
 
 After deploying, run sudo bash ops/update-site.sh. It adds public GET file access headers for native shells while preserving the existing static/API routing, validates Caddy, reloads it, and retains a backup. It restores the previous site file if validation or reload fails. The API permits catalog GET requests from the standard Capacitor localhost origins.
 
-For server-published packs, place canonical 16-bit mono/stereo 44.1/48 kHz WAV files under the current site's /packs/ path using an operator-managed content publication process. File hosting outside generated demonstration assets must survive release switches; durable uploaded-content storage and an upload UI remain pending. Do not publish a URL that will disappear on the next deployment. Until durable storage is configured, add licensed assets to the release's public/packs directory or build pipeline, preserving their content-addressed paths.
+For server-published packs, use Settings → Manage content to upload audio into the persistent content volume. Built-in demonstration assets remain in the static build. Do not manually copy uploaded audio into release directories; the /packs/uploads/ route serves managed files from the backend.
 
-A manifest contains existing title/tradition/creator/license/attribution/provenance/version/minimum_engine metadata and assets with id, title, url, sha256, bytes, seconds. Calculate SHA-256 from the exact served bytes. File IDs must be unique; URLs must be same-site /packs/ paths. New publication requires at least one asset. Old metadata-only catalog entries are ignored by the current browser.
+A manifest contains existing title/tradition/creator/license/attribution/provenance/version/minimum_engine metadata and assets with id, title, url, sha256, bytes, seconds. The upload service calculates SHA-256 from normalized served bytes. File IDs must be unique; URLs must be same-site /packs/ paths. New publication requires at least one asset. Old metadata-only catalog entries are ignored by the current browser.
 
 POST /api/admin/packs/{id} creates a draft. PUT to the same route replaces a manifest, requires expected_revision and a higher version, increments the revision and resets it to draft. Use the reviewed then published lifecycle again. Stale updates return 409. Existing offline downloads retain their installed manifest until the user installs a complete valid update. Withdrawal removes a server pack from future discovery; already downloaded local files are not remotely erased.
 
 The demonstrated downloads are original synthesized studies under CC0-1.0, not authentic performer recordings. Published traditional recordings still require rights and practitioner review.
+
+## Content administration deployment (0.11.0)
+
+Run the released frontend deployment, sudo bash ops/start-backend.sh, then sudo bash ops/update-site.sh --enable-api. The Caddy helper adds API and uploaded-audio proxy routes while retaining the site's other directives and automatic rollback checks. The existing PostgreSQL volume is retained. Alembic adds the asset registry and revision-event tables. A new content volume is initialized with the API user's ownership; do not use docker compose down -v during updates.
+
+The current administration workflow is documented in [content-admin.md](content-admin.md). It supersedes the earlier manual hosting procedure for new server-published packs. Built-in generated sound-pack files remain static. New review/publication requires assets uploaded through the managed service; legacy manually hosted records must be re-uploaded when edited and re-reviewed.
+
+The backend startup script retains an existing .env. The default uploaded-content quota is 2147483648 bytes. Set CORE_AURA_CONTENT_LIMIT_BYTES in .env before recreating the API if a different limit is required.
