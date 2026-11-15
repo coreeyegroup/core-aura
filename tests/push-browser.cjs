@@ -76,7 +76,10 @@ const { execFileSync } = require("node:child_process");
     await p
       .getByText(/Closed-app reminders enabled · 1 active schedules/)
       .first()
-      .waitFor();
+      .waitFor().catch(async e=>{
+        console.log('Reminder UI diagnostics:',await p.evaluate(()=>({text:document.body.innerText,permission:Notification.permission,settings:localStorage.getItem('core-aura.push.v1')?JSON.parse(localStorage.getItem('core-aura.push.v1')).enabled:null,subscription:localStorage.getItem('test-subscribed')})));
+        await p.screenshot({path:'mobile-verification/push-error.png',fullPage:true});throw e;
+      });
     let put = sent.filter((r) => r.method === "PUT").at(-1);
     assert.equal(put.body.timezone, "Asia/Kolkata");
     assert.equal(put.body.schedules.length, 1);
