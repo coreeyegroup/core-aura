@@ -52,3 +52,17 @@ Test normal and enlarged text, portrait/landscape, Bluetooth routes, speaker/hea
 Use Settings → Display to change text size or spacing without reinstalling or reloading. Reset display restores 100% text with compact spacing. Pinch zoom is retained. The page asks for device-width; if a browser is set to Desktop site, turn that browser setting off.
 
 Save a session, open Library, choose WAV audio, select a duration, then Download WAV. A worker renders a mono 44.1 kHz 16-bit file from the saved configuration. Cancel export terminates rendering. Exports are capped at 10 minutes and need device storage for downloads. Settings JSON exports remain available separately. Native shells currently require the website/PWA for WAV download.
+
+## Sound-pack deployment (0.10.0)
+
+The release build generates /catalog-packs.json and content-addressed /packs/core-resonance/1.0.0/*.wav. The current static player works without the API and falls back to its bundled catalog when /api/catalog is unavailable. Pack audio is excluded from the web player's precache; it is downloaded on request and stored transactionally in IndexedDB.
+
+After deploying, run sudo bash ops/update-site.sh. It adds public GET file access headers for native shells while preserving the existing static/API routing, validates Caddy, reloads it, and retains a backup. It restores the previous site file if validation or reload fails. The API permits catalog GET requests from the standard Capacitor localhost origins.
+
+For server-published packs, place canonical 16-bit mono/stereo 44.1/48 kHz WAV files under the current site's /packs/ path using an operator-managed content publication process. File hosting outside generated demonstration assets must survive release switches; durable uploaded-content storage and an upload UI remain pending. Do not publish a URL that will disappear on the next deployment. Until durable storage is configured, add licensed assets to the release's public/packs directory or build pipeline, preserving their content-addressed paths.
+
+A manifest contains existing title/tradition/creator/license/attribution/provenance/version/minimum_engine metadata and assets with id, title, url, sha256, bytes, seconds. Calculate SHA-256 from the exact served bytes. File IDs must be unique; URLs must be same-site /packs/ paths. New publication requires at least one asset. Old metadata-only catalog entries are ignored by the current browser.
+
+POST /api/admin/packs/{id} creates a draft. PUT to the same route replaces a manifest, requires expected_revision and a higher version, increments the revision and resets it to draft. Use the reviewed then published lifecycle again. Stale updates return 409. Existing offline downloads retain their installed manifest until the user installs a complete valid update. Withdrawal removes a server pack from future discovery; already downloaded local files are not remotely erased.
+
+The demonstrated downloads are original synthesized studies under CC0-1.0, not authentic performer recordings. Published traditional recordings still require rights and practitioner review.

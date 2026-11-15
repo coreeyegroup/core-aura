@@ -2,5 +2,7 @@ core-aura.coreeye.in {
     root * /var/www/core-aura/current
     encode zstd gzip
     header Cache-Control "no-cache"
+    @packfiles path /packs/*
+    header @packfiles Access-Control-Allow-Origin "*"
     file_server
 }

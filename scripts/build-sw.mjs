@@ -6,8 +6,9 @@ async function files(dir) {
   const out = [];
   for (const e of entries) {
     const p = path.join(dir, e.name);
-    if (e.isDirectory()) out.push(...(await files(p)));
-    else if (!["sw.js", "health.json"].includes(e.name))
+    if (e.isDirectory()) {
+      if (e.name !== "packs") out.push(...(await files(p)));
+    } else if (!["sw.js", "health.json"].includes(e.name))
       out.push("/" + path.relative("dist", p).split(path.sep).join("/"));
   }
   return out;
