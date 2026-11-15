@@ -1397,3 +1397,12 @@ textarea:focus-visible {
     padding-inline: 0.6rem;
   }
 }
+
+.preview-error {
+  flex-basis: 100%;
+  overflow-wrap: anywhere;
+  color: #852c26;
+}
+.affirmation-row {
+  flex-wrap: wrap;
+}

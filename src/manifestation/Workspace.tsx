@@ -208,6 +208,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                   <label>
                     Sentence {i + 1}
                     <textarea
+                      aria-label={"Sentence " + (i + 1)}
                       disabled={active}
                       value={line.text}
                       maxLength={300}

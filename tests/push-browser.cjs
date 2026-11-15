@@ -83,7 +83,7 @@ const { execFileSync } = require("node:child_process");
     assert.equal(put.body.schedules[0].name, "Push test practice");
     assert.ok(!JSON.stringify(put.body).includes("I care for"));
     // Disabled schedules are removed from the remote device registration.
-    await p.getByRole('button',{name:'Disable',exact:true}).click();
+    await p.getByRole("button", { name: "Disable", exact: true }).click();
     await p
       .getByText(/Closed-app reminders enabled · 0 active schedules/)
       .first()

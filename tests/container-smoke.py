@@ -20,7 +20,7 @@ def run(*args):
     return subprocess.run(args, check=True, capture_output=True, text=True)
 
 
-def start():
+def start(public_key=""):
     run(
         "docker",
         "run",
@@ -35,6 +35,8 @@ def start():
         "CORE_AURA_CONTENT_ROOT=/data/content",
         "-e",
         "CORE_AURA_ADMIN_TOKEN=container-test-key",
+        "-e",
+        "CORE_AURA_VAPID_PUBLIC_KEY=" + public_key,
         "-v",
         volume + ":/data/content",
         image,
@@ -80,7 +82,77 @@ try:
         content = response.read()
     assert hashlib.sha256(content).hexdigest() == asset["sha256"]
     print("Non-root upload and persistence across container recreation passed")
+    # Generate persistent keys without printing their private component.
+    run(
+        "docker",
+        "exec",
+        name,
+        "python",
+        "-c",
+        "from pathlib import Path; Path('/data/content/vapid.env').touch()",
+    )
+    run(
+        "docker",
+        "exec",
+        name,
+        "python",
+        "scripts/generate-vapid.py",
+        "/data/content/vapid.env",
+    )
+    read_key = "from pathlib import Path; import hashlib; print(hashlib.sha256(Path('/data/content/vapid.env').read_bytes()).hexdigest())"
+    before = run("docker", "exec", name, "python", "-c", read_key).stdout
+    run(
+        "docker",
+        "exec",
+        name,
+        "python",
+        "scripts/generate-vapid.py",
+        "/data/content/vapid.env",
+    )
+    assert run("docker", "exec", name, "python", "-c", read_key).stdout == before
+    public = run(
+        "docker",
+        "exec",
+        name,
+        "python",
+        "-c",
+        "from pathlib import Path; print(dict(l.split('=',1) for l in Path('/data/content/vapid.env').read_text().splitlines() if '=' in l)['CORE_AURA_VAPID_PUBLIC_KEY'])",
+    ).stdout.strip()
+    run("docker", "rm", "-f", name)
+    start(public)
+    with urllib.request.urlopen(base + "/api/manifest-reminders/config") as response:
+        assert not json.load(response)["ready"]
+    run(
+        "docker",
+        "run",
+        "-d",
+        "--name",
+        name + "-worker",
+        "-e",
+        "DATABASE_URL=sqlite:////data/content/smoke.db",
+        "-v",
+        volume + ":/data/content",
+        image,
+        "python",
+        "-c",
+        "import os; from pathlib import Path; os.environ.update(dict(l.split('=',1) for l in Path('/data/content/vapid.env').read_text().splitlines() if '=' in l)); from app.reminder_worker import main; main()",
+    )
+    for attempt in range(30):
+        with urllib.request.urlopen(
+            base + "/api/manifest-reminders/config"
+        ) as response:
+            config = json.load(response)
+        if config["ready"]:
+            break
+        time.sleep(1)
+    else:
+        raise RuntimeError("Reminder worker failed to become ready")
+    assert config["publicKey"] == public
+    print(
+        "Persistent VAPID key generation and separate reminder worker readiness passed; no subscriptions were registered or sent."
+    )
 finally:
+    subprocess.run(["docker", "rm", "-f", name + "-worker"], check=False)
     subprocess.run(["docker", "logs", name], check=False)
     subprocess.run(["docker", "rm", "-f", name], check=False)
     subprocess.run(["docker", "volume", "rm", volume], check=False)

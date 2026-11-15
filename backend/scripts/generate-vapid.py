@@ -33,6 +33,8 @@ computed = encode(
 if public and public != computed:
     raise SystemExit("VAPID keys do not match; restore the matching pair")
 with path.open("a") as output:
+    if not path.read_text().endswith("\n"):
+        output.write("\n")
     if not private:
         output.write(
             "\nCORE_AURA_VAPID_PRIVATE_KEY="

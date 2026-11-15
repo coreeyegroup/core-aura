@@ -58,7 +58,11 @@ export function PreviewButton({
       >
         {playing ? "■ Stop" : "▶ Play"}
       </button>
-      {error && <span role="status">{error}</span>}
+      {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
+        <span className="preview-error" role="status">
+          {error || state.error}
+        </span>
+      )}
     </>
   );
 }

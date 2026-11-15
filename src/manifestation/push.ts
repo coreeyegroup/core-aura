@@ -194,7 +194,8 @@ export function syncPushReminders(force = false): Promise<void> {
     .catch((e) => {
       fingerprint = "";
       report(
-        (e as Error).message +
+        (s.cleanup ? "Disable pending: " : "") +
+          (e as Error).message +
           " Changes will retry when you reopen the app or reconnect.",
       );
     });
