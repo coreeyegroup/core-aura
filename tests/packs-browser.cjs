@@ -1,3 +1,4 @@
+const { navigate } = require("./navigation.cjs");
 const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 const assert = require("node:assert/strict");
@@ -25,7 +26,7 @@ const fs = require("node:fs");
     await p.route("**/api/catalog", (route) =>
       route.fulfill({ json: { packs: [manifest] } }),
     );
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#explore");
     await p.getByRole("button", { name: "Sound packs", exact: true }).click();
     await p
       .getByRole("heading", { name: "Published study", exact: true })
@@ -41,11 +42,9 @@ const fs = require("node:fs");
       })),
       [],
     );
-    const card = p
-      .locator(".pack-card")
-      .filter({
-        has: p.getByRole("heading", { name: "Published study", exact: true }),
-      });
+    const card = p.locator(".pack-card").filter({
+      has: p.getByRole("heading", { name: "Published study", exact: true }),
+    });
     await card
       .getByRole("button", { name: "Download pack", exact: true })
       .click();
@@ -110,15 +109,10 @@ const fs = require("node:fs");
         { exact: true },
       )
       .waitFor();
-    await p
-      .getByRole("button", { name: "Library", exact: true })
-      .last()
-      .click();
-    const installed = p
-      .locator(".pack-card")
-      .filter({
-        has: p.getByRole("heading", { name: "Published study", exact: true }),
-      });
+    await navigate(p, "Library");
+    const installed = p.locator(".pack-card").filter({
+      has: p.getByRole("heading", { name: "Published study", exact: true }),
+    });
     await installed.getByText("v1.0.0", { exact: true }).waitFor();
     await p.screenshot({ path: "mobile-verification/downloaded-393.png" });
     await installed
@@ -144,17 +138,14 @@ const fs = require("node:fs");
     await installed
       .getByRole("button", { name: "Pause Bell · 432 Hz", exact: true })
       .waitFor();
-    await p.getByRole("button", { name: "Studio", exact: true }).last().click();
+    await navigate(p, "Studio");
     await p.getByRole("button", { name: "Play", exact: true }).last().click();
     await p
       .getByRole("button", { name: "Pause", exact: true })
       .last()
       .waitFor();
     await p.getByRole("button", { name: "Stop", exact: true }).last().click();
-    await p
-      .getByRole("button", { name: "Library", exact: true })
-      .last()
-      .click();
+    await navigate(p, "Library");
     await installed
       .getByRole("button", { name: "Play Bell · 432 Hz", exact: true })
       .waitFor();

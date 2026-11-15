@@ -1,21 +1,23 @@
 {
   "name": "core-aura",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build && node scripts/build-packs.mjs && node scripts/build-sw.mjs",
     "test": "vitest run --pool=threads --maxWorkers=1 --minWorkers=1",
-    "test:browser": "node tests/application.cjs && node tests/packs-browser.cjs && node tests/admin-browser.cjs",
+    "test:browser": "node tests/application.cjs && node tests/packs-browser.cjs && node tests/admin-browser.cjs && node tests/manifestation-browser.cjs",
     "native:sync": "npm run build && cap sync",
     "native:android": "cap open android",
     "native:ios": "cap open ios"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "6.1.0",
     "@capacitor/android": "7.6.10",
     "@capacitor/core": "7.6.10",
     "@capacitor/ios": "7.6.10",
+    "@capacitor/local-notifications": "7.0.7",
     "lucide-react": "0.468.0",
     "react": "19.1.1",
     "react-dom": "19.1.1"

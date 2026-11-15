@@ -106,4 +106,12 @@ describe("recorded playback in the shared audio context", () => {
     );
     expect(engine.snapshot().length).toBe(1);
   });
+  it("does not start a tone stopped while its audio context is still connecting", async () => {
+    const engine = setup();
+    // Delay module loading rather than an output buffer; Stop must invalidate that pending voice.
+    const pending = engine.play({ ...channel(), id: "manifest-background" });
+    engine.stop("manifest-background");
+    await pending;
+    expect(engine.snapshot()).toEqual([]);
+  });
 });

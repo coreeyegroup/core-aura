@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AudioLines,
-  Compass,
   Flower2,
   Library,
   Settings,
@@ -13,6 +12,7 @@ import {
   Check,
   ArrowRight,
   WifiOff,
+  Sparkles,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -34,6 +34,10 @@ import { ChannelEditor, Transport } from "./components/Controls";
 import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
+import { Manifestation, ManifestLibrary } from "./manifestation/Workspace";
+import { manifestationStore } from "./manifestation/store";
+import { manifestPlayer } from "./manifestation/player";
+import { Due, observeReminders } from "./manifestation/reminders";
 import { readAppearance, saveAppearance, Appearance } from "./appearance";
 
 function time(seconds: number) {
@@ -58,18 +62,84 @@ function note(hz: number) {
   );
 }
 const tabs = [
-  ["explore", "Explore", Compass],
-  ["studio", "Studio", AudioLines],
+  ["manifest", "Manifest", Sparkles],
+  ["studio", "Sounds", AudioLines],
   ["chakras", "Chakras", Flower2],
   ["library", "Library", Library],
 ] as const;
 export default function App() {
   const [tab, setTab] = useState<Tab>(() => {
     const route = location.hash.slice(1);
-    return ["studio", "chakras", "library", "admin"].includes(route)
+    return [
+      "manifest",
+      "explore",
+      "studio",
+      "chakras",
+      "library",
+      "admin",
+    ].includes(route)
       ? (route as Tab)
-      : "explore";
+      : "manifest";
   });
+  const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(
+    "explore",
+  );
+  const [libraryView, setLibraryView] = useState("manifestation");
+  const [due, setDue] = useState<Due | null>(null);
+  const practice = useSyncExternalStore(
+    manifestPlayer.subscribe,
+    manifestPlayer.snapshot,
+  );
+  function openManifest(id: string) {
+    try {
+      manifestPlayer.stop();
+      manifestationStore.open(id);
+      setTab("manifest");
+      history.replaceState(null, "", "#manifest");
+      setDue(null);
+      window.scrollTo({ top: 0 });
+    } catch {
+      setMessage(
+        "The scheduled practice is unavailable. Check your saved practices.",
+      );
+    }
+  }
+  useEffect(
+    () =>
+      observeReminders((reminder) => {
+        const { draft, plans } = manifestationStore.snapshot().data;
+        const saved = plans.find((p) => p.id === draft.id);
+        const unsaved =
+          draft.lines.length > 0 &&
+          (!saved || JSON.stringify(saved) !== JSON.stringify(draft));
+        const playing = manifestPlayer.snapshot().status;
+        if (
+          reminder.autoStart &&
+          document.visibilityState === "visible" &&
+          location.hash !== "#admin" &&
+          !unsaved &&
+          !["playing", "paused"].includes(playing) &&
+          engine.snapshot().length === 0
+        ) {
+          try {
+            openManifest(reminder.planId);
+            manifestPlayer.start(manifestationStore.snapshot().data.draft);
+            return;
+          } catch {}
+        }
+        setDue(reminder);
+      }, openManifest),
+    [],
+  );
+  useEffect(() => {
+    const url = new URL(location.href);
+    const id = url.searchParams.get("manifestPlan");
+    if (id) {
+      openManifest(id);
+      url.searchParams.delete("manifestPlan");
+      history.replaceState(null, "", url.pathname + url.search + "#manifest");
+    }
+  }, []);
   const [layers, setLayers] = useState<Channel[]>(() => [channel()]);
   const [chakraChannels, setChakraChannels] = useState<Channel[]>(() =>
     chakras.map((c) => ({ ...channel("sine", c.hz), id: c.id, volume: 0.25 })),
@@ -261,9 +331,10 @@ export default function App() {
       title: "Core-aura",
       artist: "Personal listening session",
     });
-    navigator.mediaSession.setActionHandler("pause", () =>
-      engine.snapshot().forEach((s) => engine.pause(s.id)),
-    );
+    navigator.mediaSession.setActionHandler("pause", () => {
+      manifestPlayer.pause();
+      engine.snapshot().forEach((s) => engine.pause(s.id));
+    });
     navigator.mediaSession.setActionHandler("stop", () => engine.stopAll());
     return () => {
       navigator.mediaSession.setActionHandler("pause", null);
@@ -281,6 +352,7 @@ export default function App() {
       navigator.mediaDevices.removeEventListener("devicechange", changed);
   }, []);
   function navigate(value: Tab) {
+    if (value === "explore" || value === "studio") setLastSoundTab(value);
     setTab(value);
     history.replaceState(null, "", "#" + value);
     setMessage("");
@@ -427,10 +499,10 @@ export default function App() {
     <div className="app">
       <header className="app-header">
         <a
-          href="#explore"
+          href="#manifest"
           onClick={(e) => {
             e.preventDefault();
-            navigate("explore");
+            navigate("manifest");
           }}
           className="brand"
         >
@@ -448,6 +520,46 @@ export default function App() {
         </div>
       </header>
       <main id="main">
+        {due && (
+          <div className="notice" role="status">
+            <span>
+              {due.name} · {due.time}
+            </span>
+            <button onClick={() => openManifest(due.planId)}>
+              Open practice
+            </button>
+            <button
+              aria-label="Dismiss manifestation reminder"
+              onClick={() => setDue(null)}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        {tab === "manifest" && (
+          <Manifestation
+            onLibrary={() => {
+              setLibraryView("manifestation");
+              navigate("library");
+            }}
+          />
+        )}
+        {(tab === "explore" || tab === "studio") && (
+          <div className="segmented" aria-label="Sound workspace">
+            <button
+              aria-pressed={tab === "explore"}
+              onClick={() => navigate("explore")}
+            >
+              Explore
+            </button>
+            <button
+              aria-pressed={tab === "studio"}
+              onClick={() => navigate("studio")}
+            >
+              Studio
+            </button>
+          </div>
+        )}
         {tab === "admin" && <Admin />}
         {tab === "explore" && (
           <>
@@ -820,110 +932,134 @@ export default function App() {
                 <p className="eyebrow">Your personal collection</p>
                 <h1>Library</h1>
               </div>
-              <button onClick={() => importInput.current?.click()}>
-                <Upload size={18} /> Import
-              </button>
-            </div>
-            <input
-              ref={importInput}
-              type="file"
-              accept=".json,application/json"
-              className="sr-only"
-              onChange={(e) => importSession(e.target.files?.[0])}
-              aria-label="Import session file"
-            />
-            <section className="offline-card">
-              <Check size={22} />
-              <div>
-                <strong>
-                  {offlineReady
-                    ? "Player ready offline"
-                    : "Preparing offline player"}
-                </strong>
-                <p>All built-in sounds are generated on this device.</p>
-              </div>
-            </section>
-            <PacksPanel library master={master} onMaster={setMaster} />
-            <h2>Saved sessions</h2>
-            {!sessions.length && (
-              <div className="empty">
-                <Library size={36} />
-                <h3>Your practice, saved.</h3>
-                <p>Build a session in Studio or Chakras, then tap Save.</p>
-                <button onClick={() => navigate("studio")}>
-                  Open Studio <ArrowRight size={18} />
+              {libraryView === "audio" && (
+                <button onClick={() => importInput.current?.click()}>
+                  <Upload size={18} /> Import
                 </button>
-              </div>
-            )}
-            {sessions.map((row) => (
-              <article className="saved-card" key={row.id}>
-                <div>
-                  <h3>{row.name}</h3>
-                  <p>
-                    {row.channels.length} layers ·{" "}
-                    {time(row.channels[0].seconds)} · {row.kind}
-                  </p>
-                </div>
-                <button className="primary" onClick={() => load(row)}>
-                  Open
-                </button>
-                <div className="saved-actions">
-                  <button
-                    onClick={() => {
-                      const name = prompt("Session name", row.name);
-                      if (name?.trim() && name.length <= 80)
-                        storeRows(
-                          sessions.map((s) =>
-                            s.id === row.id ? { ...s, name: name.trim() } : s,
-                          ),
-                        );
-                    }}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    onClick={() => {
-                      setExporting(row);
-                      setExportSeconds(
-                        Math.min(
-                          60,
-                          Math.max(...row.channels.map((c) => c.seconds)),
-                        ),
-                      );
-                      setExportError("");
-                    }}
-                  >
-                    WAV audio
-                  </button>
-                  <button onClick={() => exportSession(row)}>
-                    <Download size={16} /> Settings JSON
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm("Delete " + row.name + "?"))
-                        storeRows(sessions.filter((s) => s.id !== row.id));
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))}
-            <h2>Favorites</h2>
-            <div className="favorite-list">
-              {starred.length ? (
-                starred.map((id) => (
-                  <button key={id} onClick={() => openSound(id)}>
-                    {sounds[id].name}
-                    <ArrowRight size={18} />
-                  </button>
-                ))
-              ) : (
-                <p className="content-note">
-                  Tap a heart in Explore to keep a sound here.
-                </p>
               )}
             </div>
+            <div className="segmented" aria-label="Library collection">
+              <button
+                aria-pressed={libraryView === "manifestation"}
+                onClick={() => setLibraryView("manifestation")}
+              >
+                Affirmations
+              </button>
+              <button
+                aria-pressed={libraryView === "audio"}
+                onClick={() => setLibraryView("audio")}
+              >
+                Audio library
+              </button>
+            </div>
+            {libraryView === "manifestation" ? (
+              <ManifestLibrary onPractice={() => navigate("manifest")} />
+            ) : (
+              <>
+                <input
+                  ref={importInput}
+                  type="file"
+                  accept=".json,application/json"
+                  className="sr-only"
+                  onChange={(e) => importSession(e.target.files?.[0])}
+                  aria-label="Import session file"
+                />
+                <section className="offline-card">
+                  <Check size={22} />
+                  <div>
+                    <strong>
+                      {offlineReady
+                        ? "Player ready offline"
+                        : "Preparing offline player"}
+                    </strong>
+                    <p>All built-in sounds are generated on this device.</p>
+                  </div>
+                </section>
+                <PacksPanel library master={master} onMaster={setMaster} />
+                <h2>Saved sessions</h2>
+                {!sessions.length && (
+                  <div className="empty">
+                    <Library size={36} />
+                    <h3>Your practice, saved.</h3>
+                    <p>Build a session in Studio or Chakras, then tap Save.</p>
+                    <button onClick={() => navigate("studio")}>
+                      Open Studio <ArrowRight size={18} />
+                    </button>
+                  </div>
+                )}
+                {sessions.map((row) => (
+                  <article className="saved-card" key={row.id}>
+                    <div>
+                      <h3>{row.name}</h3>
+                      <p>
+                        {row.channels.length} layers ·{" "}
+                        {time(row.channels[0].seconds)} · {row.kind}
+                      </p>
+                    </div>
+                    <button className="primary" onClick={() => load(row)}>
+                      Open
+                    </button>
+                    <div className="saved-actions">
+                      <button
+                        onClick={() => {
+                          const name = prompt("Session name", row.name);
+                          if (name?.trim() && name.length <= 80)
+                            storeRows(
+                              sessions.map((s) =>
+                                s.id === row.id
+                                  ? { ...s, name: name.trim() }
+                                  : s,
+                              ),
+                            );
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        onClick={() => {
+                          setExporting(row);
+                          setExportSeconds(
+                            Math.min(
+                              60,
+                              Math.max(...row.channels.map((c) => c.seconds)),
+                            ),
+                          );
+                          setExportError("");
+                        }}
+                      >
+                        WAV audio
+                      </button>
+                      <button onClick={() => exportSession(row)}>
+                        <Download size={16} /> Settings JSON
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm("Delete " + row.name + "?"))
+                            storeRows(sessions.filter((s) => s.id !== row.id));
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+                <h2>Favorites</h2>
+                <div className="favorite-list">
+                  {starred.length ? (
+                    starred.map((id) => (
+                      <button key={id} onClick={() => openSound(id)}>
+                        {sounds[id].name}
+                        <ArrowRight size={18} />
+                      </button>
+                    ))
+                  ) : (
+                    <p className="content-note">
+                      Tap a heart in Explore to keep a sound here.
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
           </>
         )}
         {message && (
@@ -995,19 +1131,44 @@ export default function App() {
           )}
         </section>
       )}
-      {activeCount > 0 && tab !== "studio" && tab !== "chakras" && (
-        <div className="mini-player">
-          <AudioLines size={20} />
-          <span>{activeCount} layers playing</span>
-          <button onClick={() => engine.stopAll()}>Stop all</button>
-        </div>
-      )}
+      {["playing", "paused"].includes(practice.status) &&
+        tab !== "manifest" && (
+          <div className="mini-player">
+            <span>{practice.plan?.name}</span>
+            <button
+              onClick={() =>
+                practice.status === "playing"
+                  ? manifestPlayer.pause()
+                  : manifestPlayer.resume()
+              }
+            >
+              {practice.status === "playing"
+                ? "Pause practice"
+                : "Resume practice"}
+            </button>
+            <button onClick={() => manifestPlayer.stop()}>Stop practice</button>
+          </div>
+        )}
+      {!["playing", "paused"].includes(practice.status) &&
+        activeCount > 0 &&
+        tab !== "studio" &&
+        tab !== "chakras" && (
+          <div className="mini-player">
+            <AudioLines size={20} />
+            <span>{activeCount} layers playing</span>
+            <button onClick={() => engine.stopAll()}>Stop all</button>
+          </div>
+        )}
       <nav className="bottom-nav" aria-label="Main navigation">
         {tabs.map(([id, label, Icon]) => (
           <button
             key={id}
-            aria-current={tab === id ? "page" : undefined}
-            onClick={() => navigate(id)}
+            aria-current={
+              tab === id || (id === "studio" && tab === "explore")
+                ? "page"
+                : undefined
+            }
+            onClick={() => navigate(id === "studio" ? lastSoundTab : id)}
           >
             <Icon size={22} />
             <span>{label}</span>

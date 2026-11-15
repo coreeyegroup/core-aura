@@ -37,6 +37,11 @@ self.addEventListener('message',event=>{
 self.addEventListener('activate',event=>event.waitUntil(
   caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('core-aura-')&&k!==key).map(k=>caches.delete(k)))).then(()=>self.clients.claim())
 ));
+self.addEventListener('notificationclick',event=>{
+  event.notification.close();const planId=event.notification.data?.planId;
+  if(typeof planId!=='string') return;
+  event.waitUntil((async()=>{const windows=await self.clients.matchAll({type:'window',includeUncontrolled:true});const client=windows.find(c=>new URL(c.url).origin===self.location.origin);if(client){await client.focus();client.postMessage({type:'OPEN_MANIFESTATION',planId});}else await self.clients.openWindow('/?manifestPlan='+encodeURIComponent(planId)+'#manifest');})());
+});
 self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(event.request.method!=='GET'||url.origin!==self.location.origin||!assets.includes(url.pathname)) return;

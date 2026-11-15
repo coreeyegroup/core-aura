@@ -1,3 +1,4 @@
+const { navigate } = require("./navigation.cjs");
 const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 const assert = require("node:assert/strict");
@@ -21,10 +22,10 @@ const fs = require("node:fs");
       const p = await ctx.newPage();
       const errors = [];
       p.on("pageerror", (e) => errors.push(e.message));
-      await p.goto("http://localhost:8089");
+      await p.goto("http://localhost:8089/#explore");
       await p.getByRole("heading", { name: /Make room/ }).waitFor();
       for (const tab of ["Studio", "Chakras", "Library", "Explore"]) {
-        await p.getByRole("button", { name: tab, exact: true }).last().click();
+        await navigate(p, tab);
         const metrics = await p.evaluate(() => ({
           width: document.documentElement.clientWidth,
           overflow: document.documentElement.scrollWidth,
@@ -80,8 +81,8 @@ const fs = require("node:fs");
         ]),
       );
     });
-    await p.goto("http://localhost:8089");
-    await p.getByRole("button", { name: "Studio", exact: true }).last().click();
+    await p.goto("http://localhost:8089/#explore");
+    await navigate(p, "Studio");
     await p.getByRole("button", { name: "Play", exact: true }).last().click();
     await p
       .getByRole("button", { name: "Pause", exact: true })
@@ -108,10 +109,7 @@ const fs = require("node:fs");
       .getByRole("textbox", { name: "Session name", exact: true })
       .fill("Layered evening");
     await p.getByRole("button", { name: "Save to Library" }).click();
-    await p
-      .getByRole("button", { name: "Library", exact: true })
-      .last()
-      .click();
+    await navigate(p, "Library");
     await p.getByRole("heading", { name: "Layered evening" }).waitFor();
     await p.getByRole("heading", { name: "Legacy flute" }).waitFor();
     await p
@@ -141,10 +139,7 @@ const fs = require("node:fs");
     await p.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     await ctx.setOffline(true);
     await p.reload();
-    await p
-      .getByRole("button", { name: "Library", exact: true })
-      .last()
-      .click();
+    await navigate(p, "Library");
     const saved = p
       .locator(".saved-card")
       .filter({ has: p.getByRole("heading", { name: "Layered evening" }) });
@@ -183,7 +178,7 @@ const fs = require("node:fs");
       "22.4px",
     );
     for (const tab of ["Studio", "Chakras", "Library", "Explore"]) {
-      await q.getByRole("button", { name: tab, exact: true }).last().click();
+      await navigate(q, tab);
       assert.ok(
         await q.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -196,7 +191,7 @@ const fs = require("node:fs");
     await q.getByRole("button", { name: "Settings", exact: true }).click();
     await q.getByRole("button", { name: "Reset display" }).click();
     await q.getByRole("button", { name: "Close settings" }).click();
-    await q.getByRole("button", { name: "Studio", exact: true }).last().click();
+    await navigate(q, "Studio");
     // Save and download actual generated audio through a module worker, offline.
     await q.getByRole("button", { name: "Save", exact: true }).click();
     await q
@@ -207,10 +202,7 @@ const fs = require("node:fs");
     await q.reload();
     await q.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     await display.setOffline(true);
-    await q
-      .getByRole("button", { name: "Library", exact: true })
-      .last()
-      .click();
+    await navigate(q, "Library");
     await q.getByRole("button", { name: "WAV audio", exact: true }).click();
     await q.getByLabel("Export duration", { exact: true }).selectOption("15");
     const downloading = q.waitForEvent("download");

@@ -1,1 +1,13 @@
-{"id":"/","name":"Core-aura Sound Studio","short_name":"Core-aura","start_url":"/","display":"standalone","background_color":"#f6f4ed","theme_color":"#163e34","icons":[{"src":"/icon-192.png","sizes":"192x192","type":"image/png"},{"src":"/icon-512.png","sizes":"512x512","type":"image/png"}]}
+{
+  "id": "/",
+  "name": "Core-aura Manifestation & Sound",
+  "short_name": "Core-aura",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ed",
+  "theme_color": "#163e34",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -74,3 +74,9 @@ Run the released frontend deployment, sudo bash ops/start-backend.sh, then sudo 
 The current administration workflow is documented in [content-admin.md](content-admin.md). It supersedes the earlier manual hosting procedure for new server-published packs. Built-in generated sound-pack files remain static. New review/publication requires assets uploaded through the managed service; legacy manually hosted records must be re-uploaded when edited and re-reviewed.
 
 The backend startup script retains an existing .env. The default uploaded-content quota is 2147483648 bytes. Set CORE_AURA_CONTENT_LIMIT_BYTES in .env before recreating the API if a different limit is required.
+
+## Manifestation release (0.12.0)
+
+Deploy the frontend normally and verify version 0.12.0. No backend migration is required for manifestation practices; existing catalog administration remains available. The installed PWA updates through Settings. Personal scripts/schedules are stored on the device, so database/audio backups do not contain them; export practice JSON separately.
+
+Native packages now include @capacitor/local-notifications 7.0.7 and @capacitor-community/text-to-speech 6.1.0 for Capacitor 7. Native binaries must be rebuilt/installed through the native distribution channel to obtain these plugins. PWA reminders only run while the web app is open; native local reminders and calendar imports depend on device settings. See [manifestation.md](manifestation.md).
