@@ -15,8 +15,6 @@ export async function syncPhoneReminders(requestPermission = false) {
   const permission = requestPermission
     ? await LocalNotifications.requestPermissions()
     : await LocalNotifications.checkPermissions();
-  if (permission.display !== "granted")
-    return "Schedule saved. Enable phone reminders to receive native notifications.";
   const pending = await LocalNotifications.getPending();
   const own = pending.notifications.filter(
     (n) => n.id >= base && n.id < base + 56,
@@ -25,6 +23,8 @@ export async function syncPhoneReminders(requestPermission = false) {
     await LocalNotifications.cancel({
       notifications: own.map((n) => ({ id: n.id })),
     });
+  if (permission.display !== "granted")
+    return "Schedule saved. Enable phone reminders to receive native notifications.";
   const { plans, reminders } = manifestationStore.snapshot().data;
   const notifications: LocalNotificationSchema[] = [];
   for (const r of reminders.filter((r) => r.enabled)) {

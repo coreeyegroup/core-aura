@@ -122,11 +122,13 @@ export default function App() {
       observeReminders((reminder) => {
         const { draft, plans } = manifestationStore.snapshot().data;
         const saved = plans.find((p) => p.id === draft.id);
-        const unsaved =
-          draft.lines.length > 0 &&
-          (!saved || JSON.stringify(saved) !== JSON.stringify(draft));
+        const scheduled = plans.find((p) => p.id === reminder.planId);
+        const unsaved = saved
+          ? JSON.stringify(saved) !== JSON.stringify(draft)
+          : draft.lines.length > 0 || draft.name !== "My manifestation";
         const playing = manifestPlayer.snapshot().status;
         if (
+          scheduled &&
           reminder.autoStart &&
           document.visibilityState === "visible" &&
           location.hash !== "#admin" &&
@@ -136,7 +138,7 @@ export default function App() {
         ) {
           try {
             openManifest(reminder.planId);
-            manifestPlayer.start(manifestationStore.snapshot().data.draft);
+            manifestPlayer.start(scheduled);
             return;
           } catch {}
         }

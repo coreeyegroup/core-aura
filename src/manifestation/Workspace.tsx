@@ -534,7 +534,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
         <div className="transport">
           <button
             className="primary"
-            disabled={!p.lines.length}
+            disabled={!p.lines.length && !active}
             onClick={start}
           >
             {state.status === "playing"
