@@ -1,18 +1,18 @@
 # Core-aura implementation status
 
-Release 0.9.0 adds adjustable text size and spacing, a denser interface with fewer duplicate controls, and offline WAV export. The React, shared audio worklet, native packaging and catalog backend foundations continue from 0.8.0.
+Release 0.10.0 adds catalog browsing, integrity-checked downloadable sound packs, offline recorded playback in the shared audio context, and pack removal. Adjustable text and density remain unchanged.
 
 | Requirement | Implemented in this release | Remaining acceptance |
 | --- | --- | --- |
 | Web and installed PWA | Explore, Studio, Chakras, Library, settings, saved display preference, update flow | Physical phone acceptance on the owner's device |
 | Native mobile | Capacitor Android and iOS projects using bundled application assets | Device audio, interruptions, background operation, signed distribution |
 | Frequency generation | Sine and band-limited triangle synthesis, exact target input, slider, fine adjustment | Calibrated output-device assessment |
-| Instruments | Original synthesized flute, drum, bell, bowl and tanpura | Performer-reviewed realism and recorded instrument packs |
+| Instruments | Original synthesized flute, drum, bell, bowl and tanpura; three fixed-tuning generated WAV studies in the Core Resonance pack | Performer-reviewed realism and recorded instrument packs |
 | Indian classical music | Yaman and Mohanam phrase studies with tonic transposition | Hindustani/Carnatic practitioner review, ornamentation and expanded repertoire |
 | Mixing | One shared AudioContext, per-layer pause, mute, level, master, stop and fades | Long-duration device CPU/battery testing |
 | Chakra sessions | Seven mapped channels, separate and combined transport, bowl/sine/triangle type, per-channel level and saved combinations | Listening review on headphones and speakers |
 | Audio files | Worker-based mono 44.1 kHz 16-bit WAV export from saved sessions, up to 10 minutes; progress and cancellation | Native file sharing and longer exports |
-| Offline | Versioned whole-player cache and native bundled assets, session import/export | Resumable recording-pack downloads |
+| Offline | Versioned player cache, atomic IndexedDB pack installs, validated file hashes, cancelled/failed updates preserve older packs | Resumable partial downloads and storage-eviction recovery |
 | Session compatibility | Schema v2, engine version, validated imports, legacy flute/drone migration | Future migration tests whenever the schema changes |
 | Backend | FastAPI, PostgreSQL, migration, authenticated draft/review/publication/withdrawal API | Separate user accounts, reviewer identities and administrative UI |
 | Content rights | Required creator, license, attribution, provenance fields | Actual commissioned/licensed recordings and tradition-specific review |
@@ -37,3 +37,15 @@ Settings provides saved text scaling from 90% to 140% and Compact/Comfortable sp
 Studio keeps exact frequency input in each layer. Visual tuning is optional. A single layer has one main transport; multi-layer sessions also expose separate layer transports. Timer and master volume share one expandable session control. Chakra selection, frequency, sound and individual transport remain available; mute and per-channel volume sit in the detail panel.
 
 WAV export renders saved settings from time zero; it does not record the microphone or the current playback position. Muted channels, master volume, individual session lengths and fade envelopes are honored. Its duration is limited to 10 minutes to bound device memory. WAV downloads are enabled for web/PWA. Native sharing remains pending.
+
+## Sound packs in 0.10.0
+
+Explore → Sound packs reads the bundled catalog and the optional published server catalog. Metadata-only legacy records are omitted. Packs expose credits, source, license, version, engine compatibility and declared size. Browser player updates do not automatically download pack audio.
+
+The Core Resonance demonstration pack contains three reproducibly generated 15-second WAV studies: bell, bowl and flute at 432 Hz. Its audio is CC0-1.0; it contains no performer recording or authenticity endorsement. It is generated during the release build, not stored as binary source in Git. Native builds bundle this small demonstration pack; published server packs download from the public domain.
+
+Files use bounded canonical PCM WAV with SHA-256 integrity checks and same-site /packs/ paths. Packs are limited to 25 MB and 20 files, each at most 10 minutes. Downloads are transactional: every file must pass before the stored version is replaced. Cancellation discards partial files; resume across interrupted downloads is not implemented. Browser storage may be evicted and is not an independent backup.
+
+Recorded playback shares the existing AudioContext, analyser and master-volume state. One recorded file plays at a time. Starting a recording stops synthesis; starting synthesis stops the recording. Recorded files preserve their original tuning and are not yet layers in the tunable mixer. Pause/resume keeps playback position. Native background and interruption acceptance remain pending.
+
+Server manifests can be replaced using optimistic revisions and a higher content version. Replacement returns them to draft; review and publication are required again. New publication requires a file manifest, but the API does not upload files or certify that a supplied hash is authentic. Operators must validate rights, files and review before publication.

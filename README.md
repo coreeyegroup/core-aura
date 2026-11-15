@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.9.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.10.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -28,6 +28,12 @@ The master mixer uses one audio context. Pitch changes preserve the percussion p
 Use the named release and exact deployment commands in its handoff. ops/deploy.sh builds an archived source revision and switches the live directory atomically. ops/verify.sh verifies the public version. Existing PWA installations update through /update.html or Settings.
 
 The PostgreSQL/FastAPI catalog is optional for the current on-device player. See [operations](docs/operations.md) before starting it.
+
+## Sound packs
+
+Explore → Sound packs offers optional downloads with version, size, license and source information. Library plays and removes installed packs offline. Downloads verify SHA-256 and PCM format before committing; cancellation or corruption preserves a previous installed version. Files play through the shared audio context at their recorded tuning. Text and spacing preferences remain adjustable.
+
+The first Core Resonance pack contains original 15-second bell, bowl and flute synthesis studies. Its generated audio is CC0-1.0 and is not a performer recording. The server catalog is optional. Server manifests support versioned replacement and review; content-upload tooling and durable uploaded-content hosting remain pending.
 
 ## Native projects
 

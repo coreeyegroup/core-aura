@@ -1102,3 +1102,51 @@ progress {
 .app:has(.mini-player) main {
   padding-bottom: calc(var(--nav) + 76px + env(safe-area-inset-bottom, 0px));
 }
+
+.packs-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.pack-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 10px;
+  background: #fffefb;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.pack-card > p {
+  font-size: calc(13px * var(--text-scale));
+}
+.pack-card small {
+  color: var(--muted);
+}
+.pack-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  align-items: center;
+  padding-block: 6px;
+  border-top: 1px solid var(--line);
+}
+.pack-track strong {
+  font-size: calc(14px * var(--text-scale));
+}
+.pack-track small {
+  display: block;
+  font-size: calc(12px * var(--text-scale));
+}
+.pack-track button {
+  padding-inline: 8px;
+  font-size: calc(14px * var(--text-scale));
+}
+[data-text-size="large"] .pack-track {
+  grid-template-columns: 1fr 1fr;
+}
+[data-text-size="large"] .pack-track > span {
+  grid-column: 1/-1;
+}

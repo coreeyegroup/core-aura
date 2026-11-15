@@ -32,6 +32,7 @@ import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
 import { Waveform } from "./components/Waveform";
+import { PacksPanel } from "./packs/PacksPanel";
 import { readAppearance, saveAppearance, Appearance } from "./appearance";
 
 function time(seconds: number) {
@@ -159,6 +160,7 @@ export default function App() {
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
+  const [exploreView, setExploreView] = useState("sounds");
   const [online, setOnline] = useState(navigator.onLine);
   const [offlineReady, setOfflineReady] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
@@ -456,77 +458,103 @@ export default function App() {
               </h1>
               <p>Choose a sound. Find your own rhythm.</p>
             </div>
-            <button
-              className="feature-card"
-              onClick={() => navigate("chakras")}
-            >
-              <div className="orb" aria-hidden="true">
-                <Flower2 size={52} />
-              </div>
-              <div>
-                <span className="eyebrow">Seven frequencies</span>
-                <h2>Chakra meditation</h2>
-                <span>
-                  Create your own combination <ArrowRight size={16} />
-                </span>
-              </div>
-            </button>
-            <label className="search">
-              <span>Find a sound</span>
-              <input
-                type="search"
-                placeholder="Flute, bowl, raga…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
-            <div className="section-heading">
-              <h2>Sounds &amp; studies</h2>
-              <span>{Object.keys(sounds).length} sounds</span>
+            <div className="segmented" aria-label="Explore collection">
+              <button
+                aria-pressed={exploreView === "sounds"}
+                onClick={() => setExploreView("sounds")}
+              >
+                Sounds
+              </button>
+              <button
+                aria-pressed={exploreView === "packs"}
+                onClick={() => setExploreView("packs")}
+              >
+                Sound packs
+              </button>
             </div>
-            <div className="sound-grid">
-              {(Object.entries(sounds) as [Sound, (typeof sounds)[Sound]][])
-                .filter(([id, s]) =>
-                  (s.name + " " + s.type)
-                    .toLowerCase()
-                    .includes(query.toLowerCase()),
-                )
-                .map(([id, s]) => (
-                  <article className="sound-card" key={id}>
-                    <div className="sound-top">
-                      <span className={"sound-symbol " + id} aria-hidden="true">
-                        <AudioLines size={28} />
-                      </span>
-                      <button
-                        className="icon-button"
-                        aria-label={
-                          (starred.includes(id) ? "Unfavorite " : "Favorite ") +
-                          s.name
-                        }
-                        aria-pressed={starred.includes(id)}
-                        onClick={() => favorite(id)}
-                      >
-                        <Heart
-                          size={19}
-                          fill={starred.includes(id) ? "currentColor" : "none"}
-                        />
-                      </button>
-                    </div>
-                    <button
-                      className="sound-open"
-                      onClick={() => openSound(id)}
-                    >
-                      <small>{s.type}</small>
-                      <strong>{s.name}</strong>
-                      <span>{s.detail}</span>
-                    </button>
-                  </article>
-                ))}
-            </div>
-            <p className="content-note">
-              Instrument sounds are original synthesis studies. Raga studies use
-              approximate tuning and await practitioner review.
-            </p>
+            {exploreView === "packs" ? (
+              <PacksPanel />
+            ) : (
+              <>
+                <button
+                  className="feature-card"
+                  onClick={() => navigate("chakras")}
+                >
+                  <div className="orb" aria-hidden="true">
+                    <Flower2 size={52} />
+                  </div>
+                  <div>
+                    <span className="eyebrow">Seven frequencies</span>
+                    <h2>Chakra meditation</h2>
+                    <span>
+                      Create your own combination <ArrowRight size={16} />
+                    </span>
+                  </div>
+                </button>
+                <label className="search">
+                  <span>Find a sound</span>
+                  <input
+                    type="search"
+                    placeholder="Flute, bowl, raga…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                </label>
+                <div className="section-heading">
+                  <h2>Sounds &amp; studies</h2>
+                  <span>{Object.keys(sounds).length} sounds</span>
+                </div>
+                <div className="sound-grid">
+                  {(Object.entries(sounds) as [Sound, (typeof sounds)[Sound]][])
+                    .filter(([id, s]) =>
+                      (s.name + " " + s.type)
+                        .toLowerCase()
+                        .includes(query.toLowerCase()),
+                    )
+                    .map(([id, s]) => (
+                      <article className="sound-card" key={id}>
+                        <div className="sound-top">
+                          <span
+                            className={"sound-symbol " + id}
+                            aria-hidden="true"
+                          >
+                            <AudioLines size={28} />
+                          </span>
+                          <button
+                            className="icon-button"
+                            aria-label={
+                              (starred.includes(id)
+                                ? "Unfavorite "
+                                : "Favorite ") + s.name
+                            }
+                            aria-pressed={starred.includes(id)}
+                            onClick={() => favorite(id)}
+                          >
+                            <Heart
+                              size={19}
+                              fill={
+                                starred.includes(id) ? "currentColor" : "none"
+                              }
+                            />
+                          </button>
+                        </div>
+                        <button
+                          className="sound-open"
+                          onClick={() => openSound(id)}
+                        >
+                          <small>{s.type}</small>
+                          <strong>{s.name}</strong>
+                          <span>{s.detail}</span>
+                        </button>
+                      </article>
+                    ))}
+                </div>
+                <p className="content-note">
+                  Instrument sounds are original synthesis studies. Raga studies
+                  use approximate tuning and await practitioner review.
+                </p>
+              </>
+            )}
           </>
         )}
         {isStudio && (
@@ -813,6 +841,7 @@ export default function App() {
                 <p>All built-in sounds are generated on this device.</p>
               </div>
             </section>
+            <PacksPanel library master={master} onMaster={setMaster} />
             <h2>Saved sessions</h2>
             {!sessions.length && (
               <div className="empty">

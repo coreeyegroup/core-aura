@@ -1,6 +1,8 @@
 core-aura.coreeye.in {
     encode zstd gzip
     header Cache-Control "no-cache"
+    @packfiles path /packs/*
+    header @packfiles Access-Control-Allow-Origin "*"
     handle /api/* {
         reverse_proxy 127.0.0.1:8793
     }
