@@ -39,6 +39,7 @@ export function parsePack(value: unknown): SoundPack {
     typeof v === "string" && v.trim().length > 0 && v.length <= max;
   if (
     !p ||
+    typeof p.id !== "string" ||
     !/^[a-z0-9][a-z0-9-]{0,79}$/.test(p.id) ||
     !/^\d+\.\d+\.\d+$/.test(p.version) ||
     !/^\d+\.\d+$/.test(p.minimum_engine) ||
@@ -57,6 +58,7 @@ export function parsePack(value: unknown): SoundPack {
   for (const a of p.assets) {
     if (
       !a ||
+      typeof a.id !== "string" ||
       !/^[a-z0-9][a-z0-9-]{0,79}$/.test(a.id) ||
       !text(a.title, 120) ||
       !/^\/packs\/[a-zA-Z0-9/_.-]+\/[a-zA-Z0-9_.-]+\.wav$/.test(a.url) ||

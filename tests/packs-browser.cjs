@@ -94,12 +94,13 @@ const fs = require("node:fs");
     // A corrupt update cannot replace the old version.
     manifest = {
       ...manifest,
+      version: "1.2.0",
       assets: manifest.assets.map((a) => ({ ...a, sha256: "0".repeat(64) })),
     };
     await p
       .getByRole("button", { name: "Refresh catalog", exact: true })
       .click();
-    await p.waitForTimeout(200);
+    await card.getByText("v1.2.0", { exact: true }).waitFor();
     await card
       .getByRole("button", { name: "Download update", exact: true })
       .click();

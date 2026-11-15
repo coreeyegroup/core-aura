@@ -37,6 +37,8 @@ describe("pack manifests and audio validation", () => {
     expect(compatible({ ...pack, minimum_engine: "3.0" })).toBe(false);
   });
   it("rejects cross-origin, traversal, duplicate, malformed and oversized files", () => {
+    expect(() => parsePack({ ...pack, id: undefined })).toThrow();
+    expect(() => parsePack({ ...pack, assets: [{ ...pack.assets[0], id: undefined }] })).toThrow();
     for (const url of [
       "https://example.com/a.wav",
       "/packs/a/../tone.wav",
