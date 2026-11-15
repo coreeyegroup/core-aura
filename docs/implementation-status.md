@@ -6,14 +6,14 @@ Backend migration 003 adds subscriptions, durable deliveries and worker heartbea
 
 Pending: physical Android/iOS microphone/notification/lock-screen acceptance; production native signing and store distribution; native audio sharing; reimport of personal audio backups; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
 
-# Core-aura implementation status
+## Current implementation coverage
 
-Release 0.12.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
+Release 0.13.0 extends manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
 
 | Requirement | Implemented in this release | Remaining acceptance |
 | --- | --- | --- |
-| Manifestation | 40 category prompts, editable multi-sentence practices, sequence/each repetition, voice/silent modes, timer, background sound and JSON backup | Physical voice quality and language acceptance |
-| Schedules | Local weekday schedules, in-app/web reminders, calendar export and native local-notification integration | Physical device delivery, server push and unattended closed-app speech |
+| Manifestation | 40 category prompts, single-sentence Play previews, personal voice recordings, editable multi-sentence practices, sequence/each repetition, voice/silent modes, timer, background sound and JSON backup | Physical voice quality and language acceptance |
+| Schedules | Local weekday schedules, opt-in server push, in-app reminders, calendar export and native local-notification integration | Physical device delivery and unattended closed-app speech |
 | Web and installed PWA | Explore, Studio, Chakras, Library, settings, saved display preference, update flow | Physical phone acceptance on the owner's device |
 | Native mobile | Capacitor Android and iOS projects using bundled application assets | Device audio, interruptions, background operation, signed distribution |
 | Frequency generation | Sine and band-limited triangle synthesis, exact target input, slider, fine adjustment | Calibrated output-device assessment |
@@ -72,4 +72,4 @@ Backups now contain a database dump and an audio archive with checksums and per-
 
 ## Manifestation implementation
 
-See [manifestation.md](manifestation.md) for platform limits and acceptance. Personal scripts/schedules stay on the device and are not uploaded to the content administration service. Native speech and notifications compile separately from PWA functionality and need actual device testing. Schedules default to reminders, with opt-in visible/idle auto-start. Closed or locked apps require opening the practice and tapping Play.
+See [manifestation.md](manifestation.md) for platform limits and acceptance. Sentence text and recordings stay on the device. Opt-in web push uploads only practice names, IDs, schedule times/weekdays, timezone and the browser subscription. Native speech and notifications compile separately from PWA functionality and need actual device testing. Schedules default to reminders, with opt-in visible/idle auto-start. Closed or locked apps require opening the practice and tapping Play.
