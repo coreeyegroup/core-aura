@@ -272,6 +272,7 @@ export default function App() {
     setter((rows) => rows.map((c) => (c.id === updated.id ? updated : c)));
   }
   function openSound(sound: Sound) {
+    layers.forEach((c) => engine.stop(c.id));
     const hz = ["yaman", "mohanam", "tanpura"].includes(sound) ? 216 : 432;
     setLayers([channel(sound, hz)]);
     navigate("studio");
@@ -581,7 +582,7 @@ export default function App() {
             {layers.map((c, i) => (
               <ChannelEditor
                 key={c.id}
-                value={c}
+                value={{ ...c, seconds }}
                 title={"Layer " + (i + 1)}
                 showTransport={layers.length > 1}
                 onChange={patch}

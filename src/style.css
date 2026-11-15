@@ -746,13 +746,6 @@ output {
   display: block;
   padding: 16px;
 }
-.phone-display .app,
-.phone-display .player-dock,
-.phone-display .bottom-nav,
-.phone-display .mini-player,
-.phone-display .sheet {
-  max-width: 100%;
-}
 @media (min-width: 900px) and (pointer: fine) {
   .app-header {
     padding-top: 24px;
