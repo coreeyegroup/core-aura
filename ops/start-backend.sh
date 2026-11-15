@@ -8,10 +8,15 @@ if [[ ! -f .env ]]; then
     printf 'CORE_AURA_ADMIN_TOKEN=%s\n' "$(openssl rand -hex 32)"
   } > .env
 fi
-docker compose up -d --build
+chmod 600 .env
+docker compose build api
+# Only the key-generation container can write this protected host file.
+docker compose run --rm --no-deps --user 0 -v "$PWD/.env:/run/core-aura-env" api python scripts/generate-vapid.py /run/core-aura-env
+docker compose up -d
 for attempt in $(seq 1 60); do
-  if curl -fsS --max-time 3 http://127.0.0.1:8793/api/health; then
-    printf '\nCatalog backend ready\n'
+  if curl -fsS --max-time 3 http://127.0.0.1:8793/api/health &&
+     curl -fsS --max-time 3 http://127.0.0.1:8793/api/manifest-reminders/config | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ready") else 1)'; then
+    printf '\nCatalog and reminder backend ready\n'
     exit 0
   fi
   sleep 2

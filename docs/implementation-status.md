@@ -1,3 +1,11 @@
+# Release 0.13.0 status
+
+Added per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback, recording management and opt-in closed-app web push scheduling. Details: [manifestation guide](manifestation.md).
+
+Backend migration 003 adds subscriptions, durable deliveries and worker heartbeat. Compose adds a reminder worker; deployment preserves its VAPID keypair in .env. [Operations](operations.md) includes the upgrade and backup requirements.
+
+Pending: physical Android/iOS microphone/notification/lock-screen acceptance; production native signing and store distribution; native audio sharing; reimport of personal audio backups; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
+
 # Core-aura implementation status
 
 Release 0.12.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.

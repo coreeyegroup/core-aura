@@ -80,3 +80,28 @@ The backend startup script retains an existing .env. The default uploaded-conten
 Deploy the frontend normally and verify version 0.12.0. No backend migration is required for manifestation practices; existing catalog administration remains available. The installed PWA updates through Settings. Personal scripts/schedules are stored on the device, so database/audio backups do not contain them; export practice JSON separately.
 
 Native packages now include @capacitor/local-notifications 7.0.7 and @capacitor-community/text-to-speech 6.1.0 for Capacitor 7. Native binaries must be rebuilt/installed through the native distribution channel to obtain these plugins. PWA reminders only run while the web app is open; native local reminders and calendar imports depend on device settings. See [manifestation.md](manifestation.md).
+
+## Release 0.13.0: personal voice and reminder worker
+
+Frontend version 0.13.0 adds sentence previews and microphone recordings. Existing PWA installs update in Settings; no reinstall is required. Native microphone permission requires this version's rebuilt native binary (Android RECORD_AUDIO and iOS usage description). Physical-device acceptance remains pending.
+
+Update both code and backend:
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.13.0-voice-reminders
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+bash ops/verify.sh 0.13.0
+curl -fsS https://core-aura.coreeye.in/api/manifest-reminders/config
+```
+
+The last endpoint must report configured:true and ready:true. It exposes only the public VAPID key. start-backend builds the image, prepares a persistent matching VAPID pair in chmod-600 .env, migrates the DB and starts the API and reminder worker. Existing passwords/admin tokens are preserved. Never rotate VAPID keys during normal updates; restore the matching pair if lost. The worker receives the private key; the API receives only the public key. Default public origin/subject is https://core-aura.coreeye.in; change CORE_AURA_PUBLIC_ORIGIN only for a different actual origin. No new public listener or Caddy route is required beyond /api/*.
+
+Run `sudo docker compose ps` and `sudo docker compose logs --tail 50 reminders` from this checkout to investigate worker readiness. Outbound HTTPS to registered browser push services must be allowed. Browser microphone access requires HTTPS and explicit user permission. Native builds use local notifications rather than web push.
+
+Use ops/backup-backend.sh with a protected directory. It now includes a mode-600 environment backup along with the database and server audio, with checksums. Treat the backup as secret: it contains database/admin/VAPID credentials and subscription records. Restore the environment with the matching database, preserve ownership/mode, then run start-backend. Personal browser recordings and practice text are not in server backups; export text/settings JSON and download audio separately. Deleting the server reminder records opts those devices out until re-enabled. Inactive expired subscriptions are retained at most 30 days; delivery rows expire after seven days. Active subscriptions remain until disabled or rejected by their push service.
+
+The normal install test is: save one practice, create a reminder a few minutes ahead, Enable reminders, verify the enabled status, close the app, receive the notification and tap to reopen the same practice. Repeat with a disabled/deleted schedule and with permission denial. This real external-device delivery test is performed by the installer; automated CI uses mock subscriptions/transports and sends no real pushes.

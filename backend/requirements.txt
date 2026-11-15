@@ -3,3 +3,5 @@ uvicorn==0.34.2
 SQLAlchemy==2.0.40
 psycopg[binary]==3.2.7
 alembic==1.15.2
+pywebpush==2.5.0
+tzdata==2026.6

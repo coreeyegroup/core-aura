@@ -24,6 +24,8 @@ jobs:
           DATABASE_URL: sqlite:////tmp/core-aura-admin-test.db
           CORE_AURA_CONTENT_ROOT: /tmp/core-aura-admin-files
           CORE_AURA_ADMIN_TOKEN: test-browser-admin
+          CORE_AURA_VAPID_PUBLIC_KEY: BGsX0fLhLEJH-Lzm5WOkQPJ3A32BLeszoPShOUXYmMKWT-NC4v4af5uO5-tKfA-eFivOM1drMV7Oy7ZAaDe_UfU
+          CORE_AURA_PUBLIC_ORIGIN: http://localhost:8089
           CORE_AURA_API_PROXY: http://127.0.0.1:8090
         run: |
           (cd backend && alembic upgrade head && uvicorn app.main:app --host 127.0.0.1 --port 8090) &
@@ -33,7 +35,7 @@ jobs:
           trap 'kill "$server" "$backend"' EXIT
           curl --retry 15 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8090/api/health
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
-          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.12.0
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.13.0
           npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -71,7 +73,7 @@ jobs:
         run: |
           alembic upgrade head
           alembic upgrade head
-          python -m unittest test_catalog
+          python -m unittest test_catalog test_reminders
       - name: Verify content volume persistence and non-root image
         run: python tests/container-smoke.py
   android:
