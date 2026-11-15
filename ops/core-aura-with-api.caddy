@@ -1,0 +1,11 @@
+core-aura.coreeye.in {
+    encode zstd gzip
+    header Cache-Control "no-cache"
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8793
+    }
+    handle {
+        root * /var/www/core-aura/current
+        file_server
+    }
+}

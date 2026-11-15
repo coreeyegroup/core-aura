@@ -1,0 +1,33 @@
+{
+  "name": "core-aura",
+  "version": "0.8.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
+    "test": "vitest run --pool=threads --maxWorkers=1 --minWorkers=1",
+    "test:browser": "node tests/application.cjs",
+    "native:sync": "npm run build && cap sync",
+    "native:android": "cap open android",
+    "native:ios": "cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.6.10",
+    "@capacitor/core": "7.6.10",
+    "@capacitor/ios": "7.6.10",
+    "lucide-react": "0.468.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@capacitor/cli": "7.6.10",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "playwright": "1.56.1",
+    "typescript": "5.9.2",
+    "vite": "6.3.6",
+    "vitest": "3.2.4"
+  }
+}
