@@ -1,4 +1,4 @@
-export const VERSION = "0.8.0";
+export const VERSION = "0.9.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"

@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.8.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.9.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -17,7 +17,9 @@ The build output is dist/. The production player needs HTTPS, including for its 
 
 ## Screens
 
-Explore contains built-in sounds and favorites. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library manages versioned saved sessions, import/export and offline readiness. Settings contains update, listening and display controls.
+Explore contains built-in sounds and favorites. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library manages versioned saved sessions, import/export and offline readiness. Settings contains update, listening and display controls. Text size (90–140%) and Compact/Comfortable spacing are saved independently. The app does not force a 360-pixel viewport.
+
+Library distinguishes Settings JSON (editable session backup) from WAV audio (rendered sound). WAV export works offline on web/PWA, uses a cancellable background worker and supports up to 10 minutes per export. Native audio-file sharing remains pending.
 
 The master mixer uses one audio context. Pitch changes preserve the percussion pulse and session duration. Approximate instrument and raga synthesis remains subject to musical review.
 

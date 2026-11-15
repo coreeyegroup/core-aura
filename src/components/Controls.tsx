@@ -5,17 +5,19 @@ export function Transport({
   channels,
   states,
   onError,
+  compact = false,
 }: {
   channels: Channel[];
   states: VoiceState[];
   onError: (s: string) => void;
+  compact?: boolean;
 }) {
   const active = channels.some((c) => states.some((s) => s.id === c.id));
   const playing = channels.some((c) =>
     states.some((s) => s.id === c.id && s.status === "playing"),
   );
   return (
-    <div className="transport">
+    <div className={"transport" + (compact ? " compact-transport" : "")}>
       <button
         className="primary"
         onClick={() =>
@@ -31,13 +33,16 @@ export function Transport({
         aria-label={playing ? "Pause" : active ? "Resume" : "Play"}
       >
         {playing ? <Pause size={20} /> : <Play size={20} />}{" "}
-        {playing ? "Pause" : active ? "Resume" : "Play"}
+        <span className={compact ? "sr-only" : undefined}>
+          {playing ? "Pause" : active ? "Resume" : "Play"}
+        </span>
       </button>
       <button
         disabled={!active}
         onClick={() => channels.forEach((c) => engine.stop(c.id))}
       >
-        <Square size={18} /> Stop
+        <Square size={18} />{" "}
+        <span className={compact ? "sr-only" : undefined}>Stop</span>
       </button>
     </div>
   );
@@ -48,19 +53,32 @@ export function ChannelEditor({
   states,
   onError,
   remove,
+  title,
+  showTransport = true,
 }: {
   value: Channel;
   onChange: (c: Channel) => void;
   states: VoiceState[];
   onError: (s: string) => void;
   remove?: () => void;
+  title: string;
+  showTransport?: boolean;
 }) {
   const spec = sounds[value.sound];
   const state = states.find((s) => s.id === value.id);
   return (
     <article className="layer">
       <div className="layer-title">
-        <strong>{spec.name}</strong>
+        <strong>{title}</strong>
+        <button
+          className="icon-button"
+          aria-label={value.muted ? "Unmute layer" : "Mute layer"}
+          aria-pressed={value.muted}
+          onClick={() => onChange({ ...value, muted: !value.muted })}
+        >
+          {value.muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+        </button>
+
         {remove && (
           <button className="text-button" onClick={remove}>
             Remove
@@ -130,17 +148,11 @@ export function ChannelEditor({
           }
         />
       </label>
-      <div className="layer-actions">
-        <button
-          className="icon-button"
-          aria-label={value.muted ? "Unmute layer" : "Mute layer"}
-          aria-pressed={value.muted}
-          onClick={() => onChange({ ...value, muted: !value.muted })}
-        >
-          {value.muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-        </button>
-        <Transport channels={[value]} states={states} onError={onError} />
-      </div>
+      {showTransport && (
+        <div className="layer-actions">
+          <Transport channels={[value]} states={states} onError={onError} />
+        </div>
+      )}
     </article>
   );
 }
