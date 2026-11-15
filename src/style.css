@@ -1338,3 +1338,8 @@ textarea:focus-visible {
       env(safe-area-inset-bottom, 0px)
   );
 }
+
+.manifest-player-dock .dock-caption {
+  padding: 4px 0 6px;
+  overflow-wrap: anywhere;
+}

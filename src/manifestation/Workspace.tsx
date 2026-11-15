@@ -82,6 +82,22 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
     [custom, setCustom] = useState(""),
     [message, setMessage] = useState(""),
     [voices, setVoices] = useState<Voice[]>([]);
+  const dock = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const element = dock.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() =>
+      document.documentElement.style.setProperty(
+        "--dock-height",
+        element.getBoundingClientRect().height + "px",
+      ),
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--dock-height");
+    };
+  }, []);
   const p = data.draft,
     active = ["playing", "paused"].includes(state.status);
   const change = (patch: Partial<Plan>) => {
@@ -166,27 +182,6 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                 Sentence {current.line + 1}/{state.plan!.lines.length} ·
                 Repetition {current.repeat}/{state.plan!.repeats} ·{" "}
                 {labelTime(state.elapsed)}
-              </p>
-            )}
-            <div className="transport">
-              <button
-                className="primary"
-                disabled={!p.lines.length}
-                onClick={start}
-              >
-                {state.status === "playing"
-                  ? "Pause"
-                  : state.status === "paused"
-                    ? "Resume"
-                    : "Play practice"}
-              </button>
-              <button disabled={!active} onClick={() => manifestPlayer.stop()}>
-                Stop practice
-              </button>
-            </div>
-            {state.status === "paused" && (
-              <p className="content-note">
-                Resume repeats the current sentence from its beginning.
               </p>
             )}
             {state.error && <p role="status">{state.error}</p>}
@@ -527,6 +522,37 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
       ) : (
         <Schedules />
       )}
+      <section
+        ref={dock}
+        className="player-dock manifest-player-dock"
+        aria-label="Manifestation player"
+      >
+        <p className="dock-caption">
+          {active ? state.plan?.name : p.name} ·{" "}
+          {active ? labelTime(state.elapsed) : p.lines.length + " sentences"}
+        </p>
+        <div className="transport">
+          <button
+            className="primary"
+            disabled={!p.lines.length}
+            onClick={start}
+          >
+            {state.status === "playing"
+              ? "Pause"
+              : state.status === "paused"
+                ? "Resume"
+                : "Play practice"}
+          </button>
+          <button disabled={!active} onClick={() => manifestPlayer.stop()}>
+            Stop practice
+          </button>
+        </div>
+        {state.status === "paused" && (
+          <p className="content-note">
+            Resume repeats the current sentence from its beginning.
+          </p>
+        )}
+      </section>
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}

@@ -17,7 +17,7 @@ Repetitions range from 1 to 108. A maximum session limit (1–60 minutes) stops 
 
 Spoken voice uses browser speech synthesis in web/PWA and native text-to-speech in the new Android/iOS builds. Choose an installed voice, speech speed and volume. Availability, language, quality and offline operation depend on installed device voices. Network voices may send text to their provider. Silent reading works without speech support and displays each sentence for the chosen time.
 
-Background options are a pure tone, synthesized bowl or tanpura with frequency and level controls. Other sound playback stops the manifestation practice. A mini-player offers pause/resume/stop while viewing another screen. Native voice/background mixing still requires physical-device acceptance.
+Background options are a pure tone, synthesized bowl or tanpura with frequency and level controls. Other sound playback stops the manifestation practice. The fixed practice player keeps Play/Pause/Resume and Stop available while scrolling or editing schedules. A mini-player offers pause/resume/stop while viewing another screen. Native voice/background mixing still requires physical-device acceptance.
 
 ## Schedule
 
