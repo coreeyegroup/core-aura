@@ -1,4 +1,5 @@
 import { Channel } from "../model";
+import { signalOtherAudio } from "./activity";
 export type VoiceState = {
   id: string;
   status: "playing" | "paused" | "pausing" | "stopping";
@@ -12,6 +13,7 @@ export class AudioEngine {
   private listeners = new Set<() => void>();
   private states: VoiceState[] = [];
   private generation = 0;
+  private voiceGeneration = new Map<string, number>();
   private recording?: {
     id: string;
     buffer: AudioBuffer;
@@ -149,9 +151,15 @@ export class AudioEngine {
     return this.connecting;
   }
   async play(channel: Channel) {
+    if (channel.id !== "manifest-background") signalOtherAudio();
     const token = this.generation;
+    const voiceToken = this.voiceGeneration.get(channel.id) || 0;
     await this.connect();
-    if (token !== this.generation) return;
+    if (
+      token !== this.generation ||
+      voiceToken !== (this.voiceGeneration.get(channel.id) || 0)
+    )
+      return;
     this.stopRecording();
     const state = this.states.find((s) => s.id === channel.id);
     if (state) this.node!.port.postMessage({ type: "resume", id: channel.id });
@@ -191,6 +199,7 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "pause", id });
   }
   stop(id: string) {
+    this.voiceGeneration.set(id, (this.voiceGeneration.get(id) || 0) + 1);
     if (this.recording?.id === id) {
       this.stopRecording();
       return;
@@ -198,7 +207,9 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "stop", id });
   }
   stopAll() {
+    signalOtherAudio();
     this.generation++;
+    this.voiceGeneration.clear();
     this.stopRecording();
     this.node?.port.postMessage({ type: "clear" });
   }

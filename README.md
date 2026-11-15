@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.11.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.12.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -15,9 +15,13 @@ npm run build
 
 The build output is dist/. The production player needs HTTPS, including for its real-time AudioWorklet. Localhost is supported for development.
 
+## Manifestation
+
+Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Closed-app automatic speech and web push are not implemented. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+
 ## Screens
 
-Explore contains built-in sounds and favorites. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library manages versioned saved sessions, import/export and offline readiness. Settings contains update, listening and display controls. Text size (90–140%) and Compact/Comfortable spacing are saved independently. The app does not force a 360-pixel viewport.
+Sounds includes Explore for built-in sounds/favorites and Studio for synthesis. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library separates affirmations/saved manifestation practices from audio sessions, packs and offline readiness. Settings contains update, listening and display controls. Text size (90–140%) and Compact/Comfortable spacing are saved independently. The app does not force a 360-pixel viewport.
 
 Library distinguishes Settings JSON (editable session backup) from WAV audio (rendered sound). WAV export works offline on web/PWA, uses a cancellable background worker and supports up to 10 minutes per export. Native audio-file sharing remains pending.
 
