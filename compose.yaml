@@ -1,0 +1,29 @@
+name: core-aura
+services:
+  database:
+    image: postgres:16.10
+    environment:
+      POSTGRES_DB: core_aura
+      POSTGRES_USER: core_aura
+      POSTGRES_PASSWORD: ${CORE_AURA_DATABASE_PASSWORD:?Set a database password}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U core_aura"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://core_aura:${CORE_AURA_DATABASE_PASSWORD}@database/core_aura
+      CORE_AURA_ADMIN_TOKEN: ${CORE_AURA_ADMIN_TOKEN:?Set an admin token}
+    ports:
+      - "127.0.0.1:8793:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  database:

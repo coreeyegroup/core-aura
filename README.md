@@ -1,60 +1,40 @@
-# Core-aura Sound Studio
+# Core-aura
 
-Version 0.7.0 is a local sound generator with pure tone and four synthesized instrument presets for desktop and mobile browsers. Select 20–12,000 Hz, adjust volume, choose a timer, and press Play. The web app can cache its player for offline use after the first successful online visit. See [the development blueprint](docs/core-aura-blueprint.md) for the instrument, raga, and native app roadmap.
+Core-aura 0.8.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
-## Ubuntu installation
+## Development
 
-From the project checkout, deploy the supplied release commit. The installer uses a versioned directory and switches the active symlink atomically. The first version is static and needs only Git, standard Ubuntu tools, and Caddy.
+Use Node.js 22.
 
 ```bash
-cd ~/core-aura
-sudo bash ops/deploy.sh HEAD
-sudo install -m 644 ops/core-aura.caddy /etc/caddy/sites/core-aura.caddy
-# On core-node the top-level Caddyfile imports each site individually.
-# Skip this import step on hosts that already import sites/*.caddy.
-if ! sudo grep -Fxq 'import /etc/caddy/sites/core-aura.caddy' /etc/caddy/Caddyfile; then
-  printf '\nimport /etc/caddy/sites/core-aura.caddy\n' | sudo tee -a /etc/caddy/Caddyfile >/dev/null
-fi
-sudo caddy validate --config /etc/caddy/Caddyfile && sudo systemctl reload caddy
-bash ops/verify.sh 0.7.0
+npm ci
+npm run dev
+npm test
+npm run build
 ```
 
-DNS must route core-aura.coreeye.in to this server. After reload, allow time for certificate issuance and run the verifier again if needed. If you already defined the hostname in Caddy, update that site block from the supplied configuration. Keep one site definition for the hostname.
+The build output is dist/. The production player needs HTTPS, including for its real-time AudioWorklet. Localhost is supported for development.
 
-For updates fetch the supplied revision, fast-forward the checkout, and run the deploy script with the exact release commit or tag. To roll back, run it with the preceding compatible commit and verify that version. No Caddy reload is needed for a routine static asset update. On Android open the HTTPS site in Chrome and choose Install app or Add to Home screen if offered.
+## Screens
 
-## Developer checks
+Explore contains built-in sounds and favorites. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library manages versioned saved sessions, import/export and offline readiness. Settings contains update, listening and display controls.
 
-Serve web/ on localhost:8089 with Python's http.server. With Playwright installed, run node tests/studio.cjs from another terminal. Set CHROMIUM_PATH to use a system Chromium executable. The checks cover UI playback, measured oscillator pitch, offline reload, and narrow layout.
+The master mixer uses one audio context. Pitch changes preserve the percussion pulse and session duration. Approximate instrument and raga synthesis remains subject to musical review.
 
-## Raga Yaman pilot
+## Ubuntu
 
-Choose Raga Yaman under Sound. The melody and optional drone share one tonic. Four original timed phrases repeat with short breaths, using an equal-tempered approximation and pitch slides. Changing Sa transposes both layers during playback. The study runs offline and can be saved like other sessions. Practitioner review is pending.
+Use the named release and exact deployment commands in its handoff. ops/deploy.sh builds an archived source revision and switches the live directory atomically. ops/verify.sh verifies the public version. Existing PWA installations update through /update.html or Settings.
 
-Musical references: [Tanarang](https://tanarang.com/raag-yaman/) and [KalaSudha](https://kalasudha.com/en-us/raga/yaman).
+The PostgreSQL/FastAPI catalog is optional for the current on-device player. See [operations](docs/operations.md) before starting it.
 
-## Chakra mixer
+## Native projects
 
-The Chakra Healing tab uses the modern Solfeggio mapping of Root 396, Sacral 417, Solar plexus 528, Heart 639, Throat 741, Third eye 852 and Crown 963 Hz. This is a selected spiritual meditation mapping, with variations across sources. Mapping reference: https://aroshanti.com/solfeggio-frequencies-and-the-chakras/
+Capacitor packages the shared interface in Android and iOS projects. Run npm run native:sync, then open Android Studio or Xcode. Automated Android builds provide a test APK. iOS compilation targets the simulator. Device audio and production signing require further acceptance.
 
-Each row supports sine or triangle wave, selection, play/resume, pause and stop. Play selected adds or resumes selected channels. Play all adds or resumes all seven. Stop all resets the mixer. Pausing suspends the channel audio clock, including its timer. Stop a channel before changing its sound type or duration. The combined oscillator gain is bounded for seven simultaneous channels. Returning to Sound Studio ends the chakra mix.
+## Project references
 
-Run node tests/chakra.mjs for isolated audio lifecycle checks. Device listening and mobile layout verification remain part of the release check.
+- [Original blueprint](docs/core-aura-blueprint.md)
+- [Implementation and remaining requirements](docs/implementation-status.md)
+- [Deployment, backend and native operations](docs/operations.md)
 
-## Phone interface v0.7.0
-
-The default layout is one phone column. Sound Studio and Chakra Healing live in a fixed bottom navigation bar, above the device safe area. The active screen places its transport controls directly above that bar. Chakra rows contain selection, frequency, sound type, independent transport and playback status. The page reserves scroll space for both fixed bars. Large screens retain a centered app column.
-
-Browser checks cover overflow and dock placement at 320, 360, 390 and 430 pixel widths. Browser execution is pending where Chromium cannot launch.
-
-## App screens v0.7.0
-
-Studio, Chakras and Library are individual bottom-navigation destinations. Studio and chakra channels use a single Play/Pause/Resume control alongside Stop. The chakra mix has a Selected/All selector and the same transport behavior. Library retains existing saved studio sessions. The paused audio clock preserves session time.
-
-The touch layout uses the available width, including devices with a desktop-sized layout viewport. A head script requests the phone's screen width when a coarse pointer, phone-sized screen and oversized viewport are detected. User zoom remains enabled. Validate scaling on the actual device because desktop-site settings and embedded browsers vary.
-
-## Display recovery v0.7.2
-
-Touch browsers that report a desktop viewport receive document-level display compensation when the viewport request is ignored. A header A+ button enables a saved 360-pixel phone layout independently of touch detection, and toggles back to automatic sizing. Zooming by the user remains enabled. Display information records both CSS sizing and the display factor.
-
-The browser suite includes a 980 × 2100 touch context with desktop-sized screen values and ignored viewport semantics. It verifies that the visible button height corresponds to at least 48 pixels after display scaling, checks overflow, and verifies the persisted A+ preference.
+Core-aura currently presents spiritual and musical listening practices. Instrument models and raga phrase studies are original synthesis. Practitioner-reviewed recordings, world-tradition packs and clinical research remain pending.
