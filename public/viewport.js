@@ -10,6 +10,7 @@ try {
   const size = Number.isFinite(value?.textSize)
     ? Math.max(90, Math.min(140, value.textSize))
     : 100;
+  document.documentElement.dataset.textSize = size >= 125 ? "large" : "normal";
   document.documentElement.style.setProperty(
     "--text-scale",
     String(size / 100),

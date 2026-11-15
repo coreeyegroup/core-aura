@@ -173,6 +173,26 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
+  const dockRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock) return;
+    const observer = new ResizeObserver(([entry]) => {
+      document.documentElement.style.setProperty(
+        "--dock-height",
+        entry.contentRect.height +
+          parseFloat(getComputedStyle(dock).paddingTop) +
+          parseFloat(getComputedStyle(dock).paddingBottom) +
+          1 +
+          "px",
+      );
+    });
+    observer.observe(dock);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--dock-height");
+    };
+  }, [isStudio, isChakras]);
   useEffect(() => {
     try {
       setSessions(readSessions());
@@ -889,7 +909,11 @@ export default function App() {
         )}
       </main>
       {(isStudio || isChakras) && (
-        <section className="player-dock" aria-label="Session player">
+        <section
+          ref={dockRef}
+          className="player-dock"
+          aria-label="Session player"
+        >
           <details className="session-options">
             <summary>
               Session · {seconds / 60} min · Volume {Math.round(master * 100)}%

@@ -18,6 +18,8 @@ export function readAppearance(): Appearance {
   }
 }
 export function saveAppearance(value: Appearance) {
+  document.documentElement.dataset.textSize =
+    value.textSize >= 125 ? "large" : "normal";
   document.documentElement.style.setProperty(
     "--text-scale",
     String(value.textSize / 100),
