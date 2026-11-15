@@ -84,7 +84,20 @@ export default function App() {
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(
     "explore",
   );
-  const [libraryView, setLibraryView] = useState("manifestation");
+  const [libraryView, setLibraryView] = useState(() => {
+    try {
+      return localStorage.getItem("core-aura.library-view") === "audio"
+        ? "audio"
+        : "manifestation";
+    } catch {
+      return "manifestation";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("core-aura.library-view", libraryView);
+    } catch {}
+  }, [libraryView]);
   const [due, setDue] = useState<Due | null>(null);
   const practice = useSyncExternalStore(
     manifestPlayer.subscribe,
