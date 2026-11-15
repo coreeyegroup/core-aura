@@ -7,15 +7,23 @@ if [[ ! -f "$site" ]]; then
 fi
 backup=$(mktemp /etc/caddy/sites/core-aura.caddy.backup.XXXXXXXX)
 cp -p "$site" "$backup"
-python3 - "$site" <<'PY'
+python3 - "$site" "${1:-}" <<'PY'
 import os, pathlib, sys, tempfile
 site = pathlib.Path(sys.argv[1])
 text = site.read_text()
+original = text
+marker = 'core-aura.coreeye.in {'
+if text.count(marker) != 1:
+    raise SystemExit('Expected one Core-aura site block; configuration was not changed')
 if 'Access-Control-Allow-Origin' not in text:
-    marker = 'core-aura.coreeye.in {'
-    if text.count(marker) != 1:
-        raise SystemExit('Expected one Core-aura site block; configuration was not changed')
     text = text.replace(marker, marker + '\n    @coreAuraPackFiles path /packs/*\n    header @coreAuraPackFiles Access-Control-Allow-Origin "*"', 1)
+if sys.argv[2] == '--enable-api':
+    for route in ['/api/*', '/packs/uploads/*']:
+        if 'handle ' + route not in text:
+            text = text.replace(marker, marker + '\n    handle ' + route + ' {\n        reverse_proxy 127.0.0.1:8793\n    }', 1)
+elif sys.argv[2]:
+    raise SystemExit('Usage: sudo bash ops/update-site.sh [--enable-api]')
+if text != original:
     fd, path = tempfile.mkstemp(dir=site.parent, prefix='core-aura-caddy-')
     try:
         with os.fdopen(fd, 'w') as output:

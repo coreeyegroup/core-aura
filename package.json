@@ -1,13 +1,13 @@
 {
   "name": "core-aura",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build && node scripts/build-packs.mjs && node scripts/build-sw.mjs",
     "test": "vitest run --pool=threads --maxWorkers=1 --minWorkers=1",
-    "test:browser": "node tests/application.cjs && node tests/packs-browser.cjs",
+    "test:browser": "node tests/application.cjs && node tests/packs-browser.cjs && node tests/admin-browser.cjs",
     "native:sync": "npm run build && cap sync",
     "native:android": "cap open android",
     "native:ios": "cap open ios"

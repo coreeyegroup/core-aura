@@ -1,4 +1,4 @@
-export const VERSION = "0.10.0";
+export const VERSION = "0.11.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -10,7 +10,7 @@ export type Sound =
   | "tanpura"
   | "yaman"
   | "mohanam";
-export type Tab = "explore" | "studio" | "chakras" | "library";
+export type Tab = "explore" | "studio" | "chakras" | "library" | "admin";
 export type Channel = {
   id: string;
   sound: Sound;

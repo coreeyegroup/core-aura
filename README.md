@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.10.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.11.0 is a sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -33,7 +33,7 @@ The PostgreSQL/FastAPI catalog is optional for the current on-device player. See
 
 Explore → Sound packs offers optional downloads with version, size, license and source information. Library plays and removes installed packs offline. Downloads verify SHA-256 and PCM format before committing; cancellation or corruption preserves a previous installed version. Files play through the shared audio context at their recorded tuning. Text and spacing preferences remain adjustable.
 
-The first Core Resonance pack contains original 15-second bell, bowl and flute synthesis studies. Its generated audio is CC0-1.0 and is not a performer recording. The server catalog is optional. Server manifests support versioned replacement and review; content-upload tooling and durable uploaded-content hosting remain pending.
+The first Core Resonance pack contains original 15-second bell, bowl and flute synthesis studies. Its generated audio is CC0-1.0 and is not a performer recording. The server catalog is optional. Server manifests support versioned replacement and review. Settings → Manage content provides uploads, private previews, editing, publication and revision history. Uploaded files live in a separate Docker content volume across releases.
 
 ## Native projects
 
@@ -44,5 +44,6 @@ Capacitor packages the shared interface in Android and iOS projects. Run npm run
 - [Original blueprint](docs/core-aura-blueprint.md)
 - [Implementation and remaining requirements](docs/implementation-status.md)
 - [Deployment, backend and native operations](docs/operations.md)
+- [Content administration and recovery](docs/content-admin.md)
 
 Core-aura currently presents spiritual and musical listening practices. Instrument models and raga phrase studies are original synthesis. Practitioner-reviewed recordings, world-tradition packs and clinical research remain pending.

@@ -33,6 +33,7 @@ import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
 import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
+import { Admin } from "./admin/Admin";
 import { readAppearance, saveAppearance, Appearance } from "./appearance";
 
 function time(seconds: number) {
@@ -65,7 +66,7 @@ const tabs = [
 export default function App() {
   const [tab, setTab] = useState<Tab>(() => {
     const route = location.hash.slice(1);
-    return ["studio", "chakras", "library"].includes(route)
+    return ["studio", "chakras", "library", "admin"].includes(route)
       ? (route as Tab)
       : "explore";
   });
@@ -447,6 +448,7 @@ export default function App() {
         </div>
       </header>
       <main id="main">
+        {tab === "admin" && <Admin />}
         {tab === "explore" && (
           <>
             <div className="page-heading">
@@ -1036,6 +1038,17 @@ export default function App() {
               Keep your device volume comfortable. Stop if listening feels
               uncomfortable.
             </p>
+            {!Capacitor.isNativePlatform() && (
+              <button
+                className="wide"
+                onClick={() => {
+                  setSettings(false);
+                  navigate("admin");
+                }}
+              >
+                Manage content
+              </button>
+            )}
             <button className="wide" onClick={update}>
               Check for updates
             </button>

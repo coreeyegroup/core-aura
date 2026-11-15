@@ -1,6 +1,6 @@
 # Core-aura implementation status
 
-Release 0.10.0 adds catalog browsing, integrity-checked downloadable sound packs, offline recorded playback in the shared audio context, and pack removal. Adjustable text and density remain unchanged.
+Release 0.11.0 adds browser-based content administration, persistent uploaded audio, private previews, publication controls and revision history. Listener display preferences and playback features remain available.
 
 | Requirement | Implemented in this release | Remaining acceptance |
 | --- | --- | --- |
@@ -14,8 +14,8 @@ Release 0.10.0 adds catalog browsing, integrity-checked downloadable sound packs
 | Audio files | Worker-based mono 44.1 kHz 16-bit WAV export from saved sessions, up to 10 minutes; progress and cancellation | Native file sharing and longer exports |
 | Offline | Versioned player cache, atomic IndexedDB pack installs, validated file hashes, cancelled/failed updates preserve older packs | Resumable partial downloads and storage-eviction recovery |
 | Session compatibility | Schema v2, engine version, validated imports, legacy flute/drone migration | Future migration tests whenever the schema changes |
-| Backend | FastAPI, PostgreSQL, migration, authenticated draft/review/publication/withdrawal API | Separate user accounts, reviewer identities and administrative UI |
-| Content rights | Required creator, license, attribution, provenance fields | Actual commissioned/licensed recordings and tradition-specific review |
+| Backend | FastAPI/PostgreSQL, uploaded-asset registry, revision events, authenticated administration screen, draft/review/publication/withdrawal | Separate user accounts and independently authenticated reviewers |
+| Content rights | Required creator, license, attribution, provenance fields and recorded operator notes | Actual commissioned/licensed recordings and tradition-specific review |
 | Scientific review | Product wording describes personal listening and meditation | Clinical research, claims register and qualified review |
 | Release delivery | Reproducible builds, atomic Ubuntu deployment, browser evidence and native build jobs | Stable app signing and store accounts |
 | World traditions | Architecture can add original sound models and reviewed content metadata | Pilot traditions, rights agreements and authentic content |
@@ -48,4 +48,14 @@ Files use bounded canonical PCM WAV with SHA-256 integrity checks and same-site 
 
 Recorded playback shares the existing AudioContext, analyser and master-volume state. One recorded file plays at a time. Starting a recording stops synthesis; starting synthesis stops the recording. Recorded files preserve their original tuning and are not yet layers in the tunable mixer. Pause/resume keeps playback position. Native background and interruption acceptance remain pending.
 
-Server manifests can be replaced using optimistic revisions and a higher content version. Replacement returns them to draft; review and publication are required again. New publication requires a file manifest, but the API does not upload files or certify that a supplied hash is authentic. Operators must validate rights, files and review before publication.
+Server manifests can be replaced using optimistic revisions and a higher content version. Replacement returns them to draft; review and publication are required again. Publication requires a managed file manifest. The upload service computes canonical file hashes and validates them during review/publication. Operators remain responsible for rights, musical context and content claims.
+
+## Content administration in 0.11.0
+
+Settings → Manage content (website) opens the shared-key administration screen. The operator enters a name and the existing server access key. Credentials remain in tab memory and are not placed in URLs, local storage or session storage. This is a single-administrator workflow; entered operator/reviewer names are self-reported, not independently verified accounts.
+
+Uploads accept bounded 16-bit PCM WAV at 44.1/48 kHz, mono or stereo. The service removes container metadata and writes a canonical WAV while preserving audio samples. Original local files are not modified. Uploaded audio has content-addressed immutable names in a separate Docker volume, outside static release directories. The default storage quota is 2 GiB, configurable in the environment. Each upload remains bounded at 25 MiB.
+
+Draft files require authenticated preview. The public file route serves audio only while a published pack references it. Review and publication verify registered metadata and actual file hashes. Pack creation, version replacement and publication decisions append database events in the same transaction. Stale revisions are rejected. Withdrawing content removes public discovery/access on subsequent uncached requests; offline downloads and previously cached public files are not remotely erased.
+
+Backups now contain a database dump and an audio archive with checksums and per-file hash verification. Backup/restore still requires an independent operational recovery rehearsal on the owner's VPS. Asset deletion/garbage collection, multi-user roles and store signing remain pending.

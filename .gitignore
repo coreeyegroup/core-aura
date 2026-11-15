@@ -17,3 +17,5 @@ ios/App/App/public/
 ios/App/App/capacitor.config.json
 ios/App/Pods/
 ios/App/build/
+
+backend/content/
