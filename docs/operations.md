@@ -46,3 +46,9 @@ Native binaries contain their own application assets. Their code updates use the
 ## Device acceptance
 
 Test normal and enlarged text, portrait/landscape, Bluetooth routes, speaker/headphone changes, calls, alarms, screen lock, offline startup, settings retention, audio pause position and session completion. Background playback and phone-call behavior remain unverified on physical devices.
+
+## Display preferences and audio export
+
+Use Settings → Display to change text size or spacing without reinstalling or reloading. Reset display restores 100% text with compact spacing. Pinch zoom is retained. The page asks for device-width; if a browser is set to Desktop site, turn that browser setting off.
+
+Save a session, open Library, choose WAV audio, select a duration, then Download WAV. A worker renders a mono 44.1 kHz 16-bit file from the saved configuration. Cancel export terminates rendering. Exports are capped at 10 minutes and need device storage for downloads. Settings JSON exports remain available separately. Native shells currently require the website/PWA for WAV download.

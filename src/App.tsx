@@ -13,7 +13,6 @@ import {
   Check,
   ArrowRight,
   WifiOff,
-  SlidersHorizontal,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -33,6 +32,7 @@ import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
 import { Waveform } from "./components/Waveform";
+import { readAppearance, saveAppearance, Appearance } from "./appearance";
 
 function time(seconds: number) {
   return (
@@ -80,6 +80,82 @@ export default function App() {
   const [starred, setStarred] = useState<Sound[]>(favorites);
   const [message, setMessage] = useState("");
   const [settings, setSettings] = useState(false);
+  const [appearance, setAppearance] = useState(readAppearance);
+  const [exporting, setExporting] = useState<Session | null>(null);
+  const [exportSeconds, setExportSeconds] = useState(60);
+  const [exportProgress, setExportProgress] = useState<number | null>(null);
+  const [exportError, setExportError] = useState("");
+  const exportWorker = useRef<Worker | null>(null);
+  useEffect(() => () => exportWorker.current?.terminate(), []);
+  function changeAppearance(next: Appearance) {
+    setAppearance(next);
+    if (!saveAppearance(next))
+      setUpdateStatus(
+        "Display changed for this visit; device storage is unavailable.",
+      );
+  }
+  function closeExport() {
+    exportWorker.current?.terminate();
+    exportWorker.current = null;
+    setExportProgress(null);
+    setExporting(null);
+    setExportError("");
+  }
+  function renderAudio() {
+    if (!exporting || exportWorker.current) return;
+    if (Capacitor.isNativePlatform()) {
+      setExportError(
+        "Use the website or installed web app to download WAV files. Native file sharing is not available yet.",
+      );
+      return;
+    }
+    try {
+      const row = parseSession(exporting);
+      setExportError("");
+      setExportProgress(0);
+      const worker = new Worker("/wav-worker.js", { type: "module" });
+      exportWorker.current = worker;
+      const failed = () => {
+        worker.terminate();
+        exportWorker.current = null;
+        setExportProgress(null);
+        setExportError("Audio export failed. Try a shorter duration.");
+      };
+      worker.onerror = failed;
+      worker.onmessage = ({ data }) => {
+        if (data.error) {
+          failed();
+          return;
+        }
+        if (typeof data.progress === "number") setExportProgress(data.progress);
+        if (data.buffer) {
+          const url = URL.createObjectURL(
+            new Blob([data.buffer], { type: "audio/wav" }),
+          );
+          const link = document.createElement("a");
+          link.href = url;
+          link.download =
+            "core-aura-" +
+            row.name.replace(/[^a-z0-9_-]/gi, "-").slice(0, 60) +
+            ".wav";
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+          worker.terminate();
+          exportWorker.current = null;
+          setExportProgress(null);
+          setExportError("WAV file prepared. Check your downloads.");
+        }
+      };
+      worker.postMessage({
+        channels: row.channels,
+        master: row.master,
+        seconds: exportSeconds,
+      });
+    } catch {
+      setExportError("This session cannot be exported.");
+      setExportProgress(null);
+    }
+  }
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
@@ -128,17 +204,18 @@ export default function App() {
     engine.setMaster(master);
   }, [master]);
   useEffect(() => {
-    if (!settings && !saving) return;
+    if (!settings && !saving && !exporting) return;
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSettings(false);
         setSaving(false);
+        closeExport();
         return;
       }
       if (event.key !== "Tab") return;
       const items = [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="dialog"] button:not(:disabled), [role="dialog"] input, [role="dialog"] summary',
+          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled), [role="dialog"] select:not(:disabled), [role="dialog"] summary',
         ),
       ];
       const first = items[0],
@@ -154,7 +231,7 @@ export default function App() {
     };
     document.addEventListener("keydown", keyboard);
     return () => document.removeEventListener("keydown", keyboard);
-  }, [settings, saving]);
+  }, [settings, saving, exporting]);
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
     navigator.mediaSession.metadata = new MediaMetadata({
@@ -448,73 +525,65 @@ export default function App() {
                 Save
               </button>
             </div>
-            <section className="tuner" aria-labelledby="tuner-heading">
-              <div className="tuner-top">
-                <h2 id="tuner-heading">{sounds[focus.sound].name}</h2>
-                <span>
-                  {states.some((s) => s.id === focus.id) ? "Active" : "Ready"}
-                </span>
-              </div>
-              <div className="frequency">
-                {focus.hz.toFixed(focus.hz % 1 ? 2 : 0)}
-                <span> Hz</span>
-              </div>
-              <p>
-                {["yaman", "mohanam", "tanpura"].includes(focus.sound)
-                  ? "Tonic · Sa"
-                  : note(focus.hz)}
-              </p>
-              <Waveform />
-              <label className="sr-only" htmlFor="visual-tuning">
-                Tune frequency
-              </label>
-              <input
-                id="visual-tuning"
-                type="range"
-                min={sounds[focus.sound].min}
-                max={sounds[focus.sound].max}
-                step=".1"
-                value={focus.hz}
-                onChange={(e) =>
-                  patch({ ...focus, hz: Number(e.target.value) })
-                }
-              />
-              <div className="fine-tune">
-                <button
-                  onClick={() =>
-                    patch({
-                      ...focus,
-                      hz: Math.max(
-                        sounds[focus.sound].min,
-                        Math.round((focus.hz - 1) * 100) / 100,
-                      ),
-                    })
+            <details className="tuner">
+              <summary id="tuner-heading">
+                Visual tuning · {focus.hz} Hz <span>{note(focus.hz)}</span>
+              </summary>
+              <div className="tuner-content">
+                <Waveform />
+                <label className="sr-only" htmlFor="visual-tuning">
+                  Tune frequency
+                </label>
+                <input
+                  id="visual-tuning"
+                  type="range"
+                  min={sounds[focus.sound].min}
+                  max={sounds[focus.sound].max}
+                  step=".1"
+                  value={focus.hz}
+                  onChange={(e) =>
+                    patch({ ...focus, hz: Number(e.target.value) })
                   }
-                  aria-label="Decrease frequency by 1 Hz"
-                >
-                  −1 Hz
-                </button>
-                <span>Fine tuning</span>
-                <button
-                  onClick={() =>
-                    patch({
-                      ...focus,
-                      hz: Math.min(
-                        sounds[focus.sound].max,
-                        Math.round((focus.hz + 1) * 100) / 100,
-                      ),
-                    })
-                  }
-                  aria-label="Increase frequency by 1 Hz"
-                >
-                  +1 Hz
-                </button>
+                />
+                <div className="fine-tune">
+                  <button
+                    onClick={() =>
+                      patch({
+                        ...focus,
+                        hz: Math.max(
+                          sounds[focus.sound].min,
+                          Math.round((focus.hz - 1) * 100) / 100,
+                        ),
+                      })
+                    }
+                    aria-label="Decrease frequency by 1 Hz"
+                  >
+                    −1 Hz
+                  </button>
+                  <span>Fine tuning</span>
+                  <button
+                    onClick={() =>
+                      patch({
+                        ...focus,
+                        hz: Math.min(
+                          sounds[focus.sound].max,
+                          Math.round((focus.hz + 1) * 100) / 100,
+                        ),
+                      })
+                    }
+                    aria-label="Increase frequency by 1 Hz"
+                  >
+                    +1 Hz
+                  </button>
+                </div>
               </div>
-            </section>
+            </details>
             {layers.map((c, i) => (
               <ChannelEditor
                 key={c.id}
                 value={c}
+                title={"Layer " + (i + 1)}
+                showTransport={layers.length > 1}
                 onChange={patch}
                 states={states}
                 onError={setMessage}
@@ -567,9 +636,6 @@ export default function App() {
                 Save
               </button>
             </div>
-            <p className="lead">
-              Listen to one frequency or create a combination.
-            </p>
             <div className="segmented" aria-label="Mix selection">
               <button
                 aria-pressed={mixTarget === "selected"}
@@ -639,16 +705,6 @@ export default function App() {
                         states={states}
                         onError={setMessage}
                       />
-                      <button
-                        className="icon-button"
-                        aria-label={
-                          (value.muted ? "Unmute " : "Mute ") + c.name
-                        }
-                        aria-pressed={value.muted}
-                        onClick={() => patch({ ...value, muted: !value.muted })}
-                      >
-                        {value.muted ? "Off" : "On"}
-                      </button>
                     </div>
                     <details>
                       <summary>
@@ -656,7 +712,21 @@ export default function App() {
                           ? state.status + " · " + time(state.time)
                           : "Volume & focus"}
                       </summary>
-                      <p>{c.prompt}</p>
+                      <div className="focus-controls">
+                        <p>{c.prompt}</p>{" "}
+                        <button
+                          className="icon-button"
+                          aria-label={
+                            (value.muted ? "Unmute " : "Mute ") + c.name
+                          }
+                          aria-pressed={value.muted}
+                          onClick={() =>
+                            patch({ ...value, muted: !value.muted })
+                          }
+                        >
+                          {value.muted ? "Off" : "On"}
+                        </button>
+                      </div>
                       <label className="range-label">
                         {c.name} volume{" "}
                         <output>{Math.round(value.volume * 100)}%</output>
@@ -756,8 +826,22 @@ export default function App() {
                   >
                     Rename
                   </button>
+                  <button
+                    onClick={() => {
+                      setExporting(row);
+                      setExportSeconds(
+                        Math.min(
+                          60,
+                          Math.max(...row.channels.map((c) => c.seconds)),
+                        ),
+                      );
+                      setExportError("");
+                    }}
+                  >
+                    WAV audio
+                  </button>
                   <button onClick={() => exportSession(row)}>
-                    <Download size={16} /> Export
+                    <Download size={16} /> Settings JSON
                   </button>
                   <button
                     onClick={() => {
@@ -802,35 +886,40 @@ export default function App() {
       </main>
       {(isStudio || isChakras) && (
         <section className="player-dock" aria-label="Session player">
-          <div className="dock-settings">
-            <label>
-              Timer
-              <select
-                aria-label="Session duration"
-                value={seconds}
-                disabled={states.some((s) =>
-                  current.some((c) => c.id === s.id),
-                )}
-                onChange={(e) => setSeconds(Number(e.target.value))}
-              >
-                <option value="60">1 min</option>
-                <option value="300">5 min</option>
-                <option value="600">10 min</option>
-                <option value="1800">30 min</option>
-              </select>
-            </label>
-            <label>
-              Master <output>{Math.round(master * 100)}%</output>
-              <input
-                aria-label="Master volume"
-                type="range"
-                min="0"
-                max="100"
-                value={master * 100}
-                onChange={(e) => setMaster(Number(e.target.value) / 100)}
-              />
-            </label>
-          </div>
+          <details className="session-options">
+            <summary>
+              Session · {seconds / 60} min · Volume {Math.round(master * 100)}%
+            </summary>
+            <div className="dock-settings">
+              <label>
+                Timer
+                <select
+                  aria-label="Session duration"
+                  value={seconds}
+                  disabled={states.some((s) =>
+                    current.some((c) => c.id === s.id),
+                  )}
+                  onChange={(e) => setSeconds(Number(e.target.value))}
+                >
+                  <option value="60">1 min</option>
+                  <option value="300">5 min</option>
+                  <option value="600">10 min</option>
+                  <option value="1800">30 min</option>
+                </select>
+              </label>
+              <label>
+                Master <output>{Math.round(master * 100)}%</output>
+                <input
+                  aria-label="Master volume"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={master * 100}
+                  onChange={(e) => setMaster(Number(e.target.value) / 100)}
+                />
+              </label>
+            </div>
+          </details>
           {errorInvalid ? (
             <p role="alert">Enter a frequency within the instrument’s range.</p>
           ) : (
@@ -894,19 +983,48 @@ export default function App() {
               Check for updates
             </button>
             {updateStatus && <p role="status">{updateStatus}</p>}
-            <button
-              className="wide"
-              onClick={() => {
-                const next =
-                  localStorage.getItem("core-aura.display") === "phone"
-                    ? "auto"
-                    : "phone";
-                localStorage.setItem("core-aura.display", next);
-                location.reload();
-              }}
-            >
-              <SlidersHorizontal size={19} /> Change phone display size
-            </button>
+            <fieldset className="appearance-controls">
+              <legend>Display</legend>
+              <label>
+                Text size <output>{appearance.textSize}%</output>
+                <input
+                  aria-label="Text size"
+                  type="range"
+                  min="90"
+                  max="140"
+                  step="5"
+                  value={appearance.textSize}
+                  onChange={(e) =>
+                    changeAppearance({
+                      ...appearance,
+                      textSize: Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+              <label>
+                Spacing
+                <select
+                  value={appearance.density}
+                  onChange={(e) =>
+                    changeAppearance({
+                      ...appearance,
+                      density: e.target.value as Appearance["density"],
+                    })
+                  }
+                >
+                  <option value="compact">Compact</option>
+                  <option value="comfortable">Comfortable</option>
+                </select>
+              </label>
+              <button
+                onClick={() =>
+                  changeAppearance({ textSize: 100, density: "compact" })
+                }
+              >
+                Reset display
+              </button>
+            </fieldset>
             <button
               className="wide"
               onClick={() => {
@@ -934,6 +1052,84 @@ export default function App() {
               Built-in sounds are synthesis studies. Clinical claims and
               cultural content require their respective review.
             </p>
+          </section>
+        </div>
+      )}
+      {exporting && (
+        <div className="modal-backdrop">
+          <section
+            className="sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="export-title"
+          >
+            <div className="section-heading">
+              <h2 id="export-title">Export audio</h2>
+              <button
+                autoFocus
+                className="icon-button"
+                aria-label="Close audio export"
+                onClick={closeExport}
+              >
+                <X />
+              </button>
+            </div>
+            <p>{exporting.name} · mono WAV · 44.1 kHz · 16-bit</p>
+            <label>
+              Export duration
+              <select
+                disabled={exportProgress !== null}
+                value={exportSeconds}
+                onChange={(e) => setExportSeconds(Number(e.target.value))}
+              >
+                {[
+                  ...new Set([
+                    Math.min(
+                      60,
+                      Math.max(...exporting.channels.map((c) => c.seconds)),
+                    ),
+                    15,
+                    30,
+                    60,
+                    300,
+                    600,
+                  ]),
+                ]
+                  .filter(
+                    (n) =>
+                      n <=
+                      Math.max(...exporting.channels.map((c) => c.seconds)),
+                  )
+                  .sort((a, b) => a - b)
+                  .map((n) => (
+                    <option key={n} value={n}>
+                      {n < 60 ? n + " sec" : n / 60 + " min"}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <p className="content-note">
+              Renders saved settings from the beginning. No microphone
+              recording. Maximum 10 minutes per export.
+            </p>
+            {exportProgress !== null ? (
+              <>
+                <label>
+                  Rendering {exportProgress}%
+                  <progress
+                    aria-label="Audio export progress"
+                    max="100"
+                    value={exportProgress}
+                  />
+                </label>
+                <button onClick={closeExport}>Cancel export</button>
+              </>
+            ) : (
+              <button className="primary" onClick={renderAudio}>
+                Download WAV
+              </button>
+            )}
+            {exportError && <p role="status">{exportError}</p>}
           </section>
         </div>
       )}

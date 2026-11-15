@@ -157,23 +157,68 @@ const fs = require("node:fs");
       .waitFor();
     await p.getByRole("button", { name: "Stop", exact: true }).last().click();
     await ctx.close();
-    // Host browser that ignores mobile viewport, including desktop dimensions.
-    const ignored = await browser.newContext({
-      viewport: { width: 980, height: 2100 },
-      screen: { width: 980, height: 2100 },
-      isMobile: false,
+    // Display controls vary text independently of layout and persist across reloads.
+    const display = await browser.newContext({
+      viewport: { width: 320, height: 852 },
+      screen: { width: 320, height: 852 },
+      isMobile: true,
       hasTouch: true,
-      deviceScaleFactor: 1,
     });
-    const q = await ignored.newPage();
-    await q.goto("http://localhost:8089");
-    const fallback = await q.evaluate(() => ({
-      zoom: Number(getComputedStyle(document.documentElement).zoom),
-      overflow: document.documentElement.scrollWidth,
-    }));
-    assert.ok(fallback.zoom > 2.7 && fallback.overflow <= 980);
-    await q.screenshot({ path: "mobile-verification/ignored-viewport.png" });
-    await ignored.close();
+    const q = await display.newPage();
+    await q.goto("http://localhost:8089/#studio");
+    assert.equal(
+      await q.getByRole("button", { name: "Play", exact: true }).count(),
+      1,
+    );
+    await q.getByRole("button", { name: "Settings", exact: true }).click();
+    await q.getByRole("slider", { name: "Text size", exact: true }).fill("140");
+    await q.getByLabel("Spacing", { exact: true }).selectOption("comfortable");
+    await q.getByRole("button", { name: "Close settings" }).click();
+    await q.reload();
+    assert.equal(
+      await q.evaluate(() => getComputedStyle(document.body).fontSize),
+      "22.4px",
+    );
+    for (const tab of ["Studio", "Chakras", "Library", "Explore"]) {
+      await q.getByRole("button", { name: tab, exact: true }).last().click();
+      assert.ok(
+        await q.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      );
+      await q.screenshot({
+        path: "mobile-verification/large-" + tab.toLowerCase() + "-320.png",
+      });
+    }
+    await q.getByRole("button", { name: "Settings", exact: true }).click();
+    await q.getByRole("button", { name: "Reset display" }).click();
+    await q.getByRole("button", { name: "Close settings" }).click();
+    await q.getByRole("button", { name: "Studio", exact: true }).last().click();
+    // Save and download actual generated audio through a module worker, offline.
+    await q.getByRole("button", { name: "Save", exact: true }).click();
+    await q
+      .getByRole("textbox", { name: "Session name", exact: true })
+      .fill("WAV test");
+    await q.getByRole("button", { name: "Save to Library" }).click();
+    await q.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+    await q.reload();
+    await q.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+    await display.setOffline(true);
+    await q
+      .getByRole("button", { name: "Library", exact: true })
+      .last()
+      .click();
+    await q.getByRole("button", { name: "WAV audio", exact: true }).click();
+    await q.getByLabel("Export duration", { exact: true }).selectOption("15");
+    const downloading = q.waitForEvent("download");
+    await q.getByRole("button", { name: "Download WAV", exact: true }).click();
+    const download = await downloading;
+    await download.saveAs("mobile-verification/session.wav");
+    const wav = fs.readFileSync("mobile-verification/session.wav");
+    assert.equal(wav.subarray(0, 4).toString(), "RIFF");
+    assert.equal(wav.readUInt32LE(24), 44100);
+    assert.equal(wav.length, 44 + 15 * 44100 * 2);
+    await display.close();
     fs.writeFileSync(
       "mobile-verification/measurements.json",
       JSON.stringify(results, null, 2),
