@@ -259,6 +259,22 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
+  const miniRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = miniRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() =>
+      document.documentElement.style.setProperty(
+        "--mini-height",
+        element.getBoundingClientRect().height + "px",
+      ),
+    );
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty("--mini-height");
+    };
+  }, [tab, practice.status, states.some((s) => s.status === "playing")]);
   const dockRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const dock = dockRef.current;
@@ -1146,7 +1162,7 @@ export default function App() {
       )}
       {["playing", "paused"].includes(practice.status) &&
         tab !== "manifest" && (
-          <div className="mini-player">
+          <div ref={miniRef} className="mini-player">
             <span>{practice.plan?.name}</span>
             <button
               onClick={() =>
@@ -1166,7 +1182,7 @@ export default function App() {
         activeCount > 0 &&
         tab !== "studio" &&
         tab !== "chakras" && (
-          <div className="mini-player">
+          <div ref={miniRef} className="mini-player">
             <AudioLines size={20} />
             <span>{activeCount} layers playing</span>
             <button onClick={() => engine.stopAll()}>Stop all</button>

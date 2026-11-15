@@ -1320,3 +1320,21 @@ textarea:focus-visible {
   min-width: 0;
   padding-inline: 8px;
 }
+
+.saved-card > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+[data-text-size="large"] .manifest-workspace > .section-heading {
+  flex-direction: column;
+  align-items: stretch;
+}
+[data-text-size="large"] .manifest-workspace .fields {
+  grid-template-columns: 1fr;
+}
+.app:has(.mini-player) main {
+  padding-bottom: calc(
+    var(--nav) + var(--mini-height, 76px) + 16px +
+      env(safe-area-inset-bottom, 0px)
+  );
+}

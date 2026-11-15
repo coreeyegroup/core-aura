@@ -88,6 +88,38 @@ function speechMock() {
           [],
         );
       }
+      if (width === 320) {
+        await p.getByRole("button", { name: "Settings", exact: true }).click();
+        const size = p.getByRole("slider", { name: "Text size", exact: true });
+        await size.focus();
+        await size.press("End");
+        await p
+          .getByLabel("Spacing", { exact: true })
+          .selectOption("comfortable");
+        await p
+          .getByRole("button", { name: "Close settings", exact: true })
+          .click();
+        assert.ok(
+          await p.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+        await p.screenshot({
+          path: "mobile-verification/affirmations-large-320.png",
+        });
+        await p
+          .getByRole("button", { name: "Manifest", exact: true })
+          .last()
+          .click();
+        assert.ok(
+          await p.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        );
+        await p.screenshot({
+          path: "mobile-verification/manifest-large-320.png",
+        });
+      }
       await c.close();
     }
     const ctx = await browser.newContext({

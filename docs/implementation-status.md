@@ -64,4 +64,4 @@ Backups now contain a database dump and an audio archive with checksums and per-
 
 ## Manifestation implementation
 
-See [manifestation.md](manifestation.md) for platform limits and acceptance. Personal scripts/schedules stay on the device and are not uploaded to the content administration service. Native speech and notifications compile separately from PWA functionality and need actual device testing. Scheduled reminders open a practice; speaking requires a user tap.
+See [manifestation.md](manifestation.md) for platform limits and acceptance. Personal scripts/schedules stay on the device and are not uploaded to the content administration service. Native speech and notifications compile separately from PWA functionality and need actual device testing. Schedules default to reminders, with opt-in visible/idle auto-start. Closed or locked apps require opening the practice and tapping Play.
