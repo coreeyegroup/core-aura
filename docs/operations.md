@@ -105,3 +105,20 @@ Run `sudo docker compose ps` and `sudo docker compose logs --tail 50 reminders` 
 Use ops/backup-backend.sh with a protected directory. It now includes a mode-600 environment backup along with the database and server audio, with checksums. Treat the backup as secret: it contains database/admin/VAPID credentials and subscription records. Restore the environment with the matching database, preserve ownership/mode, then run start-backend. Personal browser recordings and practice text are not in server backups; export text/settings JSON and download audio separately. Deleting the server reminder records opts those devices out until re-enabled. Inactive expired subscriptions are retained at most 30 days; delivery rows expire after seven days. Active subscriptions remain until disabled or rejected by their push service.
 
 The normal install test is: save one practice, create a reminder a few minutes ahead, Enable reminders, verify the enabled status, close the app, receive the notification and tap to reopen the same practice. Repeat with a disabled/deleted schedule and with permission denial. This real external-device delivery test is performed by the installer; automated CI uses mock subscriptions/transports and sends no real pushes.
+
+## Release 0.14.0: voice import and file sharing
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.14.0-voice-library
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+bash ops/verify.sh 0.14.0
+```
+
+No new database migration, public route or server tool is required. The backend image is rebuilt for matching health/version metadata; existing content, reminder registrations and VAPID keys are retained. Existing Caddy /api routing remains sufficient. Update the installed PWA in Settings.
+
+Pinned native additions: @capacitor/filesystem 7.1.9 and @capacitor/share 7.0.4. Android and iOS must be rebuilt to obtain those native plugins. The iOS privacy manifest is included in the app target resources. Android sharing is limited to the core-aura-exports cache subdirectory. No new storage permission is needed. Native packages remain development builds until stable production signing/distribution is configured.
+
+Acceptance: play a library affirmation; use direct Play/Pause on a saved practice; import a short 16-bit PCM WAV into a sentence, preview and confirm; export that recording and reimport the exported WAV while offline. Verify invalid/truncated/overlong files do not change the prior sentence attachment. On actual native builds, choose Save to Files or another explicit share destination, check the saved file, cancel another share, and test JSON/ICS exports. Automated native-share tests mock the filesystem and OS sheet; no files are sent to external recipients during CI.

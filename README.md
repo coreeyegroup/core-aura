@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.13.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.14.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -17,13 +17,13 @@ The build output is dist/. The production player needs HTTPS, including for its 
 
 ## Manifestation
 
-Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Every affirmation has a Play preview; selected sentences can use personal microphone recordings. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
 
 ## Screens
 
 Sounds includes Explore for built-in sounds/favorites and Studio for synthesis. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library separates affirmations/saved manifestation practices from audio sessions, packs and offline readiness. Settings contains update, listening and display controls. Text size (90–140%) and Compact/Comfortable spacing are saved independently. The app does not force a 360-pixel viewport.
 
-Library distinguishes Settings JSON (editable session backup) from WAV audio (rendered sound). WAV export works offline on web/PWA, uses a cancellable background worker and supports up to 10 minutes per export. Native audio-file sharing remains pending.
+Library distinguishes Settings JSON (editable session backup) from WAV audio (rendered sound). WAV export works offline on web/PWA, uses a cancellable background worker and supports up to 10 minutes per export. Native builds can open the share sheet for WAV audio, settings JSON, practice JSON and calendar files; physical-device acceptance remains pending.
 
 The master mixer uses one audio context. Pitch changes preserve the percussion pulse and session duration. Approximate instrument and raga synthesis remains subject to musical review.
 

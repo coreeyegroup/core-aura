@@ -1406,3 +1406,10 @@ textarea:focus-visible {
 .affirmation-row {
   flex-wrap: wrap;
 }
+
+.preview-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}

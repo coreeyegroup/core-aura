@@ -1,14 +1,14 @@
-# Release 0.13.0 status
+# Release 0.14.0 status
 
-Added per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback, recording management and opt-in closed-app web push scheduling. Details: [manifestation guide](manifestation.md).
+Added PCM WAV import, portable voice WAV export, saved-recording reuse, direct saved-practice Play/Pause, and native share-sheet exports. Per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback and opt-in closed-app web push remain available. Details: [manifestation guide](manifestation.md).
 
 Backend migration 003 adds subscriptions, durable deliveries and worker heartbeat. Compose adds a reminder worker; deployment preserves its VAPID keypair in .env. [Operations](operations.md) includes the upgrade and backup requirements.
 
-Pending: physical Android/iOS microphone/notification/lock-screen acceptance; production native signing and store distribution; native audio sharing; reimport of personal audio backups; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
+Pending: physical Android/iOS microphone/notification/lock-screen acceptance; production native signing and store distribution; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
 
 ## Current implementation coverage
 
-Release 0.13.0 extends manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
+Release 0.14.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
 
 | Requirement | Implemented in this release | Remaining acceptance |
 | --- | --- | --- |
@@ -21,7 +21,7 @@ Release 0.13.0 extends manifestation the opening workspace, with an affirmation 
 | Indian classical music | Yaman and Mohanam phrase studies with tonic transposition | Hindustani/Carnatic practitioner review, ornamentation and expanded repertoire |
 | Mixing | One shared AudioContext, per-layer pause, mute, level, master, stop and fades | Long-duration device CPU/battery testing |
 | Chakra sessions | Seven mapped channels, separate and combined transport, bowl/sine/triangle type, per-channel level and saved combinations | Listening review on headphones and speakers |
-| Audio files | Worker-based mono 44.1 kHz 16-bit WAV export from saved sessions, up to 10 minutes; progress and cancellation | Native file sharing and longer exports |
+| Audio files | Saved-session WAV exports up to 10 minutes, PCM voice WAV import, portable 32 kHz voice exports and native share sheets | Physical native share-sheet acceptance and longer exports |
 | Offline | Versioned player cache, atomic IndexedDB pack installs, validated file hashes, cancelled/failed updates preserve older packs | Resumable partial downloads and storage-eviction recovery |
 | Session compatibility | Schema v2, engine version, validated imports, legacy flute/drone migration | Future migration tests whenever the schema changes |
 | Backend | FastAPI/PostgreSQL, uploaded-asset registry, revision events, authenticated administration screen, draft/review/publication/withdrawal | Separate user accounts and independently authenticated reviewers |
@@ -46,7 +46,7 @@ Settings provides saved text scaling from 90% to 140% and Compact/Comfortable sp
 
 Studio keeps exact frequency input in each layer. Visual tuning is optional. A single layer has one main transport; multi-layer sessions also expose separate layer transports. Timer and master volume share one expandable session control. Chakra selection, frequency, sound and individual transport remain available; mute and per-channel volume sit in the detail panel.
 
-WAV export renders saved settings from time zero; it does not record the microphone or the current playback position. Muted channels, master volume, individual session lengths and fade envelopes are honored. Its duration is limited to 10 minutes to bound device memory. WAV downloads are enabled for web/PWA. Native sharing remains pending.
+WAV export renders saved settings from time zero; it does not record the microphone or the current playback position. Muted channels, master volume, individual session lengths and fade envelopes are honored. Its duration is limited to 10 minutes to bound device memory. WAV downloads are enabled for web/PWA; new native builds use the system share sheet.
 
 ## Sound packs in 0.10.0
 

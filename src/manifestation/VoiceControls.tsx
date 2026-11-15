@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { engine } from "../audio/engine";
 import { Capacitor } from "@capacitor/core";
+import { Play, Square } from "lucide-react";
+import { deliverFile } from "../files/deliver";
+import { importVoice, exportVoice } from "./voice-files";
 import { Line } from "./model";
 import { manifestPlayer } from "./player";
 import { manifestationStore as store } from "./store";
@@ -56,7 +59,12 @@ export function PreviewButton({
           }
         }}
       >
-        {playing ? "■ Stop" : "▶ Play"}
+        {playing ? (
+          <Square size={16} aria-hidden="true" />
+        ) : (
+          <Play size={16} aria-hidden="true" />
+        )}
+        <span>{playing ? "Stop" : "Play"}</span>
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">
@@ -78,20 +86,35 @@ export function RecordSentence({
   const dialog = useRef<HTMLDialogElement>(null),
     session = useRef<Capture | undefined>(undefined),
     controller = useRef<AbortController | undefined>(undefined),
-    alive = useRef(true);
+    alive = useRef(true),
+    fileInput = useRef<HTMLInputElement>(null),
+    preview = useRef<HTMLAudioElement>(null),
+    currentPhase = useRef("idle");
   const [phase, setPhase] = useState<
       "idle" | "asking" | "recording" | "processing" | "ready" | "saving"
     >("idle"),
     [clip, setClip] = useState<PersonalRecording>(),
     [url, setUrl] = useState(""),
     [error, setError] = useState("");
+  const [saved, setSaved] = useState<PersonalRecording[]>([]);
+  currentPhase.current = phase;
+  useEffect(() => {
+    void recordings()
+      .then((rows) => {
+        if (alive.current) setSaved(rows.filter((c) => c.text === line.text));
+      })
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     alive.current = true;
     dialog.current?.showModal();
     const hide = () => {
       if (document.hidden) {
-        controller.current?.abort();
-        onClose();
+        preview.current?.pause();
+        if (["asking", "recording"].includes(currentPhase.current)) {
+          controller.current?.abort();
+          onClose();
+        }
       }
     };
     document.addEventListener("visibilitychange", hide);
@@ -158,6 +181,61 @@ export function RecordSentence({
     >
       <h2 id="record-heading">Record your sentence</h2>
       <p>{line.text}</p>
+      <input
+        className="sr-only"
+        type="file"
+        accept="audio/wav,audio/x-wav,.wav"
+        aria-label="Import sentence WAV"
+        ref={fileInput}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          manifestPlayer.stop();
+          engine.stopAll();
+          setError("");
+          setPhase("processing");
+          void importVoice(file, line.text)
+            .then((value) => {
+              if (alive.current) {
+                setClip(value);
+                setPhase("ready");
+              }
+            })
+            .catch((e) => {
+              if (alive.current) {
+                setError(e.message);
+                setPhase("idle");
+              }
+            });
+        }}
+      />
+      {phase === "idle" && saved.length > 0 && (
+        <label>
+          Saved voice for these words
+          <select
+            aria-label="Saved voice for these words"
+            defaultValue=""
+            onChange={(e) => {
+              const value = saved.find((c) => c.id === e.target.value);
+              if (value) {
+                setClip(value);
+                setPhase("ready");
+              }
+            }}
+          >
+            <option value="" disabled>
+              Choose a recording
+            </option>
+            {saved.map((c) => (
+              <option key={c.id} value={c.id}>
+                {new Date(c.createdAt).toLocaleString()} ·{" "}
+                {Math.round(c.seconds)} sec
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <p className="content-note">
         Up to 60 seconds. Recordings stay on this device. Stop and listen before
         saving.
@@ -174,6 +252,7 @@ export function RecordSentence({
       {url && phase === "ready" && (
         <audio
           controls
+          ref={preview}
           onPlay={() => {
             manifestPlayer.stop();
             engine.stopAll();
@@ -182,7 +261,16 @@ export function RecordSentence({
           aria-label="Your recording preview"
         />
       )}
+      {phase === "ready" && (
+        <p className="content-note">
+          Listen and confirm that the recording matches the sentence above
+          before using it.
+        </p>
+      )}
       <div className="admin-actions">
+        {phase === "idle" && (
+          <button onClick={() => fileInput.current?.click()}>Import WAV</button>
+        )}
         {["idle", "ready"].includes(phase) && (
           <button onClick={() => void start()}>
             {clip ? "Record again" : "Start recording"}
@@ -221,6 +309,12 @@ export function RecordSentence({
   );
 }
 export function PersonalVoices() {
+  const playback = useSyncExternalStore(
+    manifestPlayer.subscribe,
+    manifestPlayer.snapshot,
+  );
+  const [busy, setBusy] = useState(false),
+    [message, setMessage] = useState("");
   const [clips, setClips] = useState<PersonalRecording[]>([]),
     [error, setError] = useState("");
   useEffect(() => {
@@ -245,8 +339,8 @@ export function PersonalVoices() {
       <summary>My voice recordings ({clips.length})</summary>
       <p className="content-note">
         Stored on this device, up to 100 clips / 50 MB. Practice JSON backups
-        contain sentences and settings; download recordings separately to keep
-        audio copies.
+        contain sentences and settings; export WAV recordings separately to keep
+        reimportable audio copies.
       </p>
       {clips.map((c) => (
         <article className="saved-card" key={c.id}>
@@ -263,22 +357,51 @@ export function PersonalVoices() {
               recorded
             />
             <button
-              disabled={Capacitor.isNativePlatform()}
-              title={
-                Capacitor.isNativePlatform()
-                  ? "Native file sharing is pending."
-                  : undefined
-              }
+              disabled={busy}
               onClick={() => {
-                const url = URL.createObjectURL(c.blob),
-                  a = document.createElement("a");
-                a.href = url;
-                a.download = `core-aura-voice-${c.id}.${c.mime.includes("mp4") ? "m4a" : c.mime.includes("ogg") ? "ogg" : "webm"}`;
-                a.click();
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                setBusy(true);
+                setError("");
+                void exportVoice(c)
+                  .then((blob) =>
+                    deliverFile(blob, `core-aura-voice-${c.id}.wav`),
+                  )
+                  .then(setMessage)
+                  .catch((e) => setError(e.message))
+                  .finally(() => setBusy(false));
               }}
             >
-              Download
+              {Capacitor.isNativePlatform() ? "Share WAV" : "Download WAV"}
+            </button>
+            <button
+              disabled={["playing", "paused"].includes(playback.status)}
+              onClick={() => {
+                try {
+                  const { draft } = store.snapshot().data;
+                  const existing = draft.lines.find((l) => l.text === c.text);
+                  if (!existing && draft.lines.length >= 50)
+                    throw Error("Choose up to 50 sentences.");
+                  const line = {
+                    id: existing?.id || crypto.randomUUID(),
+                    text: c.text,
+                    recordingId: c.id,
+                    recordedText: c.text,
+                  };
+                  store.draft({
+                    ...draft,
+                    useRecordings: true,
+                    lines: existing
+                      ? draft.lines.map((l) =>
+                          l.id === existing.id ? line : l,
+                        )
+                      : [...draft.lines, line],
+                  });
+                  setMessage("Recording added to your current practice.");
+                } catch (e) {
+                  setError((e as Error).message);
+                }
+              }}
+            >
+              Use in practice
             </button>
             <button
               onClick={() => {
@@ -308,7 +431,7 @@ export function PersonalVoices() {
           practice.
         </p>
       )}
-      {error && <p role="status">{error}</p>}
+      {(error || message) && <p role="status">{error || message}</p>}
     </details>
   );
 }
