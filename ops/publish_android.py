@@ -30,7 +30,10 @@ def fetch(url, path, limit):
             out.write(block)
 
 def command(args):
-    return subprocess.check_output([str(a) for a in args], stderr=subprocess.STDOUT)
+    try:
+        return subprocess.check_output([str(a) for a in args], stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(error.output.decode(errors="replace").strip()) from None
 
 def signing_identity(state, published):
     key, password = state / "release.p12", state / "password"
@@ -108,7 +111,7 @@ def publish(inputs):
         signed_name = f"core-aura-{version}.apk"
         signed = stage / signed_name
         signer = inputs / TOOL_NAME
-        command(["java", "-jar", signer, "sign", "--ks", key, "--ks-key-alias", "core-aura", "--ks-pass", "file:" + str(password), "--key-pass", "file:" + str(password), "--v4-signing-enabled", "false", "--out", signed, inputs / apk_name])
+        command(["java", "-jar", signer, "sign", "--ks", key, "--ks-key-alias", "core-aura", "--ks-pass", "file:" + str(password), "--ks-type", "PKCS12", "--v4-signing-enabled", "false", "--out", signed, inputs / apk_name])
         verification = command(["java", "-jar", signer, "verify", "--verbose", "--print-certs", signed]).decode()
         certificate = re.search(r"Signer #1 certificate SHA-256 digest: ([a-fA-F0-9]{64})", verification)
         if not certificate or certificate[1].lower() != fingerprint:
