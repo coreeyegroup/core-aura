@@ -1,4 +1,6 @@
-# Release 0.18.0 status
+# Release 0.19.0 status
+
+Added a hosted Android download page, native version/signing-aware update checks and a permanent VPS-owned signing/publication channel. CI produces unsigned inputs only after verification; the VPS publishes a signed APK and update metadata atomically outside web release directories. Android installation remains user-confirmed. The old debug APK needs a one-time backed-up transition to the stable key. See [Android distribution](android-distribution.md).
 
 Completed a continuity audit with nested navigation/history, reload restoration, saved-practice targets, composer/workspace persistence, draft replacement protection, save-to-schedule handoff, preview identity, global paused-player controls, non-overlapping playback, complete emergency stop and explicit service readiness checks. Findings and remaining limits: [flow audit](flow-audit.md).
 
@@ -10,7 +12,7 @@ Added editable device-local categories/affirmations, category moves and library 
 
 Backend migration 003 adds subscriptions, durable deliveries and worker heartbeat. Compose adds a reminder worker; deployment preserves its VAPID keypair in .env. [Operations](operations.md) includes the upgrade and backup requirements.
 
-Pending: physical Android/iOS microphone/notification/lock-screen acceptance; production native signing and store distribution; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
+Pending: physical Android/iOS microphone/notification/lock-screen acceptance; VPS signing-key setup/publication and physical stable-update acceptance; iOS/store distribution; accounts/cloud practice synchronization; editor/reviewer account separation. No claims of cell regeneration, guaranteed health/wealth results or closed-app automatic speech.
 
 ## Current implementation coverage
 

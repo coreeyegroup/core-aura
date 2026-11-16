@@ -1,4 +1,13 @@
 core-aura.coreeye.in {
+    handle_path /android/* {
+        root * /var/www/core-aura/android
+        header Access-Control-Allow-Origin "*"
+        header Cache-Control "no-store"
+        @androidApk path *.apk
+        header @androidApk Content-Type application/vnd.android.package-archive
+        header @androidApk Content-Disposition attachment
+        file_server
+    }
     root * /var/www/core-aura/current
     encode zstd gzip
     header Cache-Control "no-cache"

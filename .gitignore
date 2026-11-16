@@ -19,3 +19,11 @@ ios/App/Pods/
 ios/App/build/
 
 backend/content/
+
+# Private Android signing identities and local distribution builds
+*.p12
+*.jks
+*.keystore
+android-publish-inputs/
+android-publication-test/
+deliverables/

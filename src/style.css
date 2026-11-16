@@ -1911,3 +1911,34 @@ progress {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.android-updates {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+.header-download {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.apk-download-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-decoration: none;
+  font-size: calc(14px * var(--text-scale));
+}
+@media (max-width: 379px) {
+  .app-header .connection-status {
+    display: none;
+  }
+}

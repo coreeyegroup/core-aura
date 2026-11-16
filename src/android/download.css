@@ -1,0 +1,139 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #eaecef;
+  background: #14161c;
+  color-scheme: dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+main {
+  max-width: 620px;
+  margin: auto;
+  padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #353a45;
+  padding: 4px 0 14px;
+}
+header a {
+  font-weight: 800;
+  color: #eaecef;
+  text-decoration: none;
+}
+header span {
+  font-size: 11px;
+  color: #a2acbb;
+}
+h1 {
+  font-size: 25px;
+  margin: 18px 0 8px;
+}
+h2 {
+  font-size: 18px;
+}
+p {
+  color: #b8c0cc;
+  font-size: 14px;
+}
+section {
+  border: 1px solid #424956;
+  background: #1e2028;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 12px 0;
+}
+dl {
+  margin: 0 0 12px;
+}
+dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid #353a45;
+  font-size: 14px;
+}
+dt {
+  color: #b8c0cc;
+}
+dd {
+  margin: 0;
+  text-align: right;
+}
+a {
+  color: #f0c342;
+}
+button,
+.primary {
+  min-height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #596273;
+  border-radius: 7px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+button {
+  background: #292d37;
+  color: #eaecef;
+}
+button:disabled {
+  opacity: 0.6;
+}
+.primary {
+  background: #f0b90b;
+  color: #181a20;
+  font-weight: 700;
+  border-color: #f0b90b;
+}
+summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 14px;
+}
+summary::after {
+  content: "+";
+  margin-left: auto;
+}
+details[open] summary::after {
+  content: "−";
+}
+code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+ol {
+  padding-left: 20px;
+  font-size: 14px;
+}
+li {
+  padding: 4px 0;
+}
+footer a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #f0c342;
+  outline-offset: 3px;
+}
+[hidden] {
+  display: none !important;
+}

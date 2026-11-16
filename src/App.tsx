@@ -33,6 +33,7 @@ import {
 import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
+import { AndroidUpdates } from "./android/AndroidUpdates";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { readWorkspace, saveWorkspace } from "./workspace";
 import { Dashboard, Tool } from "./components/Dashboard";
@@ -791,6 +792,17 @@ export default function App() {
             <i aria-hidden="true" />
             {online ? "Online" : "Offline"}
           </span>
+          {!Capacitor.isNativePlatform() && (
+            <a
+              className="header-download"
+              href="/download.html"
+              target="_blank"
+              rel="noopener"
+              aria-label="Download Android app"
+            >
+              <Download size={20} />
+            </a>
+          )}
           <button
             className="icon-button"
             onClick={() => setSettings(true)}
@@ -1587,9 +1599,28 @@ export default function App() {
               </button>
             )}
             <ConnectionPanel online={online} offlineReady={offlineReady} />
-            <button className="wide" onClick={update}>
-              Check for updates
-            </button>
+            {Capacitor.getPlatform() === "android" ? (
+              <AndroidUpdates
+                audioActive={
+                  states.length > 0 ||
+                  ["playing", "paused"].includes(practice.status)
+                }
+              />
+            ) : (
+              <button className="wide" onClick={update}>
+                Check for updates
+              </button>
+            )}
+            {!Capacitor.isNativePlatform() && (
+              <a
+                className="apk-download-link"
+                href="/download.html"
+                target="_blank"
+                rel="noopener"
+              >
+                Download Android APK
+              </a>
+            )}
             {updateStatus && <p role="status">{updateStatus}</p>}
 
             <button
