@@ -94,6 +94,7 @@ export default function App() {
   });
   const [manifestSection, setManifestSection] = useState("practice");
   const [category, setCategory] = useState("Health");
+  const [recordingsOpen, setRecordingsOpen] = useState(false);
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(
     "explore",
   );
@@ -409,6 +410,7 @@ export default function App() {
       navigator.mediaDevices.removeEventListener("devicechange", changed);
   }, []);
   function navigate(value: Tab) {
+    if (value === "library") setRecordingsOpen(false);
     if (value === "manifest") setManifestSection("practice");
     if (value === "explore" || value === "studio") setLastSoundTab(value);
     setTab(value);
@@ -438,15 +440,7 @@ export default function App() {
     ) {
       setLibraryView(tool === "sessions" ? "audio" : "manifestation");
       navigate("library");
-      if (tool === "recordings")
-        requestAnimationFrame(() => {
-          const element =
-            document.querySelector<HTMLDetailsElement>(".personal-voices");
-          if (element) {
-            element.open = true;
-            element.scrollIntoView({ block: "start" });
-          }
-        });
+      setRecordingsOpen(tool === "recordings");
       return;
     }
     navigate(tool);
@@ -1080,6 +1074,7 @@ export default function App() {
             {libraryView === "manifestation" ? (
               <ManifestLibrary
                 initialCategory={category}
+                recordingsOpen={recordingsOpen}
                 onPractice={() => navigate("manifest")}
               />
             ) : (

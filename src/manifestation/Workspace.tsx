@@ -642,9 +642,11 @@ export function Manifestation({
 export function ManifestLibrary({
   onPractice,
   initialCategory = "Health",
+  recordingsOpen = false,
 }: {
   onPractice: () => void;
   initialCategory?: string;
+  recordingsOpen?: boolean;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
@@ -894,7 +896,7 @@ export function ManifestLibrary({
             </div>
           ))}
       </div>
-      <PersonalVoices />
+      <PersonalVoices initiallyOpen={recordingsOpen} />
       <div className="section-heading">
         <h2>Saved practices</h2>
         <button onClick={() => input.current?.click()}>Import practice</button>
