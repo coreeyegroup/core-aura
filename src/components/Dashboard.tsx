@@ -18,6 +18,7 @@ import {
 import { affirmationLibrary } from "../manifestation/library";
 import { manifestationStore } from "../manifestation/store";
 import { manifestPlayer } from "../manifestation/player";
+import { practiceActive } from "../manifestation/flow";
 import { nextOccurrence } from "../manifestation/model";
 export type Tool =
   | "affirmations"
@@ -27,7 +28,8 @@ export type Tool =
   | "recordings"
   | "packs"
   | "sessions"
-  | "display";
+  | "display"
+  | "practices";
 const tools = [
   ["affirmations", "Affirmations", BookOpen],
   ["studio", "Sound studio", SlidersHorizontal],
@@ -78,7 +80,7 @@ export function Dashboard({
       return date && plan ? [{ ...r, date, name: plan.name }] : [];
     })
     .sort((a, b) => +a.date - +b.date);
-  const active = ["playing", "paused"].includes(player.status),
+  const active = practiceActive(player),
     current = active ? player.plan || data.draft : data.draft;
   return (
     <section className="dashboard" aria-label="Practice dashboard">
@@ -203,154 +205,160 @@ export function Dashboard({
           )}
         </section>
         <div className="dashboard-stack">
-        <section
-          className="dashboard-module"
-          aria-labelledby="saved-practices-title"
-        >
-          <div className="module-title">
-            <h2 id="saved-practices-title">
-              Saved practices{" "}
-              <span className="count-tag">{data.plans.length}</span>
-            </h2>
-            <button
-              className="text-button"
-              onClick={() => onTool("affirmations")}
-            >
-              View all <ChevronRight size={14} />
-            </button>
-          </div>
-          {data.plans
-            .slice(-3)
-            .reverse()
-            .map((plan) => (
-              <div className="practice-ticker" key={plan.id}>
-                <button
-                  className="ticker-open"
-                  onClick={() => onPractice(plan.id)}
-                >
-                  <span className="ticker-symbol">
-                    <Sparkles size={17} />
-                  </span>
-                  <span>
-                    <strong>{plan.name}</strong>
-                    <small>
-                      {plan.lines.length} sentences · {plan.repeats} rounds ·{" "}
-                      {plan.seconds / 60} min
-                    </small>
-                  </span>
-                  <ChevronRight size={14} />
-                </button>
-                <button
-                  className="ticker-play"
-                  aria-label={`${player.plan?.id === plan.id && player.status === "playing" ? "Pause" : player.plan?.id === plan.id && player.status === "paused" ? "Resume" : "Play"} saved practice: ${plan.name}`}
-                  onClick={() => {
-                    try {
-                      if (
-                        player.plan?.id === plan.id &&
-                        player.status === "playing"
-                      )
-                        manifestPlayer.pause();
-                      else if (
-                        player.plan?.id === plan.id &&
-                        player.status === "paused"
-                      )
-                        manifestPlayer.resume();
-                      else manifestPlayer.start(plan);
-                      setMessage("");
-                    } catch (e) {
-                      setMessage((e as Error).message);
-                    }
-                  }}
-                >
-                  {player.plan?.id === plan.id &&
-                  player.status === "playing" ? (
-                    <Pause size={18} />
-                  ) : (
-                    <Play size={18} />
-                  )}
-                </button>
-              </div>
-            ))}
-          {!data.plans.length && (
-            <div className="module-empty">
-              <BookOpen size={20} />
-              <div>
-                <strong>No saved practices yet</strong>
-                <p>Choose sentences, set repetition and save.</p>
-              </div>
+          <section
+            className="dashboard-module"
+            aria-labelledby="saved-practices-title"
+          >
+            <div className="module-title">
+              <h2 id="saved-practices-title">
+                Saved practices{" "}
+                <span className="count-tag">{data.plans.length}</span>
+              </h2>
               <button
                 className="text-button"
-                onClick={onContinue}
-                aria-label="Create a practice"
+                onClick={() => onTool("practices")}
               >
-                <ChevronRight size={20} />
+                View all <ChevronRight size={14} />
               </button>
             </div>
-          )}
-        </section>
-        <section className="dashboard-module" aria-labelledby="reminders-title">
-          <div className="module-title">
-            <h2 id="reminders-title">Next reminder</h2>
-            <button className="text-button" onClick={() => onTool("schedule")}>
-              Manage <ChevronRight size={14} />
-            </button>
-          </div>
-          {upcoming.length ? (
-            upcoming.slice(0, 2).map((r) => (
+            {data.plans
+              .slice(-3)
+              .reverse()
+              .map((plan) => (
+                <div className="practice-ticker" key={plan.id}>
+                  <button
+                    className="ticker-open"
+                    onClick={() => onPractice(plan.id)}
+                  >
+                    <span className="ticker-symbol">
+                      <Sparkles size={17} />
+                    </span>
+                    <span>
+                      <strong>{plan.name}</strong>
+                      <small>
+                        {plan.lines.length} sentences · {plan.repeats} rounds ·{" "}
+                        {plan.seconds / 60} min
+                      </small>
+                    </span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    className="ticker-play"
+                    aria-label={`${player.plan?.id === plan.id && player.status === "playing" ? "Pause" : player.plan?.id === plan.id && player.status === "paused" ? "Resume" : "Play"} saved practice: ${plan.name}`}
+                    onClick={() => {
+                      try {
+                        if (
+                          player.plan?.id === plan.id &&
+                          player.status === "playing"
+                        )
+                          manifestPlayer.pause();
+                        else if (
+                          player.plan?.id === plan.id &&
+                          player.status === "paused"
+                        )
+                          manifestPlayer.resume();
+                        else manifestPlayer.start(plan);
+                        setMessage("");
+                      } catch (e) {
+                        setMessage((e as Error).message);
+                      }
+                    }}
+                  >
+                    {player.plan?.id === plan.id &&
+                    player.status === "playing" ? (
+                      <Pause size={18} />
+                    ) : (
+                      <Play size={18} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            {!data.plans.length && (
+              <div className="module-empty">
+                <BookOpen size={20} />
+                <div>
+                  <strong>No saved practices yet</strong>
+                  <p>Choose sentences, set repetition and save.</p>
+                </div>
+                <button
+                  className="text-button"
+                  onClick={onContinue}
+                  aria-label="Create a practice"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+            )}
+          </section>
+          <section
+            className="dashboard-module"
+            aria-labelledby="reminders-title"
+          >
+            <div className="module-title">
+              <h2 id="reminders-title">Next reminder</h2>
               <button
-                className="reminder-ticker"
-                key={r.id}
+                className="text-button"
                 onClick={() => onTool("schedule")}
               >
-                <Clock3 size={18} />
-                <span>
-                  <strong>{r.name}</strong>
-                  <small>
-                    {r.date.toLocaleDateString(undefined, {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}{" "}
-                    · Tap reminder to open practice
-                  </small>
-                </span>
-                <b>{r.time}</b>
+                Manage <ChevronRight size={14} />
               </button>
-            ))
-          ) : (
-            <div className="module-empty">
-              <Clock3 size={20} />
-              <div>
-                <strong>No upcoming reminders</strong>
-                <p>Schedule a saved practice for your routine.</p>
-              </div>
             </div>
-          )}
-        </section>
-        <section
-          className="dashboard-module"
-          aria-labelledby="quick-tones-title"
-        >
-          <div className="module-title">
-            <h2 id="quick-tones-title">Quick tones</h2>
-            <span>Opens in Studio</span>
-          </div>
-          <div className="tone-grid">
-            {[432, 528, 639].map((hz) => (
-              <button key={hz} onClick={() => onTone(hz)}>
-                <AudioLines size={17} />
-                <strong>
-                  {hz}
-                  <small> Hz</small>
-                </strong>
-                <ChevronRight size={14} />
-              </button>
-            ))}
-          </div>
-          <p className="module-footnote">
-            Pure sine synthesis · Tune pitch, level and duration in Studio.
-          </p>
-        </section>
+            {upcoming.length ? (
+              upcoming.slice(0, 2).map((r) => (
+                <button
+                  className="reminder-ticker"
+                  key={r.id}
+                  onClick={() => onTool("schedule")}
+                >
+                  <Clock3 size={18} />
+                  <span>
+                    <strong>{r.name}</strong>
+                    <small>
+                      {r.date.toLocaleDateString(undefined, {
+                        weekday: "short",
+                        day: "numeric",
+                        month: "short",
+                      })}{" "}
+                      · Tap reminder to open practice
+                    </small>
+                  </span>
+                  <b>{r.time}</b>
+                </button>
+              ))
+            ) : (
+              <div className="module-empty">
+                <Clock3 size={20} />
+                <div>
+                  <strong>No upcoming reminders</strong>
+                  <p>Schedule a saved practice for your routine.</p>
+                </div>
+              </div>
+            )}
+          </section>
+          <section
+            className="dashboard-module"
+            aria-labelledby="quick-tones-title"
+          >
+            <div className="module-title">
+              <h2 id="quick-tones-title">Quick tones</h2>
+              <span>Opens in Studio</span>
+            </div>
+            <div className="tone-grid">
+              {[432, 528, 639].map((hz) => (
+                <button key={hz} onClick={() => onTone(hz)}>
+                  <AudioLines size={17} />
+                  <strong>
+                    {hz}
+                    <small> Hz</small>
+                  </strong>
+                  <ChevronRight size={14} />
+                </button>
+              ))}
+            </div>
+            <p className="module-footnote">
+              Pure sine synthesis · Tune pitch, level and duration in Studio.
+            </p>
+          </section>
         </div>
       </div>
       {(message || error || catalog.error) && (

@@ -1,4 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { practiceActive } from "./flow";
 import { speech, Voice } from "./speech";
 import { coreVoices } from "./server-voice";
 import { manifestationStore as store } from "./store";
@@ -16,7 +17,7 @@ export function VoicePanel() {
     [language, setLanguage] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
-  const active = ["playing", "paused"].includes(state.status);
+  const active = practiceActive(state);
   useEffect(() => {
     let alive = true;
     const load = async () => {

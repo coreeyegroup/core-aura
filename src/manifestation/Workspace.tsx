@@ -7,10 +7,18 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { confirmDraftReplacement, isPreview, practiceActive } from "./flow";
 import { affirmationLibrary } from "./library";
 import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
-import { Line, nextOccurrence, Plan, position, Reminder } from "./model";
+import {
+  Line,
+  nextOccurrence,
+  parsePlan,
+  Plan,
+  position,
+  Reminder,
+} from "./model";
 import { manifestPlayer } from "./player";
 import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
@@ -69,9 +77,11 @@ function NumberField({
 export function Manifestation({
   onLibrary,
   initialView = "practice",
+  onView,
 }: {
   onLibrary: () => void;
   initialView?: string;
+  onView?: (view: "practice" | "schedule") => void;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
@@ -79,7 +89,15 @@ export function Manifestation({
       manifestPlayer.snapshot,
     );
   const [view, setView] = useState(initialView),
-    [custom, setCustom] = useState(""),
+    [custom, setCustom] = useState(() => {
+      try {
+        return (
+          localStorage.getItem("core-aura.composer.v1")?.slice(0, 300) || ""
+        );
+      } catch {
+        return "";
+      }
+    }),
     [message, setMessage] = useState("");
   useEffect(() => setView(initialView), [initialView]);
   const [recordLine, setRecordLine] = useState<Line>();
@@ -99,14 +117,26 @@ export function Manifestation({
       document.documentElement.style.removeProperty("--dock-height");
     };
   }, []);
-  const p = data.draft,
-    active = ["playing", "paused"].includes(state.status);
+  const active = practiceActive(state),
+    p = active && state.plan ? state.plan : data.draft;
+  function composer(value: string) {
+    setCustom(value);
+    try {
+      localStorage.setItem("core-aura.composer.v1", value);
+    } catch {
+      setMessage(
+        "This sentence is only available for this visit because device storage is unavailable.",
+      );
+    }
+  }
   const change = (patch: Partial<Plan>) => {
     try {
       store.draft({ ...p, ...patch });
       setMessage("");
+      return true;
     } catch (e) {
       setMessage((e as Error).message);
+      return false;
     }
   };
   const current =
@@ -115,8 +145,8 @@ export function Manifestation({
       : null;
   function start() {
     try {
-      if (state.status === "playing") manifestPlayer.pause();
-      else if (state.status === "paused") manifestPlayer.resume();
+      if (active && state.status === "playing") manifestPlayer.pause();
+      else if (active && state.status === "paused") manifestPlayer.resume();
       else manifestPlayer.start(p);
       setMessage("");
     } catch (e) {
@@ -132,13 +162,19 @@ export function Manifestation({
       <div className="segmented" aria-label="Manifestation workspace">
         <button
           aria-pressed={view === "practice"}
-          onClick={() => setView("practice")}
+          onClick={() => {
+            setView("practice");
+            onView?.("practice");
+          }}
         >
           Practice
         </button>
         <button
           aria-pressed={view === "schedule"}
-          onClick={() => setView("schedule")}
+          onClick={() => {
+            setView("schedule");
+            onView?.("schedule");
+          }}
         >
           Schedule
         </button>
@@ -146,8 +182,8 @@ export function Manifestation({
       {view === "practice" ? (
         <>
           {(active ||
-            state.status === "completed" ||
-            state.status === "error") && (
+            (!isPreview(state) &&
+              (state.status === "completed" || state.status === "error"))) && (
             <div className="manifest-now" aria-live="polite">
               <span className="eyebrow">
                 {active
@@ -324,12 +360,13 @@ export function Manifestation({
                   <label>
                     Your own sentence
                     <textarea
+                      aria-label="Your own sentence"
                       disabled={active}
                       rows={2}
                       value={custom}
                       maxLength={300}
                       placeholder="Write the words you want to repeat"
-                      onChange={(e) => setCustom(e.target.value)}
+                      onChange={(e) => composer(e.target.value)}
                     />
                   </label>
                   <div className="admin-actions">
@@ -338,13 +375,13 @@ export function Manifestation({
                         active || !custom.trim() || p.lines.length >= 50
                       }
                       onClick={() => {
-                        change({
+                        const added = change({
                           lines: [
                             ...p.lines,
                             { id: crypto.randomUUID(), text: custom.trim() },
                           ],
                         });
-                        setCustom("");
+                        if (added) composer("");
                       }}
                     >
                       Add sentence
@@ -394,12 +431,7 @@ export function Manifestation({
                 <button
                   disabled={active}
                   onClick={() => {
-                    if (
-                      p.lines.length &&
-                      !confirm(
-                        "Start a new practice? Saved practices remain in Library.",
-                      )
-                    )
+                    if (!confirmDraftReplacement(data.draft, data.plans))
                       return;
                     try {
                       store.fresh();
@@ -411,6 +443,17 @@ export function Manifestation({
                 >
                   New practice
                 </button>
+                {data.plans.some((plan) => plan.id === p.id) && (
+                  <button
+                    disabled={active}
+                    onClick={() => {
+                      setView("schedule");
+                      onView?.("schedule");
+                    }}
+                  >
+                    Schedule practice
+                  </button>
+                )}
               </div>
             </div>
             <div className="practice-settings">
@@ -581,7 +624,12 @@ export function Manifestation({
           </div>
         </>
       ) : (
-        <Schedules />
+        <Schedules
+          onCreate={() => {
+            setView("practice");
+            onView?.("practice");
+          }}
+        />
       )}
       {recordLine && (
         <RecordSentence
@@ -615,9 +663,9 @@ export function Manifestation({
             disabled={!p.lines.length && !active}
             onClick={start}
           >
-            {state.status === "playing"
+            {active && state.status === "playing"
               ? "Pause"
-              : state.status === "paused"
+              : active && state.status === "paused"
                 ? "Resume"
                 : "Play practice"}
           </button>
@@ -643,9 +691,13 @@ export function ManifestLibrary({
   onPractice,
   initialCategory = "Health",
   recordingsOpen = false,
+  section = "all",
+  onCategory,
 }: {
-  onPractice: () => void;
+  onPractice: (id?: string) => void;
   initialCategory?: string;
+  section?: "all" | "saved" | "recordings";
+  onCategory?: (category: string) => void;
   recordingsOpen?: boolean;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
@@ -660,15 +712,26 @@ export function ManifestLibrary({
   const [editing, setEditing] = useState<EditLibrary>(),
     [manage, setManage] = useState(false);
   const libraryInput = useRef<HTMLInputElement>(null);
+  const savedSection = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (section === "saved") {
+      savedSection.current?.scrollIntoView({ block: "start" });
+      savedSection.current?.focus({ preventScroll: true });
+    }
+  }, [section]);
   const [category, setCategory] = useState<string>(initialCategory),
     [query, setQuery] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => setCategory(initialCategory), [initialCategory]);
   useEffect(() => {
-    if (!catalog.data.categories.includes(category))
-      setCategory(catalog.data.categories[0] || "");
+    if (!catalog.data.categories.includes(category)) {
+      const next = catalog.data.categories[0] || "";
+      setCategory(next);
+      onCategory?.(next);
+    }
   }, [catalog.data, category]);
   const input = useRef<HTMLInputElement>(null);
-  const active = ["playing", "paused"].includes(state.status);
+  const active = practiceActive(state);
   function select(id: string, text: string) {
     try {
       const selected = data.draft.lines.some((l) => l.text === text);
@@ -698,13 +761,16 @@ export function ManifestLibrary({
     try {
       if (file.size > 100000)
         throw Error("Choose a practice file under 100 KB.");
+      const value = parsePlan(JSON.parse(await file.text()));
+      if (!confirmDraftReplacement(data.draft, data.plans)) return;
       manifestPlayer.stop();
-      store.import(JSON.parse(await file.text()));
+      store.import(value);
       setMessage("Practice imported.");
     } catch (e) {
       setMessage((e as Error).message);
+    } finally {
+      if (input.current) input.current.value = "";
     }
-    if (input.current) input.current.value = "";
   }
   return (
     <section className="manifest-workspace" aria-label="Manifestation library">
@@ -713,7 +779,7 @@ export function ManifestLibrary({
         <button
           className="primary"
           disabled={!data.draft.lines.length}
-          onClick={onPractice}
+          onClick={() => onPractice()}
         >
           Use selection ({data.draft.lines.length})
         </button>
@@ -725,7 +791,10 @@ export function ManifestLibrary({
           <select
             aria-label="Category"
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              onCategory?.(e.target.value);
+            }}
           >
             {catalog.data.categories.map((c) => (
               <option key={c}>{c}</option>
@@ -835,7 +904,10 @@ export function ManifestLibrary({
         <LibraryEditor
           edit={editing}
           onClose={() => setEditing(undefined)}
-          onCategory={setCategory}
+          onCategory={(value) => {
+            setCategory(value);
+            onCategory?.(value);
+          }}
         />
       )}
       {catalog.error && <p role="status">{catalog.error}</p>}
@@ -897,112 +969,122 @@ export function ManifestLibrary({
           ))}
       </div>
       <PersonalVoices initiallyOpen={recordingsOpen} />
-      <div className="section-heading">
-        <h2>Saved practices</h2>
-        <button onClick={() => input.current?.click()}>Import practice</button>
-      </div>
-      <input
-        className="sr-only"
-        ref={input}
-        type="file"
-        accept="application/json,.json"
-        aria-label="Import manifestation practice"
-        onChange={(e) => void importPlan(e.target.files?.[0])}
-      />
-      {!data.plans.length && (
-        <p className="content-note">
-          Save your selected sentences as a practice to schedule them. Practices
-          stay on this device; export backups to keep a copy.
-        </p>
-      )}
-      {data.plans.map((plan) => (
-        <article className="saved-card" key={plan.id}>
-          <div>
-            <h3>{plan.name}</h3>
-            <p>
-              {plan.lines.length} sentences · {plan.repeats} repetitions ·{" "}
-              {plan.mode === "speech" ? "spoken" : "reading"}
-            </p>
-          </div>
-          <button
-            className="primary"
-            onClick={() => {
-              try {
-                manifestPlayer.stop();
-                store.open(plan.id);
-                onPractice();
-              } catch (e) {
-                setMessage((e as Error).message);
-              }
-            }}
-          >
-            Open practice
+      <section
+        className="saved-practices-section"
+        ref={savedSection}
+        tabIndex={-1}
+        aria-label="Saved practices"
+      >
+        <div className="section-heading">
+          <h2>Saved practices</h2>
+          <button onClick={() => input.current?.click()}>
+            Import practice
           </button>
-          <div className="saved-actions">
+        </div>
+        <input
+          className="sr-only"
+          ref={input}
+          type="file"
+          accept="application/json,.json"
+          aria-label="Import manifestation practice"
+          onChange={(e) => void importPlan(e.target.files?.[0])}
+        />
+        {!data.plans.length && (
+          <p className="content-note">
+            Save your selected sentences as a practice to schedule them.
+            Practices stay on this device; export backups to keep a copy.
+          </p>
+        )}
+        {data.plans.map((plan) => (
+          <article className="saved-card" key={plan.id}>
+            <div>
+              <h3>{plan.name}</h3>
+              <p>
+                {plan.lines.length} sentences · {plan.repeats} repetitions ·{" "}
+                {plan.mode === "speech" ? "spoken" : "reading"}
+              </p>
+            </div>
             <button
-              aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
+              className="primary"
               onClick={() => {
                 try {
-                  if (state.plan?.id === plan.id && state.status === "playing")
-                    manifestPlayer.pause();
-                  else if (
-                    state.plan?.id === plan.id &&
-                    state.status === "paused"
-                  )
-                    manifestPlayer.resume();
-                  else manifestPlayer.start(plan);
+                  onPractice(plan.id);
                 } catch (e) {
                   setMessage((e as Error).message);
                 }
               }}
             >
-              {state.plan?.id === plan.id && state.status === "playing"
-                ? "Pause"
-                : state.plan?.id === plan.id && state.status === "paused"
-                  ? "Resume"
-                  : "Play"}
+              Open practice
             </button>
-            <button
-              onClick={() =>
-                download(
-                  JSON.stringify(withoutRecordings(plan), null, 2),
-                  "core-aura-practice.json",
-                  "application/json",
-                )
-                  .then(setMessage)
-                  .catch((e) => setMessage(e.message))
-              }
-            >
-              Export practice
-            </button>
-            <button
-              onClick={() => {
-                if (
-                  !confirm(
-                    "Delete " +
-                      plan.name +
-                      " and its schedules from this device?",
+            <div className="saved-actions">
+              <button
+                aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
+                onClick={() => {
+                  try {
+                    if (
+                      state.plan?.id === plan.id &&
+                      state.status === "playing"
+                    )
+                      manifestPlayer.pause();
+                    else if (
+                      state.plan?.id === plan.id &&
+                      state.status === "paused"
+                    )
+                      manifestPlayer.resume();
+                    else manifestPlayer.start(plan);
+                  } catch (e) {
+                    setMessage((e as Error).message);
+                  }
+                }}
+              >
+                {state.plan?.id === plan.id && state.status === "playing"
+                  ? "Pause"
+                  : state.plan?.id === plan.id && state.status === "paused"
+                    ? "Resume"
+                    : "Play"}
+              </button>
+              <button
+                onClick={() =>
+                  download(
+                    JSON.stringify(withoutRecordings(plan), null, 2),
+                    "core-aura-practice.json",
+                    "application/json",
                   )
-                )
-                  return;
-                try {
-                  if (state.plan?.id === plan.id) manifestPlayer.stop();
-                  store.remove(plan.id);
-                  void syncPhoneReminders().catch(() =>
-                    setMessage(
-                      "Practice removed. Phone reminder cancellation needs another attempt.",
-                    ),
-                  );
-                } catch (e) {
-                  setMessage((e as Error).message);
+                    .then(setMessage)
+                    .catch((e) => setMessage(e.message))
                 }
-              }}
-            >
-              Delete practice
-            </button>
-          </div>
-        </article>
-      ))}
+              >
+                Export practice
+              </button>
+              <button
+                onClick={() => {
+                  if (
+                    !confirm(
+                      "Delete " +
+                        plan.name +
+                        " and its schedules from this device?",
+                    )
+                  )
+                    return;
+                  try {
+                    if (state.plan?.id === plan.id) manifestPlayer.stop();
+                    store.remove(plan.id);
+                    void syncPhoneReminders().catch(() =>
+                      setMessage(
+                        "Practice removed. Phone reminder cancellation needs another attempt.",
+                      ),
+                    );
+                  } catch (e) {
+                    setMessage((e as Error).message);
+                  }
+                }}
+              >
+                Delete practice
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}
@@ -1011,13 +1093,17 @@ export function ManifestLibrary({
     </section>
   );
 }
-function Schedules() {
+function Schedules({ onCreate }: { onCreate: () => void }) {
   const pushMessage = useSyncExternalStore(
     pushStatus.subscribe,
     pushStatus.snapshot,
   );
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
-  const [planId, setPlanId] = useState(data.plans[0]?.id || ""),
+  const [planId, setPlanId] = useState(
+      data.plans.find((plan) => plan.id === data.draft.id)?.id ||
+        data.plans[0]?.id ||
+        "",
+    ),
     [time, setTime] = useState("07:00"),
     [days, setDays] = useState([0, 1, 2, 3, 4, 5, 6]),
     [message, setMessage] = useState(""),
@@ -1063,6 +1149,12 @@ function Schedules() {
       aria-label="Manifestation schedules"
     >
       <h2>Schedule your practice</h2>
+      {!data.plans.length && (
+        <div className="notice">
+          <span>Save a practice before adding a reminder.</span>
+          <button onClick={onCreate}>Create a practice</button>
+        </div>
+      )}
       {!Capacitor.isNativePlatform() && (
         <>
           <p role="status" className="content-note">

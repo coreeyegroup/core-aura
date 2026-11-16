@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.17.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.18.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -18,6 +18,10 @@ The build output is dist/. The production player needs HTTPS, including for its 
 ## Manifestation
 
 Home is the starting workspace: current practice, saved counts, eight tool shortcuts, affirmation categories, saved-practice transport, upcoming reminders and quick tone setup. Manifest is the practice editor. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. The category/affirmation library supports add, rename/edit, move, delete and JSON backup on this device. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Voice selection, language filtering and Test voice are available in the compact Voice & playback panel in Manifest and Library. Optional self-hosted eSpeak NG voices work through the backend when device speech is unavailable. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+
+## Continuity
+
+Nested workspace routes restore Schedule, category filters, saved practices, recordings and sound packs after reload and support browser Back/Forward. The unfinished sentence composer and validated sound workspace persist on this device. Opening another practice asks before replacing unsaved edits. Save → Schedule selects the current saved practice. Paused sound controls remain reachable across tabs; previews have separate identity, foreign players use a non-overlapping banner, and Stop all audio covers speech and synthesis. Settings → Connection & offline readiness distinguishes network, local assets, API, server voice and push readiness. See the [flow audit](docs/flow-audit.md) for reproduced gaps, verification and remaining work.
 
 ## Screens
 

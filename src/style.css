@@ -1852,3 +1852,62 @@ progress {
 .sentence-editor > label {
   margin-bottom: 6px;
 }
+.playback-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.playback-location {
+  flex: 1;
+  display: block;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: calc(12px * var(--text-scale));
+}
+.playback-location small {
+  display: block;
+  font-size: calc(10px * var(--text-scale));
+  font-weight: 400;
+  margin-top: 2px;
+}
+.playback-banner > button:not(.playback-location),
+.mini-player > button:not(.playback-location) {
+  font-size: calc(11px * var(--text-scale));
+  padding-inline: 6px;
+}
+.saved-practices-section {
+  display: grid;
+  gap: var(--gap);
+  scroll-margin-top: 75px;
+}
+.personal-voices {
+  scroll-margin-top: 75px;
+}
+.service-status {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin: 4px 0 8px;
+}
+.service-status div {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: calc(12px * var(--text-scale));
+}
+.service-status dt {
+  color: var(--muted);
+}
+.service-status dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

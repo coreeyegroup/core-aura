@@ -1,4 +1,6 @@
-# Release 0.17.0 status
+# Release 0.18.0 status
+
+Completed a continuity audit with nested navigation/history, reload restoration, saved-practice targets, composer/workspace persistence, draft replacement protection, save-to-schedule handoff, preview identity, global paused-player controls, non-overlapping playback, complete emergency stop and explicit service readiness checks. Findings and remaining limits: [flow audit](flow-audit.md).
 
 Added a real-data Home dashboard, eight functional tool shortcuts, category routing, saved-practice transport, upcoming reminders and quick tone setup. Reworked visual hierarchy with neutral surfaces, amber actions, filled controls and five-destination navigation. Added compact sentence queues with inline preview and edit disclosure, plus the live Studio pitch/waveform monitor.
 

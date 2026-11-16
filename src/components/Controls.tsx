@@ -1,5 +1,5 @@
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
-import { Channel, sounds } from "../model";
+import { Channel, chakras, sounds } from "../model";
 import { engine, VoiceState } from "../audio/engine";
 export function Transport({
   channels,
@@ -20,15 +20,29 @@ export function Transport({
     <div className={"transport" + (compact ? " compact-transport" : "")}>
       <button
         className="primary"
-        onClick={() =>
-          engine
+        onClick={() => {
+          if (!playing && channels.length) {
+            const chakra = channels.every((c) =>
+              chakras.some((k) => k.id === c.id),
+            );
+            engine
+              .snapshot()
+              .filter(
+                (state) =>
+                  state.id.startsWith("pack:") ||
+                  (state.id !== "manifest-background" &&
+                    chakras.some((k) => k.id === state.id) !== chakra),
+              )
+              .forEach((state) => engine.stop(state.id));
+          }
+          return engine
             .toggle(channels)
             .catch(() =>
               onError(
                 "Audio could not start. Check your connection or downloaded player and try again.",
               ),
-            )
-        }
+            );
+        }}
         disabled={!channels.length}
         aria-label={playing ? "Pause" : active ? "Resume" : "Play"}
       >
