@@ -1,4 +1,4 @@
-export const VERSION = "0.16.0";
+export const VERSION = "0.17.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -11,6 +11,7 @@ export type Sound =
   | "yaman"
   | "mohanam";
 export type Tab =
+  | "home"
   | "manifest"
   | "explore"
   | "studio"

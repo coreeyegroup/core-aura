@@ -1,10 +1,10 @@
-# Core-aura interface, release 0.16.0
+# Core-aura interface, release 0.17.0
 
 The interface prioritizes readable information and direct operation. It uses flat surfaces, separators, small corner radii and compact spacing. Decorative heroes, large catalog cards and idle practice banners are removed. Content remains naturally sized; short pages do not repeat information simply to fill the display.
 
 ## Layout and controls
 
-- Four persistent destinations: Manifest, Sounds, Chakras and Library. Settings is available in the header.
+- Five persistent destinations: Home, Manifest, Sounds, Chakras and Library. Settings is available in the header. Home is the default route; existing feature links remain supported.
 - One primary Play/Pause/Resume control and a separate Stop control. Per-layer controls remain available for independent mixing.
 - Chakra rows show selection, name, state, frequency, sound type and transport. The settings icon opens level and focus controls.
 - Affirmations use compact rows with selection, sentence text and preview. Category and affirmation editing stays in an expandable management panel.
@@ -21,6 +21,16 @@ All themes use semantic surface, text, border and action colors, including dialo
 
 ## Release verification
 
-Automated browser checks cover Manifest, affirmation Library, Studio, Chakras and Explore in Light, Dark and High Contrast at 393 pixels. They check WCAG A/AA rules with axe, overflow, visible button height, compact affirmation/chakra rows and page errors. Further checks cover 320-pixel screens with enlarged text, saved appearance after reload, live System theme changes, reset and wide-screen practice columns. Screenshots and density measurements are uploaded in the mobile-verification CI artifact. Automated checks do not replace physical phone listening and interaction review.
+Automated browser checks cover Home, Manifest, affirmation Library, Studio, Chakras and Explore in Light, Dark and High Contrast at 393 pixels. They check WCAG A/AA rules with axe, overflow, visible button height, compact affirmation/chakra rows and page errors. Further checks cover 320-pixel screens with enlarged text, saved appearance after reload, live System theme changes, reset and wide-screen practice columns. Screenshots and density measurements are uploaded in the mobile-verification CI artifact. Automated checks do not replace physical phone listening and interaction review.
 
-After updating, confirm version 0.16.0. Switch all themes, reload, and confirm the chosen theme persists. Try 140% text and Comfortable spacing. Check that playback controls stay clear of the navigation bar, sentences remain readable, chakra controls work individually and together, voice preview remains available, and existing saved practices and recordings are present.
+After updating, confirm version 0.17.0. Switch all themes, reload, and confirm the chosen theme persists. Try 140% text and Comfortable spacing. Check that playback controls stay clear of the navigation bar, sentences remain readable, chakra controls work individually and together, voice preview remains available, and existing saved practices and recordings are present.
+
+## Dashboard and compact workspace
+
+Home uses actual device data: the current draft or active practice, saved-practice count, enabled-reminder count, sound-session count, category totals and the next valid reminder times. Dates refresh every 30 seconds. Empty states are labelled; no activity history, completion streak or therapeutic result is invented.
+
+Eight tool shortcuts open Affirmations, Sound Studio, Chakras, Schedule, Recordings, Sound Packs, Sessions and Display. Category rows open the corresponding library filter. Saved practices have direct Play/Pause/Resume and editor access. Quick tones open 432, 528 or 639 Hz sine synthesis in Studio; they do not start audio without the player's Play action.
+
+The visual hierarchy uses charcoal surfaces in Dark, neutral light surfaces in Light, amber primary actions, consistent icons and compact secondary type. Theme choices and 90–140% text scaling remain available. Each sentence queue row exposes preview immediately; its Edit icon reveals text, recording, ordering and removal. Custom text entry is an explicit Write your own affirmation panel. Studio's monitor shows the actual selected pitch and mixed waveform.
+
+Additional browser tests verify real dashboard counts, schedule ordering, category routing, saved-practice transport, recording/packs shortcuts, exact tone setup and sentence editing. Physical phone readability and interaction acceptance remain the owner's final check.

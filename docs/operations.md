@@ -154,3 +154,17 @@ bash ops/verify.sh 0.16.0
 ```
 
 Update the installed PWA through Settings → Update app and confirm 0.16.0. No reinstall is required for the PWA. Native packages use bundled assets and require the new native build. No data migration is introduced by the display redesign. See [interface acceptance](interface.md) for phone checks.
+
+## Release 0.17.0: professional app workspace
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.17.0-app-workspace
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+bash ops/verify.sh 0.17.0
+```
+
+Open Settings → Update app in the PWA and confirm 0.17.0. Home is the new starting screen; tap Home if an existing link reopens Manifest. Verify category shortcuts, saved-practice Play/Pause, upcoming reminder time, exact quick-tone frequency and sentence edit/preview. Themes and existing device data are preserved. Native apps require the newly built package because they bundle the interface.

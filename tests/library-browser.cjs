@@ -81,7 +81,7 @@ function wave() {
       if (r.url().endsWith("/api/speech/speak"))
         requests.push(r.postDataJSON());
     });
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#manifest");
     await p
       .getByRole("button", { name: "Choose affirmations", exact: true })
       .click();

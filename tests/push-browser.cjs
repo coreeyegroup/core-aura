@@ -58,7 +58,7 @@ const { execFileSync } = require("node:child_process");
         return sub;
       };
     });
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#manifest");
     await p.evaluate(async () => {
       await navigator.serviceWorker.ready;
     });
