@@ -23,7 +23,7 @@ class CoreAuraMixer extends AudioWorkletProcessor {
     const out = outputs[0][0];
     if (!out) return true;
     let weight = 0;
-    for (const c of this.channels.values()) weight += c.muted ? 0 : c.volume;
+    for (const c of this.channels.values()) weight += c.muted || c.status === "paused" ? 0 : c.volume;
     const scale = (this.master * 0.65) / Math.max(1, weight);
     for (let i = 0; i < out.length; i++) {
       let sum = 0;

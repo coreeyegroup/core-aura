@@ -1,0 +1,21 @@
+import {it,expect,vi} from "vitest";
+import {chakras,chakraSounds,parseSession,ENGINE_VERSION} from "../src/model";
+it("accepts every supported chakra timbre across all seven fixed frequencies",()=>{
+ for(const sound of chakraSounds) expect(()=>parseSession({schemaVersion:2,engineVersion:ENGINE_VERSION,id:"mix",name:"Mix",kind:"chakras",master:.5,channels:chakras.map(c=>({id:c.id,hz:c.hz,sound,seconds:300,volume:.25,muted:false}))})).not.toThrow();
+});
+it("paused voices do not attenuate an audible chakra",async()=>{
+ let Mixer:any;
+ vi.stubGlobal("sampleRate",48000);
+ vi.stubGlobal("AudioWorkletProcessor",class{port={onmessage:undefined as any,postMessage:vi.fn()};});
+ vi.stubGlobal("registerProcessor",(_:string,p:any)=>{Mixer=p;});
+ // @ts-expect-error Shared browser worklet.
+ await import("../public/mixer-worklet.js");
+ const a=new Mixer(), b=new Mixer();
+ const start=(m:any,id:string)=>m.port.onmessage({data:{type:"start",channel:{id,sound:"sine",hz:396,seconds:5,volume:1,muted:false}}});
+ start(a,"root");start(b,"root");
+ for(let i=0;i<6;i++){start(b,"paused-"+i);b.channels.get("paused-"+i).status="paused";}
+ let energyA=0,energyB=0;
+ for(let i=0;i<80;i++){const x=new Float32Array(128),y=new Float32Array(128);a.process([],[[x]]);b.process([],[[y]]);for(let j=0;j<128;j++){energyA+=x[j]*x[j];energyB+=y[j]*y[j];}}
+ expect(energyA).toBeGreaterThan(0);expect(energyB).toBeCloseTo(energyA,6);
+ vi.unstubAllGlobals();
+});

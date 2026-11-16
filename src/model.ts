@@ -1,4 +1,4 @@
-export const VERSION = "0.19.0";
+export const VERSION = "0.20.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -104,6 +104,7 @@ export const sounds: Record<
     type: "Raga",
   },
 };
+export const chakraSounds: Sound[] = ["sine", "triangle", "bowl", "flute", "bell"];
 export const chakras = [
   {
     id: "root",
@@ -219,7 +220,7 @@ export function parseSession(value: unknown): Session {
     s.channels.some(
       (c) =>
         !chakras.some((k) => k.id === c.id && k.hz === c.hz) ||
-        !["sine", "triangle", "bowl"].includes(c.sound),
+        !chakraSounds.includes(c.sound),
     )
   )
     throw Error("This chakra session uses unsupported settings.");

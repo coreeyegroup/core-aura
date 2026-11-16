@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
 import { Channel, chakras, sounds } from "../model";
 import { engine, VoiceState } from "../audio/engine";
@@ -6,25 +7,34 @@ export function Transport({
   states,
   onError,
   compact = false,
+  stopChannels = channels,
+  exclusive = false,
 }: {
   channels: Channel[];
   states: VoiceState[];
   onError: (s: string) => void;
   compact?: boolean;
+  stopChannels?: Channel[];
+  exclusive?: boolean;
 }) {
+  const [busy,setBusy] = useState(false);
+  const stoppable = stopChannels.some(c=>states.some(s=>s.id===c.id));
   const active = channels.some((c) => states.some((s) => s.id === c.id));
-  const playing = channels.some((c) =>
+  const playing = (exclusive ? stopChannels : channels).some((c) =>
     states.some((s) => s.id === c.id && s.status === "playing"),
   );
   return (
     <div className={"transport" + (compact ? " compact-transport" : "")}>
       <button
         className="primary"
-        onClick={() => {
+        onClick={async () => {
+          if (busy) return;
+          setBusy(true);
           if (!playing && channels.length) {
             const chakra = channels.every((c) =>
               chakras.some((k) => k.id === c.id),
             );
+            if (exclusive) stopChannels.filter(c=>!channels.some(target=>target.id===c.id)).forEach(c=>engine.stop(c.id));
             engine
               .snapshot()
               .filter(
@@ -35,15 +45,20 @@ export function Transport({
               )
               .forEach((state) => engine.stop(state.id));
           }
+          if (playing && exclusive) {
+            stopChannels.forEach(c=>engine.pause(c.id));
+            setBusy(false);
+            return;
+          }
           return engine
             .toggle(channels)
             .catch(() =>
               onError(
                 "Audio could not start. Check your connection or downloaded player and try again.",
               ),
-            );
+            ).finally(()=>setBusy(false));
         }}
-        disabled={!channels.length}
+        disabled={busy || (!channels.length && !playing)}
         aria-label={playing ? "Pause" : active ? "Resume" : "Play"}
       >
         {playing ? <Pause size={20} /> : <Play size={20} />}{" "}
@@ -52,8 +67,8 @@ export function Transport({
         </span>
       </button>
       <button
-        disabled={!active}
-        onClick={() => channels.forEach((c) => engine.stop(c.id))}
+        disabled={!stoppable}
+        onClick={() => stopChannels.forEach((c) => engine.stop(c.id))}
       >
         <Square size={18} />{" "}
         <span className={compact ? "sr-only" : undefined}>Stop</span>
