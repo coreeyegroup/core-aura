@@ -128,7 +128,7 @@ jobs:
 
   android-publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [web, backend, android, ios]
+    needs: [web, backend, android]
     runs-on: ubuntu-22.04
     permissions:
       contents: write
