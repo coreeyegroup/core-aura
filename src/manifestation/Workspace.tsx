@@ -11,7 +11,14 @@ import { confirmDraftReplacement, isPreview, practiceActive } from "./flow";
 import { affirmationLibrary } from "./library";
 import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
-import { Line, nextOccurrence, Plan, position, Reminder } from "./model";
+import {
+  Line,
+  nextOccurrence,
+  parsePlan,
+  Plan,
+  position,
+  Reminder,
+} from "./model";
 import { manifestPlayer } from "./player";
 import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
@@ -754,15 +761,16 @@ export function ManifestLibrary({
     try {
       if (file.size > 100000)
         throw Error("Choose a practice file under 100 KB.");
-      const value = JSON.parse(await file.text());
+      const value = parsePlan(JSON.parse(await file.text()));
       if (!confirmDraftReplacement(data.draft, data.plans)) return;
       manifestPlayer.stop();
       store.import(value);
       setMessage("Practice imported.");
     } catch (e) {
       setMessage((e as Error).message);
+    } finally {
+      if (input.current) input.current.value = "";
     }
-    if (input.current) input.current.value = "";
   }
   return (
     <section className="manifest-workspace" aria-label="Manifestation library">

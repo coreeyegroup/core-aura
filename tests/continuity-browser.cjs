@@ -231,6 +231,25 @@ const { chromium } = require("playwright"),
       await p
         .getByRole("button", { name: "Play practice", exact: true })
         .click();
+      await nav("Library");
+      const stopsBeforeInvalid = await p.evaluate(() => window.__voiceStops);
+      await p
+        .getByLabel("Import manifestation practice", { exact: true })
+        .setInputFiles({
+          name: "broken.json",
+          mimeType: "application/json",
+          buffer: Buffer.from('{"schemaVersion":1}'),
+        });
+      await p
+        .getByText(
+          "This manifestation practice has invalid or unsupported settings.",
+          { exact: true },
+        )
+        .waitFor();
+      assert.equal(
+        await p.evaluate(() => window.__voiceStops),
+        stopsBeforeInvalid,
+      );
       await nav("Sounds");
       assert.equal(await p.locator(".player-dock").count(), 1);
       assert.equal(await p.locator(".mini-player").count(), 0);
@@ -310,6 +329,31 @@ const { chromium } = require("playwright"),
       await p.screenshot({
         path: "mobile-verification/continuity-manifest-393.png",
       });
+      await nav("Library");
+      const importFile = {
+        name: "practice.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(
+          await p.evaluate(() =>
+            JSON.stringify(
+              JSON.parse(localStorage.getItem("core-aura.manifestation.v1"))
+                .plans[0],
+            ),
+          ),
+        ),
+      };
+      for (let attempt = 0; attempt < 2; attempt++) {
+        p.once("dialog", (dialog) => dialog.dismiss());
+        await p
+          .getByLabel("Import manifestation practice", { exact: true })
+          .setInputFiles(importFile);
+        await p.waitForFunction(
+          () =>
+            document.querySelector(
+              'input[aria-label="Import manifestation practice"]',
+            ).value === "",
+        );
+      }
       assert.deepEqual(errors, []);
       await c.close();
       console.log(
