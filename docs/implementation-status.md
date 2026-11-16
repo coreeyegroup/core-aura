@@ -1,4 +1,6 @@
-# Release 0.15.0 status
+# Release 0.16.0 status
+
+Rebuilt the shared interface around compact rows and grouped controls. Added saved System, Light, Dark and High Contrast themes, pre-paint appearance restoration and live system-theme tracking. Removed decorative catalog cards and idle practice banners; voice options use one expandable panel. Text scaling and comfortable spacing remain adjustable. Browser checks cover five screens in three explicit themes, small screens, enlarged text, contrast and touch targets. See [interface guide](interface.md).
 
 Added editable device-local categories/affirmations, category moves and library backup/restore, visible voice selection/testing, startup/voice error diagnostics and optional multilingual Core-aura server voices. Portable recordings, direct saved-practice controls and native sharing remain available. Per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback and opt-in closed-app web push remain available. Details: [manifestation guide](manifestation.md).
 
@@ -8,27 +10,27 @@ Pending: physical Android/iOS microphone/notification/lock-screen acceptance; pr
 
 ## Current implementation coverage
 
-Release 0.15.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
+Release 0.16.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
 
-| Requirement | Implemented in this release | Remaining acceptance |
-| --- | --- | --- |
-| Manifestation | 40 category prompts, single-sentence Play previews, personal voice recordings, editable multi-sentence practices, sequence/each repetition, voice/silent modes, timer, background sound and JSON backup | Physical voice quality and language acceptance |
-| Schedules | Local weekday schedules, opt-in server push, in-app reminders, calendar export and native local-notification integration | Physical device delivery and unattended closed-app speech |
-| Web and installed PWA | Explore, Studio, Chakras, Library, settings, saved display preference, update flow | Physical phone acceptance on the owner's device |
-| Native mobile | Capacitor Android and iOS projects using bundled application assets | Device audio, interruptions, background operation, signed distribution |
-| Frequency generation | Sine and band-limited triangle synthesis, exact target input, slider, fine adjustment | Calibrated output-device assessment |
-| Instruments | Original synthesized flute, drum, bell, bowl and tanpura; three fixed-tuning generated WAV studies in the Core Resonance pack | Performer-reviewed realism and recorded instrument packs |
-| Indian classical music | Yaman and Mohanam phrase studies with tonic transposition | Hindustani/Carnatic practitioner review, ornamentation and expanded repertoire |
-| Mixing | One shared AudioContext, per-layer pause, mute, level, master, stop and fades | Long-duration device CPU/battery testing |
-| Chakra sessions | Seven mapped channels, separate and combined transport, bowl/sine/triangle type, per-channel level and saved combinations | Listening review on headphones and speakers |
-| Audio files | Saved-session WAV exports up to 10 minutes, PCM voice WAV import, portable 32 kHz voice exports and native share sheets | Physical native share-sheet acceptance and longer exports |
-| Offline | Versioned player cache, atomic IndexedDB pack installs, validated file hashes, cancelled/failed updates preserve older packs | Resumable partial downloads and storage-eviction recovery |
-| Session compatibility | Schema v2, engine version, validated imports, legacy flute/drone migration | Future migration tests whenever the schema changes |
-| Backend | FastAPI/PostgreSQL, uploaded-asset registry, revision events, authenticated administration screen, draft/review/publication/withdrawal | Separate user accounts and independently authenticated reviewers |
-| Content rights | Required creator, license, attribution, provenance fields and recorded operator notes | Actual commissioned/licensed recordings and tradition-specific review |
-| Scientific review | Product wording describes personal listening and meditation | Clinical research, claims register and qualified review |
-| Release delivery | Reproducible builds, atomic Ubuntu deployment, browser evidence and native build jobs | Stable app signing and store accounts |
-| World traditions | Architecture can add original sound models and reviewed content metadata | Pilot traditions, rights agreements and authentic content |
+| Requirement            | Implemented in this release                                                                                                                                                                             | Remaining acceptance                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Manifestation          | 40 category prompts, single-sentence Play previews, personal voice recordings, editable multi-sentence practices, sequence/each repetition, voice/silent modes, timer, background sound and JSON backup | Physical voice quality and language acceptance                                 |
+| Schedules              | Local weekday schedules, opt-in server push, in-app reminders, calendar export and native local-notification integration                                                                                | Physical device delivery and unattended closed-app speech                      |
+| Web and installed PWA  | Explore, Studio, Chakras, Library, settings, saved display preference, update flow                                                                                                                      | Physical phone acceptance on the owner's device                                |
+| Native mobile          | Capacitor Android and iOS projects using bundled application assets                                                                                                                                     | Device audio, interruptions, background operation, signed distribution         |
+| Frequency generation   | Sine and band-limited triangle synthesis, exact target input, slider, fine adjustment                                                                                                                   | Calibrated output-device assessment                                            |
+| Instruments            | Original synthesized flute, drum, bell, bowl and tanpura; three fixed-tuning generated WAV studies in the Core Resonance pack                                                                           | Performer-reviewed realism and recorded instrument packs                       |
+| Indian classical music | Yaman and Mohanam phrase studies with tonic transposition                                                                                                                                               | Hindustani/Carnatic practitioner review, ornamentation and expanded repertoire |
+| Mixing                 | One shared AudioContext, per-layer pause, mute, level, master, stop and fades                                                                                                                           | Long-duration device CPU/battery testing                                       |
+| Chakra sessions        | Seven mapped channels, separate and combined transport, bowl/sine/triangle type, per-channel level and saved combinations                                                                               | Listening review on headphones and speakers                                    |
+| Audio files            | Saved-session WAV exports up to 10 minutes, PCM voice WAV import, portable 32 kHz voice exports and native share sheets                                                                                 | Physical native share-sheet acceptance and longer exports                      |
+| Offline                | Versioned player cache, atomic IndexedDB pack installs, validated file hashes, cancelled/failed updates preserve older packs                                                                            | Resumable partial downloads and storage-eviction recovery                      |
+| Session compatibility  | Schema v2, engine version, validated imports, legacy flute/drone migration                                                                                                                              | Future migration tests whenever the schema changes                             |
+| Backend                | FastAPI/PostgreSQL, uploaded-asset registry, revision events, authenticated administration screen, draft/review/publication/withdrawal                                                                  | Separate user accounts and independently authenticated reviewers               |
+| Content rights         | Required creator, license, attribution, provenance fields and recorded operator notes                                                                                                                   | Actual commissioned/licensed recordings and tradition-specific review          |
+| Scientific review      | Product wording describes personal listening and meditation                                                                                                                                             | Clinical research, claims register and qualified review                        |
+| Release delivery       | Reproducible builds, atomic Ubuntu deployment, browser evidence and native build jobs                                                                                                                   | Stable app signing and store accounts                                          |
+| World traditions       | Architecture can add original sound models and reviewed content metadata                                                                                                                                | Pilot traditions, rights agreements and authentic content                      |
 
 ## Platform decision
 

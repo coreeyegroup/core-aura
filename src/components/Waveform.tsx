@@ -16,7 +16,10 @@ export function Waveform() {
         if (pen) {
           pen.clearRect(0, 0, c.width, c.height);
           pen.beginPath();
-          pen.strokeStyle = "#c6d69b";
+          pen.strokeStyle =
+            getComputedStyle(document.documentElement)
+              .getPropertyValue("--accent")
+              .trim() || "#185aa3";
           pen.lineWidth = 2;
           let peak = 0.015;
           for (const value of samples) peak = Math.max(peak, Math.abs(value));
