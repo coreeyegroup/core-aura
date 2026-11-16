@@ -37,11 +37,9 @@ To restore, stop the API and restore into a fresh database first. Verify the sch
 
 Run npm ci, npm run build and npx cap sync. Open Android Studio with npm run native:android or Xcode with npm run native:ios.
 
-The Android project disables desktop overview sizing and uses the device font scale. GitHub Actions produces a signed debug APK for testing. Debug credentials on ephemeral CI runners are temporary, so production updates require a stable signing key and a managed release channel. Use native builds as test builds until that channel is configured.
+The Android project disables desktop overview sizing and uses the device font scale. GitHub Actions verifies debug/release compilation and prepares unsigned release inputs. The VPS publisher uses one permanent private identity, signs/verifies the APK and publishes it on the existing domain. Android Settings checks the native update channel and opens the compatible APK for a user-confirmed update. See [Android distribution](android-distribution.md) for first publication, future releases, key backup and the one-time transition from the earlier debug APK.
 
-The iOS job compiles an unsigned simulator application. Physical iPhone installation and App Store release require the appropriate Apple account and signing configuration.
-
-Native binaries contain their own application assets. Their code updates use the native distribution channel. The in-app updater describes this distinction when running natively.
+The iOS job compiles an unsigned simulator application. Physical iPhone installation and App Store release require the appropriate Apple account and signing configuration. Native binaries contain their own application assets; updating the web player does not replace those bundled assets.
 
 ## Device acceptance
 
@@ -182,3 +180,19 @@ bash ops/verify.sh 0.18.0
 ```
 
 Update the installed PWA in Settings and confirm 0.18.0. Check Home → Schedule → reload and browser Back, category → selection → editor → Back, draft replacement cancellation, saved practice → Schedule practice, and paused Studio → Home → Resume audio. Switch between a running practice and Sounds to confirm controls do not overlap. Settings → Stop all audio must stop spoken practice as well as tones. Expand Connection & offline readiness and confirm the API, voices and web-push states reflect the deployed backend. The sound workspace restores settings after reload and requires an explicit Play action. No database migration is added.
+
+## Release 0.19.0: hosted APK and native update option
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.19.0-android-channel
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+sudo bash ops/publish-android.sh
+bash ops/verify.sh 0.19.0
+curl -fsS https://core-aura.coreeye.in/android/latest.json
+```
+
+The main workflow must finish its android-publish job before the publisher can download the exact build inputs. The customer page is https://core-aura.coreeye.in/download.html and the stable download alias is https://core-aura.coreeye.in/android/core-aura-latest.apk. Keep the generated private signing backup protected outside the VPS. Future code updates retain that identity; Settings → Android app updates → Check for app updates offers a newer APK. Android asks for installation confirmation. See the Android distribution guide before replacing the older debug APK or moving signing state to another server.

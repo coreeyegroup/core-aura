@@ -36,7 +36,7 @@ jobs:
           trap 'kill "$server" "$backend"' EXIT
           curl --retry 15 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8090/api/health
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
-          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.18.0
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.19.0
           npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -78,6 +78,11 @@ jobs:
           python -m unittest test_catalog test_reminders test_speech
       - name: Verify content volume persistence and non-root image
         run: python tests/container-smoke.py
+      - name: Validate Android download routes
+        run: |
+          python3 tests/site_config_test.py
+          docker run --rm -v "$PWD/ops/core-aura.caddy:/etc/caddy/Caddyfile:ro" caddy:2.9.1-alpine caddy validate --config /etc/caddy/Caddyfile
+          docker run --rm -v "$PWD/ops/core-aura-with-api.caddy:/etc/caddy/Caddyfile:ro" caddy:2.9.1-alpine caddy validate --config /etc/caddy/Caddyfile
   android:
     runs-on: ubuntu-22.04
     steps:
@@ -91,10 +96,20 @@ jobs:
           java-version: "21"
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
       - run: npm ci
       - run: npm run build && npx cap sync android
-      - run: bash android/gradlew -p android assembleDebug
+      - run: bash android/gradlew -p android assembleDebug assembleRelease testDebugUnitTest
+      - name: Prepare unsigned Android release inputs
+        run: |
+          git diff --exit-code -- android
+          python3 scripts/android_inputs.py --apk android/app/build/outputs/apk/release/app-release-unsigned.apk --tools "$ANDROID_HOME/build-tools/35.0.0" --output android-publish-inputs
+      - name: Verify permanent signing and atomic publication
+        run: python3 tests/android_publication.py android-publish-inputs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-aura-android-publish-inputs
+          path: android-publish-inputs/
       - uses: actions/upload-artifact@v4
         with:
           name: core-aura-android-debug
@@ -110,3 +125,36 @@ jobs:
       - run: npm run build && npx cap sync ios
       - run: xcodebuild -workspace ios/App/App.xcworkspace -scheme App -sdk iphonesimulator -configuration Debug -derivedDataPath /tmp/core-aura-ios CODE_SIGNING_ALLOWED=NO build
       - run: plutil -lint /tmp/core-aura-ios/Build/Products/Debug-iphonesimulator/App.app/PrivacyInfo.xcprivacy
+
+  android-publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [web, backend, android]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-aura-android-publish-inputs
+          path: android-publish-inputs
+      - name: Publish immutable unsigned release inputs
+        working-directory: android-publish-inputs
+        run: |
+          version=$(python3 -c 'import json;print(json.load(open("publish-inputs.json"))["versionName"])')
+          tag="android-v$version"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            mkdir existing
+            gh release download "$tag" --pattern publish-inputs.json --dir existing
+            python3 -c 'import json; a=json.load(open("publish-inputs.json")); b=json.load(open("existing/publish-inputs.json")); assert a["sourceDigest"]==b["sourceDigest"] and a["versionCode"]==b["versionCode"], "Native code changed: increase app version and versionCode before publishing"'
+            echo "This Android release is already published. Existing assets were preserved."
+          else
+            cat > release-notes.md <<'NOTES'
+          Unsigned Android build inputs for VPS-owned signing. These are not installable APK downloads.
+          Run ops/publish-android.sh from the matching checkout to sign and publish the app at core-aura.coreeye.in.
+          The private signing identity stays on the VPS and is never uploaded to GitHub.
+          NOTES
+            gh release create "$tag" --target "$GITHUB_SHA" --title "Core-aura Android $version — build inputs" --notes-file release-notes.md --prerelease publish-inputs.json apksigner-35.0.0.jar "core-aura-$version-unsigned.apk"
+          fi

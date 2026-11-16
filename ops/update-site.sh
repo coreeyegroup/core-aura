@@ -1,21 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
-site=/etc/caddy/sites/core-aura.caddy
+site=${CORE_AURA_CADDY_SITE:-/etc/caddy/sites/core-aura.caddy}
 if [[ ! -f "$site" ]]; then
   echo "Core-aura site configuration is missing: $site" >&2
   exit 1
 fi
-backup=$(mktemp /etc/caddy/sites/core-aura.caddy.backup.XXXXXXXX)
+backup=$(mktemp "${site}.backup.XXXXXXXX")
 cp -p "$site" "$backup"
 python3 - "$site" "${1:-}" <<'PY'
 import os, pathlib, sys, tempfile
 site = pathlib.Path(sys.argv[1])
 text = site.read_text()
 original = text
+android_route = '''
+    handle_path /android/* {
+        root * /var/www/core-aura/android
+        header Access-Control-Allow-Origin "*"
+        header Cache-Control "no-store"
+        @androidApk path *.apk
+        header @androidApk Content-Type application/vnd.android.package-archive
+        header @androidApk Content-Disposition attachment
+        file_server
+    }'''
+if 'handle_path /android/*' not in text:
+    text = text.replace('core-aura.coreeye.in {', 'core-aura.coreeye.in {' + android_route, 1)
 marker = 'core-aura.coreeye.in {'
 if text.count(marker) != 1:
     raise SystemExit('Expected one Core-aura site block; configuration was not changed')
-if 'Access-Control-Allow-Origin' not in text:
+if '@coreAuraPackFiles' not in text and '@packfiles' not in text:
     text = text.replace(marker, marker + '\n    @coreAuraPackFiles path /packs/*\n    header @coreAuraPackFiles Access-Control-Allow-Origin "*"', 1)
 if sys.argv[2] == '--enable-api':
     for route in ['/api/*', '/packs/uploads/*']:
@@ -44,4 +56,4 @@ if ! systemctl reload caddy; then
   echo "Reload failed; the previous Core-aura site file was restored." >&2
   exit 1
 fi
-echo "Core-aura pack headers updated. Backup: $backup"
+echo "Core-aura routes and pack headers updated. Backup: $backup"

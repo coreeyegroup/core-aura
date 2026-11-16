@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.18.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.19.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -43,9 +43,11 @@ Explore → Sound packs offers optional downloads with version, size, license an
 
 The first Core Resonance pack contains original 15-second bell, bowl and flute synthesis studies. Its generated audio is CC0-1.0 and is not a performer recording. The server catalog is optional. Server manifests support versioned replacement and review. Settings → Manage content provides uploads, private previews, editing, publication and revision history. Uploaded files live in a separate Docker content volume across releases.
 
-## Native projects
+## Android APK and updates
 
-Capacitor packages the shared interface in Android and iOS projects. Run npm run native:sync, then open Android Studio or Xcode. Automated Android builds provide a test APK. iOS compilation targets the simulator. Device audio and production signing require further acceptance.
+The website links to /download.html and the persistent /android/core-aura-latest.apk download. Android Settings includes Check for app updates, validates package/version/signing identity and offers the latest compatible signed APK. Android asks the user to approve installation. The VPS signs verified CI build inputs with its permanent private key; a web deployment does not remove the APK channel. Publish using sudo bash ops/publish-android.sh after the verified main build. See [Android distribution](docs/android-distribution.md) for exact commands, private key backup and the one-time migration from the old temporary test APK.
+
+Capacitor packages the shared interface in Android and iOS projects. Run npm run native:sync, then open Android Studio or Xcode. Automated verification builds Android debug/release packages, tests real APK signing/publication and compiles the iOS simulator project. Physical-device acceptance and iOS production signing/store distribution remain separate.
 
 ## Project references
 

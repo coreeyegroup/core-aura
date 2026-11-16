@@ -4,6 +4,9 @@ const proxy = {
   "/packs/uploads": process.env.CORE_AURA_API_PROXY || "http://127.0.0.1:8793",
 };
 export default defineConfig({
+  build: {
+    rollupOptions: { input: { app: "index.html", download: "download.html" } },
+  },
   server: { proxy },
   preview: { host: "127.0.0.1", port: 8089, proxy },
 });

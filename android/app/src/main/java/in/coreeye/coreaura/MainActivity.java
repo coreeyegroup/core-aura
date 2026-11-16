@@ -7,6 +7,7 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle state) {
+        registerPlugin(AppDistributionPlugin.class);
         super.onCreate(state);
         WebSettings settings = getBridge().getWebView().getSettings();
         settings.setUseWideViewPort(false);

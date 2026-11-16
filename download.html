@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#14161c" />
+    <title>Download Android · Core-aura</title>
+    <link rel="icon" href="/icon-192.png" />
+  </head>
+  <body>
+    <main>
+      <header><a href="/">CORE AURA</a><span>ANDROID APP</span></header>
+      <h1>Core-aura for Android</h1>
+      <p>
+        Install the app on your phone. Practice, audio tools and saved content
+        open in their own Android app.
+      </p>
+      <p id="status" role="status">Checking the latest Android release…</p>
+      <section id="release" hidden>
+        <dl>
+          <div>
+            <dt>Version</dt>
+            <dd id="version"></dd>
+          </div>
+          <div>
+            <dt>Download size</dt>
+            <dd id="size"></dd>
+          </div>
+          <div>
+            <dt>Android minimum</dt>
+            <dd id="minimum"></dd>
+          </div>
+        </dl>
+        <a id="apk" class="primary" download>Download Android APK</a>
+        <details>
+          <summary>Verify the downloaded file</summary>
+          <p>SHA-256</p>
+          <code id="sha"></code>
+        </details>
+      </section>
+      <button id="retry">Check again</button>
+      <section>
+        <h2>Install or update</h2>
+        <ol>
+          <li>Download the APK and open it from Downloads.</li>
+          <li>Allow installation from the download source if Android asks.</li>
+          <li>Confirm Install or Update, then open Core-aura.</li>
+        </ol>
+        <p>
+          Future stable updates appear in
+          <strong>Settings → Android app updates</strong>. Android asks for
+          confirmation; an update with the same signing key preserves app data.
+        </p>
+        <details>
+          <summary>Moving from the earlier test APK?</summary>
+          <p>
+            The earlier test APK has a temporary signing key. Export your
+            practices, affirmation library and recordings first. Replace that
+            test app once with this stable app, then import your backups. This
+            replacement is needed only for the test-to-stable transition.
+          </p>
+        </details>
+      </section>
+      <footer><a href="/">Return to Core-aura</a></footer>
+    </main>
+    <script type="module" src="/src/android/download.ts"></script>
+  </body>
+</html>
