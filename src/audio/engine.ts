@@ -160,6 +160,9 @@ export class AudioEngine {
   private notify() {
     for (const fn of this.listeners) fn();
   }
+  unlock() {
+    return this.connect();
+  }
   private async connect() {
     if (this.node) {
       await this.context!.resume();

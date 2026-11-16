@@ -3,6 +3,7 @@ import { TextToSpeech } from "@capacitor-community/text-to-speech";
 import { Line, Plan } from "./model";
 import { recording } from "./recordings";
 import { engine } from "../audio/engine";
+import { serverSpeech } from "./server-voice";
 export type Voice = {
   name: string;
   lang: string;
@@ -18,6 +19,9 @@ export interface SpeechDriver {
 let stopping = Promise.resolve();
 let generation = 0;
 let overlay: AbortController | undefined;
+let pending:
+  | { utterance: SpeechSynthesisUtterance; cancel: () => void }
+  | undefined;
 export const speech: SpeechDriver = {
   async voices() {
     if (Capacitor.isNativePlatform())
@@ -28,6 +32,8 @@ export const speech: SpeechDriver = {
   },
   stop() {
     generation++;
+    pending?.cancel();
+    pending = undefined;
     overlay?.abort();
     overlay = undefined;
     if (Capacitor.isNativePlatform())
@@ -56,6 +62,21 @@ export const speech: SpeechDriver = {
   },
   async speak(text, plan) {
     const token = generation;
+    if (plan.voice.startsWith("core:")) {
+      overlay?.abort();
+      const controller = new AbortController();
+      overlay = controller;
+      try {
+        await engine.playOverlay(
+          () => serverSpeech(text, plan.voice, plan.rate, controller.signal),
+          plan.volume,
+          controller.signal,
+        );
+      } finally {
+        if (overlay === controller) overlay = undefined;
+      }
+      return;
+    }
     if (Capacitor.isNativePlatform()) {
       await stopping;
       if (token !== generation) return;
@@ -87,14 +108,57 @@ export const speech: SpeechDriver = {
       } else utterance.lang = "en-US";
       utterance.rate = plan.rate;
       utterance.volume = plan.volume;
-      utterance.onend = () => resolve();
-      utterance.onerror = () =>
-        reject(
+      let settled = false;
+      let startup: ReturnType<typeof setTimeout>,
+        deadline: ReturnType<typeof setTimeout>;
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(startup);
+        clearTimeout(deadline);
+        if (pending?.utterance === utterance) pending = undefined;
+        if (error) reject(error);
+        else resolve();
+      };
+      pending = {
+        utterance,
+        cancel: () =>
+          finish(new DOMException("Speech cancelled", "AbortError")),
+      };
+      utterance.onstart = () => clearTimeout(startup);
+      utterance.onend = () => finish();
+      utterance.onerror = (e) =>
+        finish(
           Error(
-            "Speech could not continue. Check the installed voice or choose silent reading.",
+            "Device speech failed (" +
+              e.error +
+              "). Select a Core-aura voice, refresh device voices, or use a personal recording.",
           ),
         );
-      speechSynthesis.speak(utterance);
+      startup = setTimeout(
+        () =>
+          finish(
+            Error(
+              "The device voice did not start. Select a Core-aura voice or refresh device voices, then tap Play again.",
+            ),
+          ),
+        8000,
+      );
+      deadline = setTimeout(
+        () =>
+          finish(
+            Error(
+              "The device voice stopped responding. Try a shorter sentence or a Core-aura voice.",
+            ),
+          ),
+        70000,
+      );
+      try {
+        speechSynthesis.resume?.();
+        speechSynthesis.speak(utterance);
+      } catch (e) {
+        finish(e as Error);
+      }
     });
   },
 };

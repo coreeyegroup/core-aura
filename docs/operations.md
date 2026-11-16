@@ -122,3 +122,21 @@ No new database migration, public route or server tool is required. The backend 
 Pinned native additions: @capacitor/filesystem 7.1.9 and @capacitor/share 7.0.4. Android and iOS must be rebuilt to obtain those native plugins. The iOS privacy manifest is included in the app target resources. Android sharing is limited to the core-aura-exports cache subdirectory. No new storage permission is needed. Native packages remain development builds until stable production signing/distribution is configured.
 
 Acceptance: play a library affirmation; use direct Play/Pause on a saved practice; import a short 16-bit PCM WAV into a sentence, preview and confirm; export that recording and reimport the exported WAV while offline. Verify invalid/truncated/overlong files do not change the prior sentence attachment. On actual native builds, choose Save to Files or another explicit share destination, check the saved file, cancel another share, and test JSON/ICS exports. Automated native-share tests mock the filesystem and OS sheet; no files are sent to external recipients during CI.
+
+## Release 0.15.0: editable library and speech backend
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.15.0-library-voices
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+bash ops/verify.sh 0.15.0
+```
+
+The backend rebuild installs espeak-ng inside its Docker image; no host speech package or paid API key is required. No database migration or new public port is added. Existing /api/* routing covers GET /api/speech/voices and POST /api/speech/speak. start-backend now also requires the installed voice inventory to be ready. Preserve .env, existing volumes and VAPID keys as before.
+
+Update the PWA through Settings and confirm 0.15.0. If device speech fails, select Core-aura English (US) → Standard in Voice & playback, then tap Test voice. This explicitly sends that sentence to the server; it uses the normal shared audio output instead of browser text-to-speech. Check phone media volume, speaker/Bluetooth output and network access. GET /api/speech/voices should report ready:true and a non-empty voice list. POST failures explain an unavailable backend, busy engine or invalid selection.
+
+Category/affirmation changes are device-local and are not in server database backups. Use Library → Manage categories & affirmations → Export library, plus the existing practice JSON/voice WAV exports. Test category renaming, moving an affirmation, deleting a category with move/delete choices, restoring an exported library, device voice errors and server voice playback before relying on a routine. Real native/device voice listening and language quality still need phone acceptance.

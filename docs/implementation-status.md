@@ -1,6 +1,6 @@
-# Release 0.14.0 status
+# Release 0.15.0 status
 
-Added PCM WAV import, portable voice WAV export, saved-recording reuse, direct saved-practice Play/Pause, and native share-sheet exports. Per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback and opt-in closed-app web push remain available. Details: [manifestation guide](manifestation.md).
+Added editable device-local categories/affirmations, category moves and library backup/restore, visible voice selection/testing, startup/voice error diagnostics and optional multilingual Core-aura server voices. Portable recordings, direct saved-practice controls and native sharing remain available. Per-sentence Play/Stop previews, device-only microphone recordings, mixed personal/device voice playback and opt-in closed-app web push remain available. Details: [manifestation guide](manifestation.md).
 
 Backend migration 003 adds subscriptions, durable deliveries and worker heartbeat. Compose adds a reminder worker; deployment preserves its VAPID keypair in .env. [Operations](operations.md) includes the upgrade and backup requirements.
 
@@ -8,7 +8,7 @@ Pending: physical Android/iOS microphone/notification/lock-screen acceptance; pr
 
 ## Current implementation coverage
 
-Release 0.14.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
+Release 0.15.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
 
 | Requirement | Implemented in this release | Remaining acceptance |
 | --- | --- | --- |

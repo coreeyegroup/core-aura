@@ -1413,3 +1413,28 @@ textarea:focus-visible {
   justify-content: center;
   gap: 0.35rem;
 }
+.voice-panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  margin-block: 10px;
+  min-width: 0;
+}
+.voice-panel h2 {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.voice-panel fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.library-management {
+  margin-block: 10px;
+}
+.library-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-basis: 100%;
+  justify-content: end;
+}

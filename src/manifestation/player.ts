@@ -26,10 +26,9 @@ export class ManifestPlayer {
   private unsubscribe: () => void;
   constructor(
     private voice: SpeechDriver = speech,
-    private audio: Pick<
-      AudioEngine,
-      "stopAll" | "play" | "pause" | "stop"
-    > = engine,
+    private audio: Pick<AudioEngine, "stopAll" | "play" | "pause" | "stop"> & {
+      unlock?: () => Promise<void>;
+    } = engine,
   ) {
     this.unsubscribe = onOtherAudio(() => this.stop());
   }
@@ -64,6 +63,8 @@ export class ManifestPlayer {
     this.stop();
     this.accumulated = 0;
     this.update({ status: "playing", plan, step: 0, elapsed: 0, error: "" });
+    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.background)
+      void this.audio.unlock?.().catch(() => {});
     this.clockStart();
     this.background();
     void this.run(this.token);
