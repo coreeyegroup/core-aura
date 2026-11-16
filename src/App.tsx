@@ -40,7 +40,12 @@ import { manifestationStore } from "./manifestation/store";
 import { manifestPlayer } from "./manifestation/player";
 import { observePushReminders } from "./manifestation/push";
 import { Due, observeReminders } from "./manifestation/reminders";
-import { readAppearance, saveAppearance, Appearance } from "./appearance";
+import {
+  readAppearance,
+  saveAppearance,
+  applyAppearance,
+  Appearance,
+} from "./appearance";
 
 function time(seconds: number) {
   return (
@@ -185,6 +190,13 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [settings, setSettings] = useState(false);
   const [appearance, setAppearance] = useState(readAppearance);
+  useEffect(() => {
+    applyAppearance(appearance);
+    const media = matchMedia("(prefers-color-scheme: dark)");
+    const changed = () => applyAppearance(appearance);
+    media.addEventListener("change", changed);
+    return () => media.removeEventListener("change", changed);
+  }, [appearance]);
   const [exporting, setExporting] = useState<Session | null>(null);
   const [exportSeconds, setExportSeconds] = useState(60);
   const [exportProgress, setExportProgress] = useState<number | null>(null);
@@ -532,7 +544,7 @@ export default function App() {
   const activeCount = states.filter((s) => s.status === "playing").length;
   const errorInvalid = currentWithTime.some((c) => !validChannel(c));
   return (
-    <div className="app">
+    <div className="app" data-screen={tab}>
       <header className="app-header">
         <a
           href="#manifest"
@@ -545,6 +557,12 @@ export default function App() {
           <span aria-hidden="true">◉</span> core-aura
         </a>
         <div className="header-actions">
+          <span className="build-status">
+            v{VERSION} ·{" "}
+            {appearance.theme === "contrast"
+              ? "High contrast"
+              : appearance.theme}
+          </span>
           {!online && <WifiOff aria-label="Offline" size={18} />}
           <button
             className="icon-button"
@@ -600,13 +618,11 @@ export default function App() {
         {tab === "explore" && (
           <>
             <div className="page-heading">
-              <p className="eyebrow">Your listening practice</p>
-              <h1>
-                Make room
-                <br />
-                for a little stillness.
-              </h1>
-              <p>Choose a sound. Find your own rhythm.</p>
+              <h1>Sound catalog</h1>
+              <p>
+                {Object.keys(sounds).length} instruments and studies ·
+                adjustable tuning · layered playback
+              </p>
             </div>
             <div className="segmented" aria-label="Explore collection">
               <button
@@ -626,21 +642,6 @@ export default function App() {
               <PacksPanel />
             ) : (
               <>
-                <button
-                  className="feature-card"
-                  onClick={() => navigate("chakras")}
-                >
-                  <div className="orb" aria-hidden="true">
-                    <Flower2 size={52} />
-                  </div>
-                  <div>
-                    <span className="eyebrow">Seven frequencies</span>
-                    <h2>Chakra meditation</h2>
-                    <span>
-                      Create your own combination <ArrowRight size={16} />
-                    </span>
-                  </div>
-                </button>
                 <label className="search">
                   <span>Find a sound</span>
                   <input
@@ -711,7 +712,9 @@ export default function App() {
           <>
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Create a session</p>
+                <p className="eyebrow">
+                  {layers.length}/8 layers · {seconds / 60} min
+                </p>
                 <h1>Sound Studio</h1>
               </div>
               <button
@@ -824,7 +827,9 @@ export default function App() {
           <>
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Choose your focus</p>
+                <p className="eyebrow">
+                  {selected.length}/7 selected · {seconds / 60} min
+                </p>
                 <h1>Chakra meditation</h1>
               </div>
               <button
@@ -875,7 +880,11 @@ export default function App() {
                         <span className="chakra-dot" aria-hidden="true" />
                         <span>
                           <strong>{c.name}</strong>
-                          <small>{c.focus}</small>
+                          <small>
+                            {state
+                              ? state.status + " · " + time(state.time)
+                              : "Ready"}
+                          </small>
                         </span>
                       </label>
                       <div className="chakra-hz">
@@ -909,10 +918,11 @@ export default function App() {
                       </div>
                     </div>
                     <details>
-                      <summary>
-                        {state
-                          ? state.status + " · " + time(state.time)
-                          : "Volume & focus"}
+                      <summary
+                        aria-label={c.name + " volume and focus"}
+                        title="Volume and focus"
+                      >
+                        <Settings size={17} />
                       </summary>
                       <div className="focus-controls">
                         <p>{c.prompt}</p>{" "}
@@ -965,7 +975,6 @@ export default function App() {
           <>
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Your personal collection</p>
                 <h1>Library</h1>
               </div>
               {libraryView === "audio" && (
@@ -1235,23 +1244,27 @@ export default function App() {
               Keep your device volume comfortable. Stop if listening feels
               uncomfortable.
             </p>
-            {!Capacitor.isNativePlatform() && (
-              <button
-                className="wide"
-                onClick={() => {
-                  setSettings(false);
-                  navigate("admin");
-                }}
-              >
-                Manage content
-              </button>
-            )}
-            <button className="wide" onClick={update}>
-              Check for updates
-            </button>
-            {updateStatus && <p role="status">{updateStatus}</p>}
             <fieldset className="appearance-controls">
               <legend>Display</legend>
+              <label>
+                Theme
+                <select
+                  aria-label="Theme"
+                  value={appearance.theme}
+                  onChange={(e) =>
+                    changeAppearance({
+                      ...appearance,
+                      theme: e.target.value as Appearance["theme"],
+                    })
+                  }
+                >
+                  <option value="system">System</option>
+                  <option value="light">Light</option>
+                  <option value="dark">Dark</option>
+                  <option value="contrast">High contrast</option>
+                </select>
+              </label>
+
               <label>
                 Text size <output>{appearance.textSize}%</output>
                 <input
@@ -1287,12 +1300,32 @@ export default function App() {
               </label>
               <button
                 onClick={() =>
-                  changeAppearance({ textSize: 100, density: "compact" })
+                  changeAppearance({
+                    textSize: 100,
+                    density: "compact",
+                    theme: "system",
+                  })
                 }
               >
                 Reset display
               </button>
             </fieldset>
+            {!Capacitor.isNativePlatform() && (
+              <button
+                className="wide"
+                onClick={() => {
+                  setSettings(false);
+                  navigate("admin");
+                }}
+              >
+                Manage content
+              </button>
+            )}
+            <button className="wide" onClick={update}>
+              Check for updates
+            </button>
+            {updateStatus && <p role="status">{updateStatus}</p>}
+
             <button
               className="wide"
               onClick={() => {

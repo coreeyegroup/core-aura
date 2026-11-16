@@ -140,6 +140,7 @@ function wave() {
     await p
       .getByLabel("Practice name", { exact: true })
       .fill("Core voice practice");
+    await p.locator(".voice-panel > summary").click();
     await p
       .locator('select[aria-label="Voice"] option[value="core:en-us"]')
       .waitFor({ state: "attached" });

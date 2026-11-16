@@ -23,7 +23,7 @@ const fs = require("node:fs");
       const errors = [];
       p.on("pageerror", (e) => errors.push(e.message));
       await p.goto("http://localhost:8089/#explore");
-      await p.getByRole("heading", { name: /Make room/ }).waitFor();
+      await p.getByRole("heading", { name: "Sound catalog" }).waitFor();
       for (const tab of ["Studio", "Chakras", "Library", "Explore"]) {
         await navigate(p, tab);
         const metrics = await p.evaluate(() => ({

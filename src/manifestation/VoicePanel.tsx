@@ -67,8 +67,13 @@ export function VoicePanel() {
   const visible = voices.filter((v) => !language || v.lang === language),
     selected = voices.find((v) => v.voiceURI === p.voice);
   return (
-    <section className="voice-panel" aria-label="Voice and playback">
-      <h2>Voice &amp; playback</h2>
+    <details className="voice-panel" aria-label="Voice and playback">
+      <summary>
+        Voice &amp; playback{" "}
+        <span className="voice-summary-note">
+          {selected?.name || "Device default"}
+        </span>
+      </summary>
       {p.mode === "read" && (
         <p className="notice">
           Silent reading is selected.{" "}
@@ -192,6 +197,6 @@ export function VoicePanel() {
         </p>
       </details>
       {message && <p role="status">{message}</p>}
-    </section>
+    </details>
   );
 }

@@ -1,22 +1,33 @@
-// Let the browser fit its device viewport and retain pinch-to-zoom.
-// Text size and spacing are independent saved preferences, never forced widths.
-const viewport = document.querySelector('meta[name="viewport"]');
-if (viewport)
-  viewport.content = "width=device-width, initial-scale=1, viewport-fit=cover";
-try {
-  const value = JSON.parse(
-    localStorage.getItem("core-aura.appearance") || "null",
-  );
-  const size = Number.isFinite(value?.textSize)
-    ? Math.max(90, Math.min(140, value.textSize))
-    : 100;
-  document.documentElement.dataset.textSize = size >= 125 ? "large" : "normal";
-  document.documentElement.style.setProperty(
-    "--text-scale",
-    String(size / 100),
-  );
-  document.documentElement.dataset.density =
-    value?.density === "comfortable" ? "comfortable" : "compact";
-} catch {
-  document.documentElement.dataset.density = "compact";
-}
+// Apply saved presentation before app boot without changing the device viewport.
+(() => {
+  let value = {};
+  try {
+    value =
+      JSON.parse(localStorage.getItem("core-aura.appearance") || "null") || {};
+  } catch {}
+  const root = document.documentElement,
+    size = Number.isFinite(value.textSize)
+      ? Math.max(90, Math.min(140, value.textSize))
+      : 100;
+  root.dataset.textSize = size >= 125 ? "large" : "normal";
+  root.style.setProperty("--text-scale", String(size / 100));
+  root.dataset.density =
+    value.density === "comfortable" ? "comfortable" : "compact";
+  root.dataset.theme = ["system", "light", "dark", "contrast"].includes(
+    value.theme,
+  )
+    ? value.theme
+    : "system";
+  const theme =
+    root.dataset.theme === "system"
+      ? matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light"
+      : root.dataset.theme;
+  root.dataset.resolvedTheme = theme;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta)
+    meta.content = { light: "#f3f5f7", dark: "#14191f", contrast: "#000000" }[
+      theme
+    ];
+})();

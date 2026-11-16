@@ -49,13 +49,13 @@ Test normal and enlarged text, portrait/landscape, Bluetooth routes, speaker/hea
 
 ## Display preferences and audio export
 
-Use Settings → Display to change text size or spacing without reinstalling or reloading. Reset display restores 100% text with compact spacing. Pinch zoom is retained. The page asks for device-width; if a browser is set to Desktop site, turn that browser setting off.
+Use Settings → Display to change text size or spacing without reinstalling or reloading. Choose System, Light, Dark or High contrast in the same panel. Theme, text size and spacing persist on this device. Reset display restores System theme, 100% text and compact spacing. Pinch zoom is retained. The page asks for device-width; if a browser is set to Desktop site, turn that browser setting off.
 
 Save a session, open Library, choose WAV audio, select a duration, then Download WAV. A worker renders a mono 44.1 kHz 16-bit file from the saved configuration. Cancel export terminates rendering. Exports are capped at 10 minutes and need device storage for downloads. Settings JSON exports remain available separately. Native shells currently require the website/PWA for WAV download.
 
 ## Sound-pack deployment (0.10.0)
 
-The release build generates /catalog-packs.json and content-addressed /packs/core-resonance/1.0.0/*.wav. The current static player works without the API and falls back to its bundled catalog when /api/catalog is unavailable. Pack audio is excluded from the web player's precache; it is downloaded on request and stored transactionally in IndexedDB.
+The release build generates /catalog-packs.json and content-addressed /packs/core-resonance/1.0.0/\*.wav. The current static player works without the API and falls back to its bundled catalog when /api/catalog is unavailable. Pack audio is excluded from the web player's precache; it is downloaded on request and stored transactionally in IndexedDB.
 
 After deploying, run sudo bash ops/update-site.sh. It adds public GET file access headers for native shells while preserving the existing static/API routing, validates Caddy, reloads it, and retains a backup. It restores the previous site file if validation or reload fails. The API permits catalog GET requests from the standard Capacitor localhost origins.
 
@@ -98,7 +98,7 @@ bash ops/verify.sh 0.13.0
 curl -fsS https://core-aura.coreeye.in/api/manifest-reminders/config
 ```
 
-The last endpoint must report configured:true and ready:true. It exposes only the public VAPID key. start-backend builds the image, prepares a persistent matching VAPID pair in chmod-600 .env, migrates the DB and starts the API and reminder worker. Existing passwords/admin tokens are preserved. Never rotate VAPID keys during normal updates; restore the matching pair if lost. The worker receives the private key; the API receives only the public key. Default public origin/subject is https://core-aura.coreeye.in; change CORE_AURA_PUBLIC_ORIGIN only for a different actual origin. No new public listener or Caddy route is required beyond /api/*.
+The last endpoint must report configured:true and ready:true. It exposes only the public VAPID key. start-backend builds the image, prepares a persistent matching VAPID pair in chmod-600 .env, migrates the DB and starts the API and reminder worker. Existing passwords/admin tokens are preserved. Never rotate VAPID keys during normal updates; restore the matching pair if lost. The worker receives the private key; the API receives only the public key. Default public origin/subject is https://core-aura.coreeye.in; change CORE_AURA_PUBLIC_ORIGIN only for a different actual origin. No new public listener or Caddy route is required beyond /api/\*.
 
 Run `sudo docker compose ps` and `sudo docker compose logs --tail 50 reminders` from this checkout to investigate worker readiness. Outbound HTTPS to registered browser push services must be allowed. Browser microphone access requires HTTPS and explicit user permission. Native builds use local notifications rather than web push.
 
@@ -135,8 +135,22 @@ sudo bash ops/update-site.sh --enable-api
 bash ops/verify.sh 0.15.0
 ```
 
-The backend rebuild installs espeak-ng inside its Docker image; no host speech package or paid API key is required. No database migration or new public port is added. Existing /api/* routing covers GET /api/speech/voices and POST /api/speech/speak. start-backend now also requires the installed voice inventory to be ready. Preserve .env, existing volumes and VAPID keys as before.
+The backend rebuild installs espeak-ng inside its Docker image; no host speech package or paid API key is required. No database migration or new public port is added. Existing /api/\* routing covers GET /api/speech/voices and POST /api/speech/speak. start-backend now also requires the installed voice inventory to be ready. Preserve .env, existing volumes and VAPID keys as before.
 
 Update the PWA through Settings and confirm 0.15.0. If device speech fails, select Core-aura English (US) → Standard in Voice & playback, then tap Test voice. This explicitly sends that sentence to the server; it uses the normal shared audio output instead of browser text-to-speech. Check phone media volume, speaker/Bluetooth output and network access. GET /api/speech/voices should report ready:true and a non-empty voice list. POST failures explain an unavailable backend, busy engine or invalid selection.
 
 Category/affirmation changes are device-local and are not in server database backups. Use Library → Manage categories & affirmations → Export library, plus the existing practice JSON/voice WAV exports. Test category renaming, moving an affirmation, deleting a category with move/delete choices, restoring an exported library, device voice errors and server voice playback before relying on a routine. Real native/device voice listening and language quality still need phone acceptance.
+
+## Release 0.16.0: dense interface and themes
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.16.0-dense-themes
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+bash ops/verify.sh 0.16.0
+```
+
+Update the installed PWA through Settings → Update app and confirm 0.16.0. No reinstall is required for the PWA. Native packages use bundled assets and require the new native build. No data migration is introduced by the display redesign. See [interface acceptance](interface.md) for phone checks.
