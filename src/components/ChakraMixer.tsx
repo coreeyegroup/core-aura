@@ -52,15 +52,15 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
         const status=state ? state.status+" · "+clock(Math.max(0,seconds-state.time))+" left" : "Ready";
         return <article key={c.id} aria-label={c.name+" chakra"} className={"chakra-row "+(state?"active":"")} style={{"--chakra":c.color} as CSSProperties}>
           <div className="chakra-console-head">
-            <label className="chakra-choice"><input type="checkbox" aria-label={"Select "+c.name} checked={selected.includes(c.id)} onChange={e=>changeSelection(e.target.checked?[...selected,c.id]:selected.filter(id=>id!==c.id))}/><span><strong><span className="chakra-number">{index+1}</span> {c.name}</strong><small>{c.hz} Hz · {value.sound==="sine"?"Pure tone":value.sound==="triangle"||value.sound==="flute"?"Fundamental + harmonics":"Resonance"}</small></span></label>
+            <label className="chakra-choice"><input type="checkbox" aria-label={"Select "+c.name} checked={selected.includes(c.id)} onChange={e=>changeSelection(e.target.checked?[...selected,c.id]:selected.filter(id=>id!==c.id))}/><span><strong><span className="chakra-number">{index+1}</span> {c.name}</strong><small>{c.hz} Hz · {value.sound==="sine"?"Pure tone":value.sound==="triangle"||value.sound==="flute"?"Harmonic":"Resonance"}</small><small className="chakra-row-state">{value.muted?"Muted":value.volume===0?"Level is zero":status}</small></span></label>
             <Transport compact channels={[{...value,seconds}]} states={states} onError={onError}/>
           </div>
           <div className="chakra-console-controls">
             <label className="chakra-sound"><span className="sr-only">{c.name} sound type</span><select aria-label={c.name+" sound type"} value={value.sound} disabled={Boolean(state)} onChange={e=>onChange({...value,sound:e.target.value as Sound})}>{chakraSounds.map(s=><option key={s} value={s}>{sounds[s].name}</option>)}</select></label>
             <label className="chakra-level"><span className="sr-only">{c.name} volume</span><input aria-label={c.name+" volume"} type="range" min="0" max="100" value={Math.round(value.volume*100)} onChange={e=>onChange({...value,volume:Number(e.target.value)/100})}/><output>{Math.round(value.volume*100)}%</output></label>
             <button className="icon-button" aria-label={(value.muted?"Unmute ":"Mute ")+c.name} aria-pressed={value.muted} onClick={()=>onChange({...value,muted:!value.muted})}>{value.muted?<VolumeX size={18}/>:<Volume2 size={18}/>}</button>
+            <details className="chakra-row-menu"><summary aria-label={c.name+" options"}><SlidersHorizontal size={18}/></summary><div><button disabled={soloBusy} aria-label={"Solo "+c.name} onClick={()=>void solo(value)}>Solo {c.name}</button><p>{c.focus} · {c.prompt}</p></div></details>
           </div>
-          <div className="chakra-console-foot"><span>{value.muted?"Muted":value.volume===0?"Level is zero":status}</span><button className="text-button" disabled={soloBusy} aria-label={"Solo "+c.name} onClick={()=>void solo(value)}>Solo</button><details><summary aria-label={c.name+" focus"}>Focus</summary><p>{c.focus} · {c.prompt}</p></details></div>
         </article>;
       })}
     </div>

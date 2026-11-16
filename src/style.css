@@ -1966,7 +1966,7 @@ progress {
 .chakra-number { color:var(--muted); font-size:calc(10px * var(--text-scale)); font-variant-numeric:tabular-nums; }
 .chakra-console .compact-transport { display:flex; gap:3px; flex-shrink:0; }
 .chakra-console .compact-transport button { min-width:44px; min-height:44px; padding:6px; }
-.chakra-console-controls { display:grid; grid-template-columns:minmax(95px,1fr) minmax(0,1fr) 44px; gap:5px; align-items:center; }
+.chakra-console-controls { display:grid; grid-template-columns:minmax(85px,1fr) minmax(0,1fr) 44px 44px; gap:5px; align-items:center; }
 .chakra-sound select { margin:0; font-size:calc(12px * var(--text-scale)); padding-inline:4px; }
 .chakra-level { display:flex; align-items:center; gap:4px; min-width:0; }
 .chakra-level input { min-width:0; width:100%; margin:0; }
@@ -1987,3 +1987,12 @@ progress {
 [data-text-size="large"] .chakra-sound { grid-column:1/-1; }
 [data-text-size="large"] .chakra-session { grid-template-columns:1fr; }
 [data-text-size="large"] .chakra-tools-grid { grid-template-columns:1fr; }
+
+.chakra-row-menu { min-width:0; }
+.chakra-row-menu > summary { min-width:44px; min-height:44px; padding:4px; justify-content:center; margin:0; }
+.chakra-row-menu > summary::after { display:none; }
+.chakra-row-menu[open] { grid-column:1/-1; }
+.chakra-row-menu[open] > summary { margin-left:auto; width:44px; }
+.chakra-row-menu > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:4px 0; }
+.chakra-row-menu p { flex:1; min-width:100px; font-size:calc(13px * var(--text-scale)); }
+[data-text-size="large"] .chakra-console-controls { grid-template-columns:minmax(0,1fr) 44px 44px; }
