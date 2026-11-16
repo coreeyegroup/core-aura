@@ -142,6 +142,7 @@ function wav() {
     await p
       .getByRole("button", { name: "Use selection (1)", exact: true })
       .click();
+    await p.getByLabel("Edit sentence 1", { exact: true }).click();
     await p.getByRole("button", { name: "Record again", exact: true }).click();
     await p.getByLabel("Import sentence WAV", { exact: true }).setInputFiles({
       name: "restored.wav",
