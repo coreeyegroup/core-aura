@@ -55,6 +55,25 @@ try:
     subprocess.run(["docker", "build", "-t", image, "backend"], check=True)
     run("docker", "volume", "create", volume)
     start()
+    with urllib.request.urlopen(base + "/api/speech/voices") as response:
+        voice_config = json.load(response)
+    assert voice_config["ready"] and len(voice_config["voices"]) >= 15
+    spoken = urllib.request.Request(
+        base + "/api/speech/speak",
+        data=json.dumps(
+            {"text": "I am ready to begin.", "voice": "core:en-us", "rate": 1}
+        ).encode(),
+        headers={
+            "Origin": "https://core-aura.coreeye.in",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(spoken) as response:
+        with wave.open(io.BytesIO(response.read())) as audio:
+            assert audio.getnframes() > 1000 and any(
+                audio.readframes(audio.getnframes())
+            )
+    print("Actual container speech synthesis produced non-silent PCM audio")
     output = io.BytesIO()
     with wave.open(output, "wb") as audio:
         audio.setnchannels(1)

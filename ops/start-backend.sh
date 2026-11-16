@@ -15,8 +15,9 @@ docker compose run --rm --no-deps --user 0 -v "$PWD/.env:/run/core-aura-env" api
 docker compose up -d
 for attempt in $(seq 1 60); do
   if curl -fsS --max-time 3 http://127.0.0.1:8793/api/health &&
-     curl -fsS --max-time 3 http://127.0.0.1:8793/api/manifest-reminders/config | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ready") else 1)'; then
-    printf '\nCatalog and reminder backend ready\n'
+     curl -fsS --max-time 3 http://127.0.0.1:8793/api/manifest-reminders/config | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ready") else 1)' &&
+     curl -fsS --max-time 5 http://127.0.0.1:8793/api/speech/voices | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("ready") else 1)'; then
+    printf '\nCatalog, reminder and speech backend ready\n'
     exit 0
   fi
   sleep 2

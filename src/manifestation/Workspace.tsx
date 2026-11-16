@@ -6,19 +6,12 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { affirmationLibrary } from "./library";
+import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
-import {
-  affirmations,
-  categories,
-  Category,
-  Line,
-  nextOccurrence,
-  Plan,
-  position,
-  Reminder,
-} from "./model";
+import { Line, nextOccurrence, Plan, position, Reminder } from "./model";
 import { manifestPlayer } from "./player";
-import { speech, Voice } from "./speech";
+import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
 import { PreviewButton, RecordSentence, PersonalVoices } from "./VoiceControls";
 import { withoutRecordings } from "./recordings";
@@ -80,8 +73,7 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
     );
   const [view, setView] = useState("practice"),
     [custom, setCustom] = useState(""),
-    [message, setMessage] = useState(""),
-    [voices, setVoices] = useState<Voice[]>([]);
+    [message, setMessage] = useState("");
   const [recordLine, setRecordLine] = useState<Line>();
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -109,24 +101,6 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
       setMessage((e as Error).message);
     }
   };
-  useEffect(() => {
-    let alive = true;
-    const read = () =>
-      speech
-        .voices()
-        .then((v) => {
-          if (alive) setVoices(v);
-        })
-        .catch(() => {});
-    void read();
-    if ("speechSynthesis" in window)
-      speechSynthesis.addEventListener("voiceschanged", read);
-    return () => {
-      alive = false;
-      if ("speechSynthesis" in window)
-        speechSynthesis.removeEventListener("voiceschanged", read);
-    };
-  }, []);
   const current =
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
@@ -187,6 +161,31 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
             )}
             {state.error && <p role="status">{state.error}</p>}
           </div>
+          <VoicePanel />
+          {!p.lines.length && (
+            <button
+              onClick={() => {
+                const sample = {
+                  ...p,
+                  name: p.name.trim() || "Sample practice",
+                  lines: [
+                    {
+                      id: crypto.randomUUID(),
+                      text: "I take one clear step toward my goals today.",
+                    },
+                  ],
+                  mode: "speech" as const,
+                  volume: p.volume || 0.7,
+                  repeats: 1,
+                  background: null,
+                };
+                change(sample);
+                manifestPlayer.start(sample);
+              }}
+            >
+              Play sample affirmation
+            </button>
+          )}
           <fieldset className="manifest-fields">
             <legend>Sentences ({p.lines.length}/50)</legend>
             <label>
@@ -379,73 +378,6 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                 </label>
               )}
             </div>
-            {p.mode === "speech" && (
-              <details>
-                <summary>Voice &amp; volume</summary>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={!!p.useRecordings}
-                    onChange={(e) =>
-                      change({ useRecordings: e.target.checked })
-                    }
-                  />
-                  Use my recordings when available
-                </label>
-                <p className="content-note">
-                  Other sentences use the selected device voice. Speech speed
-                  applies to the device voice; personal recordings keep their
-                  original speed.
-                </p>
-                <label>
-                  Voice
-                  <select
-                    aria-label="Voice"
-                    value={p.voice}
-                    onChange={(e) => change({ voice: e.target.value })}
-                  >
-                    <option value="">Device default · English</option>
-                    {voices.map((v, i) => (
-                      <option key={v.voiceURI + ":" + i} value={v.voiceURI}>
-                        {v.name} · {v.lang}
-                        {v.localService
-                          ? " · on device"
-                          : " · network may be needed"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className="content-note">
-                  Languages and offline speech depend on installed voices. A
-                  network voice may send text to its voice provider.
-                </p>
-                <label className="range-label">
-                  Speech speed <output>{p.rate.toFixed(2)}×</output>
-                  <input
-                    type="range"
-                    aria-label="Speech speed"
-                    min="0.5"
-                    max="1.5"
-                    step="0.05"
-                    value={p.rate}
-                    onChange={(e) => change({ rate: Number(e.target.value) })}
-                  />
-                </label>
-                <label className="range-label">
-                  Voice volume <output>{Math.round(p.volume * 100)}%</output>
-                  <input
-                    type="range"
-                    aria-label="Voice volume"
-                    min="0"
-                    max="100"
-                    value={p.volume * 100}
-                    onChange={(e) =>
-                      change({ volume: Number(e.target.value) / 100 })
-                    }
-                  />
-                </label>
-              </details>
-            )}
             <details>
               <summary>Background sound</summary>
               <label>
@@ -619,9 +551,20 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
       manifestPlayer.subscribe,
       manifestPlayer.snapshot,
     );
-  const [category, setCategory] = useState<Category>("Health"),
+  const catalog = useSyncExternalStore(
+    affirmationLibrary.subscribe,
+    affirmationLibrary.snapshot,
+  );
+  const [editing, setEditing] = useState<EditLibrary>(),
+    [manage, setManage] = useState(false);
+  const libraryInput = useRef<HTMLInputElement>(null);
+  const [category, setCategory] = useState<string>("Health"),
     [query, setQuery] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!catalog.data.categories.includes(category))
+      setCategory(catalog.data.categories[0] || "");
+  }, [catalog.data, category]);
   const input = useRef<HTMLInputElement>(null);
   const active = ["playing", "paused"].includes(state.status);
   function select(id: string, text: string) {
@@ -673,15 +616,16 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
           Use selection ({data.draft.lines.length})
         </button>
       </div>
+      <VoicePanel />
       <div className="fields">
         <label>
           Category
           <select
             aria-label="Category"
             value={category}
-            onChange={(e) => setCategory(e.target.value as Category)}
+            onChange={(e) => setCategory(e.target.value)}
           >
-            {categories.map((c) => (
+            {catalog.data.categories.map((c) => (
               <option key={c}>{c}</option>
             ))}
           </select>
@@ -704,8 +648,106 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
           Stop the current practice before changing its sentences.
         </p>
       )}
+      <details
+        className="library-management"
+        onToggle={(e) => setManage(e.currentTarget.open)}
+      >
+        <summary>Manage categories &amp; affirmations</summary>
+        <p className="content-note">
+          Changes are saved on this device. Export your library to back it up or
+          move it to another device.
+        </p>
+        <div className="admin-actions">
+          <button
+            disabled={active}
+            onClick={() => setEditing({ kind: "category-add", category })}
+          >
+            Add category
+          </button>
+          <button
+            disabled={active || !category}
+            onClick={() => setEditing({ kind: "category-edit", category })}
+          >
+            Rename category
+          </button>
+          <button
+            disabled={active || !category}
+            onClick={() => setEditing({ kind: "category-delete", category })}
+          >
+            Delete category
+          </button>
+          <button
+            disabled={active || !category}
+            onClick={() => setEditing({ kind: "affirmation-add", category })}
+          >
+            Add affirmation
+          </button>
+          <button
+            disabled={!!catalog.error}
+            onClick={() =>
+              void download(
+                JSON.stringify(catalog.data, null, 2),
+                "core-aura-affirmation-library.json",
+                "application/json",
+              )
+                .then(setMessage)
+                .catch((e) => setMessage(e.message))
+            }
+          >
+            Export library
+          </button>
+          <button
+            disabled={active}
+            onClick={() => libraryInput.current?.click()}
+          >
+            Import library
+          </button>
+        </div>
+      </details>
+      <input
+        ref={libraryInput}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        aria-label="Import affirmation library"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            setMessage("Choose a library JSON file under 2 MB.");
+            return;
+          }
+          void file
+            .text()
+            .then((text) => {
+              if (
+                !confirm(
+                  "Replace this device’s affirmation library with this backup? Saved practices remain available.",
+                )
+              )
+                return;
+              affirmationLibrary.restore(JSON.parse(text));
+              setMessage("Affirmation library restored.");
+            })
+            .catch((e) => setMessage(e.message));
+        }}
+      />
+      {editing && (
+        <LibraryEditor
+          edit={editing}
+          onClose={() => setEditing(undefined)}
+          onCategory={setCategory}
+        />
+      )}
+      {catalog.error && <p role="status">{catalog.error}</p>}
+      {!catalog.data.categories.length && (
+        <p className="notice">
+          Add a category to start your affirmation library.
+        </p>
+      )}
       <div className="affirmation-list">
-        {affirmations
+        {catalog.data.affirmations
           .filter(
             (a) =>
               a.category === category &&
@@ -723,6 +765,36 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
                 <span>{a.text}</span>
               </label>
               <PreviewButton line={a} id={a.id} />
+              {manage && (
+                <div className="library-row-actions">
+                  <button
+                    disabled={active}
+                    aria-label={"Edit affirmation: " + a.text}
+                    onClick={() =>
+                      setEditing({
+                        kind: "affirmation-edit",
+                        category,
+                        item: a,
+                      })
+                    }
+                  >
+                    Edit / Move
+                  </button>
+                  <button
+                    disabled={active}
+                    aria-label={"Delete affirmation: " + a.text}
+                    onClick={() =>
+                      setEditing({
+                        kind: "affirmation-delete",
+                        category,
+                        item: a,
+                      })
+                    }
+                  >
+                    Delete
+                  </button>
+                </div>
+              )}
             </div>
           ))}
       </div>

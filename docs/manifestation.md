@@ -1,4 +1,4 @@
-# Core-aura manifestation practices (0.14.0)
+# Core-aura manifestation practices (0.15.0)
 
 ## Build a practice
 
@@ -86,3 +86,20 @@ Web/PWA uses Download WAV. The rebuilt native app uses Share WAV; practice JSON,
 Native exports use a dedicated private cache subdirectory. Android's file provider grants access only to that export directory. Files remain available for receivers that read after a destination is chosen. Generated cache files older than 24 hours are cleaned on app startup where timestamps are available; the OS may clear cache sooner. Copies saved into another app/folder are managed there. No broad storage permission is requested. The iOS filesystem timestamp privacy declaration is included in the native resource bundle.
 
 PWA users receive this update through Settings without reinstalling. Filesystem/Share plugin support requires a rebuilt native binary; JavaScript updates cannot add native plugins to an older native app. Android/iOS compilation and mocked native-share tests do not replace testing actual file pickers, share targets, cancellation and memory behavior on phones.
+
+
+## 0.15.0: editable library, speech diagnostics and more voices
+
+Library → Manage categories & affirmations supports category add/rename/delete and affirmation add/edit/move/delete, including the starter entries. Deleting a category offers moving its affirmations to another category or deleting those library entries. Stored practices retain their existing copied wording and recordings; edits to the library do not silently rewrite a saved practice. Reselect an edited sentence to use the new words. Up to 50 categories and 1,000 library affirmations are supported. Edits persist on this device. Export library backs up the category/content JSON; Import library validates and asks before replacing that device library. A corrupt stored library remains preserved and read-only until a valid backup is restored.
+
+Voice & playback is visible in both Manifest and Library. Filter by language, choose a voice and tap Test voice. Device voices depend on installed OS speech data and may use their own network provider. Refresh voices reloads the inventory. Install extra device voice data through the phone's text-to-speech settings. Silent reading and zero voice volume now show explicit notices. The empty practice offers Play sample affirmation to test without first building a routine.
+
+Device speech retains its utterance until completion/cancellation, resumes a paused browser engine, reports the actual speech error code and fails visibly if no start event arrives within eight seconds or an utterance never completes. These diagnostics cannot change device mute, Bluetooth routing or missing OS voice data. Real-device speech output still needs acceptance; a button displaying playback does not prove audible output.
+
+Core-aura voices are an additional explicit choice. The Docker backend installs open-source [eSpeak NG](https://github.com/espeak-ng/espeak-ng), a GPL-3.0-or-later synthetic speech engine. These are synthetic voices, not neural/natural performer voices. The API discovers installed language support and offers Standard, Style B and Style C variants. The candidate languages include English US/UK/India, Hindi, Kannada, Tamil, Telugu, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Spanish, French, German and Portuguese; only installed languages are offered. Text pronunciation depends on the selected language and requires listening review.
+
+Choosing Core-aura voices sends the selected sentence, voice ID and rate to the user's Core-aura server. This is opt-in through the voice selection, never an automatic fallback from a device failure. Text/audio are not persisted or logged by this service. The browser keeps up to 10 MiB of generated speech in RAM to reuse repeated sentences; it is cleared when the app reloads. Server voices require internet and the updated backend. Personal recordings continue to play on the device. The speaker AudioContext is unlocked during the Play tap before waiting for server audio.
+
+The speech API limits text to 300 characters, request JSON to 4 KiB, synthesis to two concurrent requests and 120 uncached requests/minute per API process. Voice IDs come from a fixed installed allowlist. Text is sent to the engine's stdin with no shell; synthesis has a timeout and canonical bounded mono PCM output. Responses use no-store. Same-origin website and native Core-aura origins are permitted; no general-purpose synthesis relay endpoint is exposed. Native cross-origin requests use the public Core-aura domain.
+
+Tests cover stalled speech, cancellation, raw error codes, category/affirmation CRUD and persistent moves. CI synthesizes actual English and installed Indic-language speech, checks non-zero PCM samples, and tests browser playback using server WAV rather than mocked speech completion. This verifies generation and the audio graph, not the sound of a physical phone speaker or linguistic quality.

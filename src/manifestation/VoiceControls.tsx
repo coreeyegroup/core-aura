@@ -18,10 +18,12 @@ export function PreviewButton({
   line,
   id,
   recorded = false,
+  label,
 }: {
   line: Line;
   id: string;
   recorded?: boolean;
+  label?: string;
 }) {
   const state = useSyncExternalStore(
       manifestPlayer.subscribe,
@@ -36,7 +38,13 @@ export function PreviewButton({
       <button
         className="preview-button"
         disabled={!line.text.trim()}
-        aria-label={`${playing ? "Stop preview" : "Play preview"}: ${line.text}`}
+        aria-label={
+          label
+            ? playing
+              ? "Stop voice test"
+              : label
+            : `${playing ? "Stop preview" : "Play preview"}: ${line.text}`
+        }
         onClick={() => {
           try {
             setError("");
@@ -64,7 +72,7 @@ export function PreviewButton({
         ) : (
           <Play size={16} aria-hidden="true" />
         )}
-        <span>{playing ? "Stop" : "Play"}</span>
+        <span>{playing ? "Stop" : label ? "Test voice" : "Play"}</span>
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">

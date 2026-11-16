@@ -19,6 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r backend/requirements.txt
+      - run: sudo apt-get update -qq && sudo apt-get install -y espeak-ng
       - name: Verify phone screens, offline audio and administration
         env:
           DATABASE_URL: sqlite:////tmp/core-aura-admin-test.db
@@ -35,7 +36,7 @@ jobs:
           trap 'kill "$server" "$backend"' EXIT
           curl --retry 15 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8090/api/health
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
-          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.14.0
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.15.0
           npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -68,12 +69,13 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r backend/requirements.txt httpx==0.28.1
+      - run: sudo apt-get update -qq && sudo apt-get install -y espeak-ng
       - name: Verify migrations and content publication
         working-directory: backend
         run: |
           alembic upgrade head
           alembic upgrade head
-          python -m unittest test_catalog test_reminders
+          python -m unittest test_catalog test_reminders test_speech
       - name: Verify content volume persistence and non-root image
         run: python tests/container-smoke.py
   android:

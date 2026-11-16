@@ -24,13 +24,14 @@ from .content import (
 )
 
 app = FastAPI(
-    title="Core-aura catalog", version="0.14.0", docs_url=None, redoc_url=None
+    title="Core-aura catalog", version="0.15.0", docs_url=None, redoc_url=None
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["capacitor://localhost", "http://localhost", "https://localhost"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -135,7 +136,7 @@ def health():
             db.execute(text("SELECT 1"))
     except Exception:
         raise HTTPException(503, "Database unavailable")
-    return {"status": "ok", "version": "0.14.0"}
+    return {"status": "ok", "version": "0.15.0"}
 
 
 @app.get("/api/catalog")
@@ -390,3 +391,7 @@ def history(pack_id: str):
 from .push import router as reminder_router
 
 app.include_router(reminder_router)
+
+from .speech import router as speech_router
+
+app.include_router(speech_router)

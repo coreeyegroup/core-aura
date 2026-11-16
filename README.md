@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.14.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.15.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -17,7 +17,7 @@ The build output is dist/. The production player needs HTTPS, including for its 
 
 ## Manifestation
 
-Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+Manifest is the starting workspace. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, add a background tone and save practices. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. The category/affirmation library supports add, rename/edit, move, delete and JSON backup on this device. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Voice selection, language filtering and Test voice are visible in Manifest and Library. Optional self-hosted eSpeak NG voices work through the backend when device speech is unavailable. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
 
 ## Screens
 
