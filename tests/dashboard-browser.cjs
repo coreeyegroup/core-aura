@@ -116,7 +116,8 @@ const assert = require("node:assert/strict");
       .getByLabel("Sentence 1", { exact: true })
       .fill("I take a clear step forward.");
     await p.getByLabel("Edit sentence 1", { exact: true }).click();
-    await p.locator(".queue-copy")
+    await p
+      .locator(".queue-copy")
       .getByText("I take a clear step forward.", { exact: true })
       .waitFor();
     await p.screenshot({
@@ -133,6 +134,11 @@ const assert = require("node:assert/strict");
             getComputedStyle(e).gridTemplateColumns.split(" ").length === 2,
         ),
     );
+    const moduleGaps = await p.locator(".dashboard-stack").evaluate((e) => {
+      const rows = [...e.children].map((n) => n.getBoundingClientRect());
+      return rows.slice(1).map((row, i) => row.top - rows[i].bottom);
+    });
+    assert.ok(moduleGaps.every((gap) => gap <= 16));
     assert.deepEqual(errors, []);
     await context.close();
     console.log(

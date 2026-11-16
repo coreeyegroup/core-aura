@@ -1449,6 +1449,11 @@ progress {
   border-color: var(--accent);
   color: var(--accent);
 }
+.dashboard-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .dashboard-columns {
   display: grid;
   gap: 12px;

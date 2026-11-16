@@ -202,6 +202,7 @@ export function Dashboard({
             </button>
           )}
         </section>
+        <div className="dashboard-stack">
         <section
           className="dashboard-module"
           aria-labelledby="saved-practices-title"
@@ -350,6 +351,7 @@ export function Dashboard({
             Pure sine synthesis · Tune pitch, level and duration in Studio.
           </p>
         </section>
+        </div>
       </div>
       {(message || error || catalog.error) && (
         <p className="notice" role="status">
