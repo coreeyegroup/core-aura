@@ -212,11 +212,14 @@ export class AudioEngine {
       return;
     this.stopRecording();
     const state = this.states.find((s) => s.id === channel.id);
-    if (state) this.node!.port.postMessage({ type: "resume", id: channel.id });
+    if (state && state.status !== "stopping") {
+      this.node!.port.postMessage({ type: "resume", id: channel.id });
+      this.voiceStates = this.voiceStates.map(s=>s.id===channel.id ? {...s,status:"playing"} : s);
+    }
     else {
       this.node!.port.postMessage({ type: "start", channel });
       this.voiceStates = [
-        ...this.voiceStates,
+        ...this.voiceStates.filter(s=>s.id!==channel.id),
         { id: channel.id, status: "playing", time: 0 },
       ];
     }

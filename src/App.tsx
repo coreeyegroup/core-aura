@@ -33,6 +33,7 @@ import {
 import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
+import { ChakraMixer } from "./components/ChakraMixer";
 import { AndroidUpdates } from "./android/AndroidUpdates";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { readWorkspace, saveWorkspace } from "./workspace";
@@ -1117,135 +1118,7 @@ export default function App() {
                 Save
               </button>
             </div>
-            <div className="segmented" aria-label="Mix selection">
-              <button
-                aria-pressed={mixTarget === "selected"}
-                onClick={() => setMixTarget("selected")}
-              >
-                Selected ({selected.length})
-              </button>
-              <button
-                aria-pressed={mixTarget === "all"}
-                onClick={() => setMixTarget("all")}
-              >
-                All seven
-              </button>
-            </div>
-            <div className="chakra-list">
-              {chakras.map((c, i) => {
-                const value = chakraChannels[i],
-                  state = states.find((s) => s.id === c.id);
-                return (
-                  <article
-                    className={"chakra-row " + (state ? "active" : "")}
-                    style={{ "--chakra": c.color } as React.CSSProperties}
-                    key={c.id}
-                  >
-                    <div className="chakra-head">
-                      <label className="chakra-select">
-                        <input
-                          type="checkbox"
-                          checked={selected.includes(c.id)}
-                          onChange={(e) =>
-                            setSelected((rows) =>
-                              e.target.checked
-                                ? [...rows, c.id]
-                                : rows.filter((id) => id !== c.id),
-                            )
-                          }
-                        />
-                        <span className="chakra-dot" aria-hidden="true" />
-                        <span>
-                          <strong>{c.name}</strong>
-                          <small>
-                            {state
-                              ? state.status + " · " + time(state.time)
-                              : "Ready"}
-                          </small>
-                        </span>
-                      </label>
-                      <div className="chakra-hz">
-                        {c.hz}
-                        <small> Hz</small>
-                      </div>
-                    </div>
-                    <div className="chakra-controls">
-                      <label className="chakra-type">
-                        <span>Sound</span>
-                        <select
-                          aria-label={c.name + " sound type"}
-                          value={value.sound}
-                          disabled={Boolean(state)}
-                          onChange={(e) =>
-                            patch({ ...value, sound: e.target.value as Sound })
-                          }
-                        >
-                          <option value="sine">Pure sine tone</option>
-                          <option value="triangle">Soft triangle</option>
-                          <option value="bowl">Singing bowl</option>
-                        </select>
-                      </label>
-                      <div className="chakra-transport">
-                        <Transport
-                          compact
-                          channels={[{ ...value, seconds }]}
-                          states={states}
-                          onError={setMessage}
-                        />
-                      </div>
-                    </div>
-                    <details>
-                      <summary
-                        aria-label={c.name + " volume and focus"}
-                        title="Volume and focus"
-                      >
-                        <Settings size={17} />
-                      </summary>
-                      <div className="focus-controls">
-                        <p>{c.prompt}</p>{" "}
-                        <button
-                          className="icon-button"
-                          aria-label={
-                            (value.muted ? "Unmute " : "Mute ") + c.name
-                          }
-                          aria-pressed={value.muted}
-                          onClick={() =>
-                            patch({ ...value, muted: !value.muted })
-                          }
-                        >
-                          {value.muted ? "Off" : "On"}
-                        </button>
-                      </div>
-                      <label className="range-label">
-                        {c.name} volume{" "}
-                        <output>{Math.round(value.volume * 100)}%</output>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={value.volume * 100}
-                          onChange={(e) =>
-                            patch({
-                              ...value,
-                              volume: Number(e.target.value) / 100,
-                            })
-                          }
-                        />
-                      </label>
-                    </details>
-                  </article>
-                );
-              })}
-            </div>
-            <details className="info-panel">
-              <summary>About the frequency mapping</summary>
-              <p>
-                396, 417, 528, 639, 741, 852 and 963 Hz follow a modern
-                Solfeggio meditation mapping. Associations differ across
-                practices. The sounds support a personal spiritual listening
-                practice.
-              </p>
-            </details>
+            <ChakraMixer channels={chakraChannels} states={states} selected={selected} target={mixTarget} seconds={seconds} master={master} onSelect={setSelected} onTarget={setMixTarget} onSeconds={setSeconds} onMaster={setMaster} onChange={patch} onError={setMessage}/>
           </>
         )}
         {tab === "library" && (
@@ -1423,7 +1296,7 @@ export default function App() {
           className="player-dock"
           aria-label="Session player"
         >
-          <details className="session-options">
+          {isStudio && <details className="session-options">
             <summary>
               Session · {seconds / 60} min · Volume {Math.round(master * 100)}%
             </summary>
@@ -1459,12 +1332,14 @@ export default function App() {
                 />
               </label>
             </div>
-          </details>
+          </details>}
           {errorInvalid ? (
             <p role="alert">Enter a frequency within the instrument’s range.</p>
           ) : (
             <Transport
               channels={currentWithTime}
+              stopChannels={isChakras ? chakraChannels : undefined}
+              exclusive={isChakras}
               states={states}
               onError={setMessage}
             />
