@@ -33,7 +33,16 @@ import {
 import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
+import { ConnectionPanel } from "./components/ConnectionPanel";
+import { readWorkspace, saveWorkspace } from "./workspace";
 import { Dashboard, Tool } from "./components/Dashboard";
+import { Route, defaultRoute, parseRoute, routeHash } from "./navigation";
+import {
+  confirmDraftReplacement,
+  draftChanged,
+  isPreview,
+  practiceActive,
+} from "./manifestation/flow";
 import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
@@ -78,40 +87,75 @@ const tabs = [
   ["library", "Library", Library],
 ] as const;
 export default function App() {
-  const [tab, setTab] = useState<Tab>(() => {
-    const route = location.hash.slice(1);
-    return [
-      "home",
-      "manifest",
-      "explore",
-      "studio",
-      "chakras",
-      "library",
-      "admin",
-    ].includes(route)
-      ? (route as Tab)
-      : "home";
-  });
-  const [manifestSection, setManifestSection] = useState("practice");
-  const [category, setCategory] = useState("Health");
-  const [recordingsOpen, setRecordingsOpen] = useState(false);
-  const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(
-    "explore",
-  );
-  const [libraryView, setLibraryView] = useState(() => {
+  const [route, setRoute] = useState<Route>(() => {
+    let previous = defaultRoute;
     try {
-      return localStorage.getItem("core-aura.library-view") === "audio"
-        ? "audio"
-        : "manifestation";
+      previous = {
+        ...defaultRoute,
+        libraryView:
+          localStorage.getItem("core-aura.library-view") === "audio"
+            ? "audio"
+            : "manifestation",
+      };
+    } catch {}
+    return parseRoute(location.hash, previous);
+  });
+  const routeRef = useRef(route);
+  routeRef.current = route;
+  const {
+    tab,
+    manifestSection,
+    category,
+    libraryView,
+    librarySection,
+    exploreView,
+  } = route;
+  const recordingsOpen = librarySection === "recordings";
+  const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(() => {
+    if (route.tab === "studio" || route.tab === "explore") return route.tab;
+    try {
+      return localStorage.getItem("core-aura.last-sound-view") === "studio"
+        ? "studio"
+        : "explore";
     } catch {
-      return "manifestation";
+      return "explore";
     }
   });
+  useEffect(() => {
+    try {
+      localStorage.setItem("core-aura.last-sound-view", lastSoundTab);
+    } catch {}
+  }, [lastSoundTab]);
   useEffect(() => {
     try {
       localStorage.setItem("core-aura.library-view", libraryView);
     } catch {}
   }, [libraryView]);
+  useEffect(() => {
+    const restore = () => {
+      const next = parseRoute(location.hash, routeRef.current);
+      routeRef.current = next;
+      setRoute(next);
+      if (next.tab === "studio" || next.tab === "explore")
+        setLastSoundTab(next.tab);
+      setMessage("");
+      window.scrollTo({ top: 0 });
+    };
+    addEventListener("popstate", restore);
+    addEventListener("hashchange", restore);
+    return () => {
+      removeEventListener("popstate", restore);
+      removeEventListener("hashchange", restore);
+    };
+  }, []);
+  useEffect(() => {
+    if (tab === "library" && librarySection !== "all") return;
+    const heading = document.querySelector<HTMLElement>("#main h1");
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }, [tab]);
   const [due, setDue] = useState<Due | null>(null);
   const practice = useSyncExternalStore(
     manifestPlayer.subscribe,
@@ -131,14 +175,15 @@ export default function App() {
         playing.plan?.id !== id ||
         !["playing", "paused"].includes(playing.status)
       ) {
+        const { draft, plans } = manifestationStore.snapshot().data;
+        if (!confirmDraftReplacement(draft, plans)) return false;
         manifestPlayer.stop();
         manifestationStore.open(id);
       }
-      setManifestSection("practice");
-      setTab("manifest");
-      history.replaceState(null, "", "#manifest");
+      navigate("manifest", { manifestSection: "practice" });
       setDue(null);
       window.scrollTo({ top: 0 });
+      return true;
     } catch {
       setMessage(
         "The scheduled practice is unavailable. Check your saved practices.",
@@ -149,11 +194,8 @@ export default function App() {
     () =>
       observeReminders((reminder) => {
         const { draft, plans } = manifestationStore.snapshot().data;
-        const saved = plans.find((p) => p.id === draft.id);
         const scheduled = plans.find((p) => p.id === reminder.planId);
-        const unsaved = saved
-          ? JSON.stringify(saved) !== JSON.stringify(draft)
-          : draft.lines.length > 0 || draft.name !== "My manifestation";
+        const unsaved = draftChanged(draft, plans);
         const playing = manifestPlayer.snapshot().status;
         if (
           scheduled &&
@@ -167,8 +209,7 @@ export default function App() {
           engine.snapshot().length === 0
         ) {
           try {
-            openManifest(reminder.planId);
-            manifestPlayer.start(scheduled);
+            if (openManifest(reminder.planId)) manifestPlayer.start(scheduled);
             return;
           } catch {}
         }
@@ -180,22 +221,58 @@ export default function App() {
     const url = new URL(location.href);
     const id = url.searchParams.get("manifestPlan");
     if (id) {
-      openManifest(id);
-      url.searchParams.delete("manifestPlan");
-      history.replaceState(null, "", url.pathname + url.search + "#manifest");
+      if (openManifest(id)) {
+        url.searchParams.delete("manifestPlan");
+        history.replaceState(
+          null,
+          "",
+          url.pathname + url.search + routeHash(routeRef.current),
+        );
+      }
     }
   }, []);
-  const [layers, setLayers] = useState<Channel[]>(() => [channel()]);
-  const [chakraChannels, setChakraChannels] = useState<Channel[]>(() =>
-    chakras.map((c) => ({ ...channel("sine", c.hz), id: c.id, volume: 0.25 })),
+  const [workspace] = useState(readWorkspace);
+  const [layers, setLayers] = useState<Channel[]>(
+    () => workspace.data?.layers || [channel()],
   );
-  const [selected, setSelected] = useState<string[]>([]);
-  const [mixTarget, setMixTarget] = useState("selected");
-  const [seconds, setSeconds] = useState(300);
-  const [master, setMaster] = useState(0.5);
+  const [chakraChannels, setChakraChannels] = useState<Channel[]>(
+    () =>
+      workspace.data?.chakraChannels ||
+      chakras.map((c) => ({
+        ...channel("sine", c.hz),
+        id: c.id,
+        volume: 0.25,
+      })),
+  );
+  const [selected, setSelected] = useState<string[]>(
+    workspace.data?.selected || [],
+  );
+  const [mixTarget, setMixTarget] = useState<"all" | "selected">(
+    workspace.data?.mixTarget || "selected",
+  );
+  const [seconds, setSeconds] = useState(workspace.data?.seconds || 300);
+  const [master, setMaster] = useState(workspace.data?.master ?? 0.5);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [starred, setStarred] = useState<Sound[]>(favorites);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(workspace.error);
+  useEffect(() => {
+    if (workspace.error || ![...layers, ...chakraChannels].every(validChannel))
+      return;
+    if (
+      !saveWorkspace({
+        schemaVersion: 1,
+        layers,
+        chakraChannels,
+        selected,
+        mixTarget,
+        seconds,
+        master,
+      })
+    )
+      setMessage(
+        "Sound settings are only available for this visit because device storage is unavailable.",
+      );
+  }, [layers, chakraChannels, selected, mixTarget, seconds, master]);
   const [settings, setSettings] = useState(false);
   const [appearance, setAppearance] = useState(readAppearance);
   useEffect(() => {
@@ -273,7 +350,6 @@ export default function App() {
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
-  const [exploreView, setExploreView] = useState("sounds");
   const [online, setOnline] = useState(navigator.onLine);
   const [offlineReady, setOfflineReady] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
@@ -303,7 +379,7 @@ export default function App() {
       observer.disconnect();
       document.documentElement.style.removeProperty("--mini-height");
     };
-  }, [tab, practice.status, states.some((s) => s.status === "playing")]);
+  }, [tab, practice.status, states.length > 0]);
   const dockRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const dock = dockRef.current;
@@ -393,7 +469,10 @@ export default function App() {
       manifestPlayer.pause();
       engine.snapshot().forEach((s) => engine.pause(s.id));
     });
-    navigator.mediaSession.setActionHandler("stop", () => engine.stopAll());
+    navigator.mediaSession.setActionHandler("stop", () => {
+      manifestPlayer.stop();
+      engine.stopAll();
+    });
     return () => {
       navigator.mediaSession.setActionHandler("pause", null);
       navigator.mediaSession.setActionHandler("stop", null);
@@ -402,6 +481,7 @@ export default function App() {
   useEffect(() => {
     if (!("mediaDevices" in navigator)) return;
     const changed = () => {
+      manifestPlayer.pause();
       engine.stopAll();
       setMessage("Audio output changed. Check the volume, then press Play.");
     };
@@ -409,12 +489,13 @@ export default function App() {
     return () =>
       navigator.mediaDevices.removeEventListener("devicechange", changed);
   }, []);
-  function navigate(value: Tab) {
-    if (value === "library") setRecordingsOpen(false);
-    if (value === "manifest") setManifestSection("practice");
+  function navigate(value: Tab, patch: Partial<Route> = {}) {
     if (value === "explore" || value === "studio") setLastSoundTab(value);
-    setTab(value);
-    history.replaceState(null, "", "#" + value);
+    const next = { ...routeRef.current, tab: value, ...patch };
+    const hash = routeHash(next);
+    if (location.hash !== hash) history.pushState(null, "", hash);
+    routeRef.current = next;
+    setRoute(next);
     setMessage("");
     window.scrollTo({ top: 0 });
   }
@@ -424,26 +505,28 @@ export default function App() {
       return;
     }
     if (tool === "schedule") {
-      navigate("manifest");
-      setManifestSection("schedule");
+      navigate("manifest", { manifestSection: "schedule" });
       return;
     }
     if (tool === "packs") {
-      setExploreView("packs");
-      navigate("explore");
+      navigate("explore", { exploreView: "packs" });
       return;
     }
     if (
-      tool === "affirmations" ||
-      tool === "recordings" ||
-      tool === "sessions"
+      ["affirmations", "recordings", "sessions", "practices"].includes(tool)
     ) {
-      setLibraryView(tool === "sessions" ? "audio" : "manifestation");
-      navigate("library");
-      setRecordingsOpen(tool === "recordings");
+      navigate("library", {
+        libraryView: tool === "sessions" ? "audio" : "manifestation",
+        librarySection:
+          tool === "recordings"
+            ? "recordings"
+            : tool === "practices"
+              ? "saved"
+              : "all",
+      });
       return;
     }
-    navigate(tool);
+    navigate(tool as Tab);
   }
   function patch(updated: Channel) {
     const spec = sounds[updated.sound];
@@ -551,7 +634,7 @@ export default function App() {
     if (importInput.current) importInput.current.value = "";
   }
   async function update() {
-    if (states.length) {
+    if (states.length || ["playing", "paused"].includes(practice.status)) {
       setUpdateStatus("Stop all audio before updating.");
       return;
     }
@@ -582,6 +665,109 @@ export default function App() {
   const focus = layers[0];
   const activeCount = states.filter((s) => s.status === "playing").length;
   const errorInvalid = currentWithTime.some((c) => !validChannel(c));
+  const practiceBusy = ["playing", "paused"].includes(practice.status);
+  const soundStates = states.filter(
+    (state) => state.id !== "manifest-background",
+  );
+  const showPlaybackBar = practiceBusy
+    ? tab !== "manifest"
+    : soundStates.length > 0 && !(isStudio || isChakras);
+  const playingSounds = soundStates.some((state) => state.status === "playing");
+  function openPlayingSound() {
+    if (soundStates.some((state) => state.id.startsWith("pack:")))
+      navigate("library", { libraryView: "audio", librarySection: "all" });
+    else
+      navigate(
+        soundStates.some((state) =>
+          chakras.some((chakra) => chakra.id === state.id),
+        )
+          ? "chakras"
+          : "studio",
+      );
+  }
+  async function toggleSoundPlayback() {
+    try {
+      if (playingSounds) soundStates.forEach((state) => engine.pause(state.id));
+      else {
+        const pack = soundStates.find((state) => state.id.startsWith("pack:"));
+        if (pack)
+          await engine.toggleRecording(pack.id, async () => {
+            throw Error("Reopen the downloaded track from Library.");
+          });
+        else
+          await engine.toggle(
+            [...layers, ...chakraChannels]
+              .filter((channel) =>
+                soundStates.some((state) => state.id === channel.id),
+              )
+              .map((channel) => ({ ...channel, seconds })),
+          );
+      }
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  }
+  const playbackBar = (
+    <div
+      ref={miniRef}
+      className={
+        isStudio || isChakras || tab === "manifest"
+          ? "playback-banner"
+          : "mini-player"
+      }
+      aria-label="Active playback"
+    >
+      <button
+        className="playback-location"
+        onClick={() =>
+          practiceBusy
+            ? navigate("manifest", { manifestSection: "practice" })
+            : openPlayingSound()
+        }
+      >
+        {practiceBusy
+          ? isPreview(practice)
+            ? "Sentence preview"
+            : practice.plan?.name
+          : soundStates.some((s) => s.id.startsWith("pack:"))
+            ? "Downloaded audio"
+            : `${soundStates.length} sound layers`}
+        <small>
+          {practiceBusy
+            ? practice.status
+            : playingSounds
+              ? "Playing"
+              : "Paused"}{" "}
+          · Open player
+        </small>
+      </button>
+      <button
+        onClick={() =>
+          practiceBusy
+            ? practice.status === "playing"
+              ? manifestPlayer.pause()
+              : manifestPlayer.resume()
+            : void toggleSoundPlayback()
+        }
+      >
+        {practiceBusy
+          ? practice.status === "playing"
+            ? "Pause practice"
+            : "Resume practice"
+          : playingSounds
+            ? "Pause audio"
+            : "Resume audio"}
+      </button>
+      <button
+        onClick={() => {
+          manifestPlayer.stop();
+          engine.stopAll();
+        }}
+      >
+        {practiceBusy ? "Stop practice" : "Stop all"}
+      </button>
+    </div>
+  );
   return (
     <div className="app" data-screen={tab}>
       <header className="app-header">
@@ -614,7 +800,10 @@ export default function App() {
           </button>
         </div>
       </header>
-      <main id="main">
+      <main id="main" tabIndex={-1}>
+        {showPlaybackBar &&
+          (isStudio || isChakras || (tab === "manifest" && !practiceBusy)) &&
+          playbackBar}
         {due && (
           <div className="notice" role="status">
             <span>
@@ -635,23 +824,25 @@ export default function App() {
           <Dashboard
             sessions={sessions.length}
             onTool={openTool}
-            onContinue={() => navigate("manifest")}
+            onContinue={() =>
+              navigate("manifest", { manifestSection: "practice" })
+            }
             onPractice={openManifest}
             onTone={(hz) => openSound("sine", hz)}
             onCategory={(value) => {
-              setCategory(value);
-              setLibraryView("manifestation");
-              navigate("library");
+              navigate("library", {
+                category: value,
+                libraryView: "manifestation",
+                librarySection: "all",
+              });
             }}
           />
         )}
         {tab === "manifest" && (
           <Manifestation
             initialView={manifestSection}
-            onLibrary={() => {
-              setLibraryView("manifestation");
-              navigate("library");
-            }}
+            onView={(view) => navigate("manifest", { manifestSection: view })}
+            onLibrary={() => openTool("affirmations")}
           />
         )}
         {(tab === "explore" || tab === "studio") && (
@@ -683,13 +874,13 @@ export default function App() {
             <div className="segmented" aria-label="Explore collection">
               <button
                 aria-pressed={exploreView === "sounds"}
-                onClick={() => setExploreView("sounds")}
+                onClick={() => navigate("explore", { exploreView: "sounds" })}
               >
                 Sounds
               </button>
               <button
                 aria-pressed={exploreView === "packs"}
-                onClick={() => setExploreView("packs")}
+                onClick={() => navigate("explore", { exploreView: "packs" })}
               >
                 Sound packs
               </button>
@@ -1060,13 +1251,23 @@ export default function App() {
             <div className="segmented" aria-label="Library collection">
               <button
                 aria-pressed={libraryView === "manifestation"}
-                onClick={() => setLibraryView("manifestation")}
+                onClick={() =>
+                  navigate("library", {
+                    libraryView: "manifestation",
+                    librarySection: "all",
+                  })
+                }
               >
                 Affirmations
               </button>
               <button
                 aria-pressed={libraryView === "audio"}
-                onClick={() => setLibraryView("audio")}
+                onClick={() =>
+                  navigate("library", {
+                    libraryView: "audio",
+                    librarySection: "all",
+                  })
+                }
               >
                 Audio library
               </button>
@@ -1075,7 +1276,13 @@ export default function App() {
               <ManifestLibrary
                 initialCategory={category}
                 recordingsOpen={recordingsOpen}
-                onPractice={() => navigate("manifest")}
+                section={librarySection}
+                onCategory={(value) => navigate("library", { category: value })}
+                onPractice={(id) =>
+                  id
+                    ? openManifest(id)
+                    : navigate("manifest", { manifestSection: "practice" })
+                }
               />
             ) : (
               <>
@@ -1219,10 +1426,13 @@ export default function App() {
                   )}
                   onChange={(e) => setSeconds(Number(e.target.value))}
                 >
-                  <option value="60">1 min</option>
-                  <option value="300">5 min</option>
-                  <option value="600">10 min</option>
-                  <option value="1800">30 min</option>
+                  {[...new Set([seconds, 60, 300, 600, 1800])]
+                    .sort((a, b) => a - b)
+                    .map((value) => (
+                      <option key={value} value={value}>
+                        {value % 60 === 0 ? value / 60 + " min" : time(value)}
+                      </option>
+                    ))}
                 </select>
               </label>
               <label>
@@ -1254,34 +1464,11 @@ export default function App() {
           )}
         </section>
       )}
-      {["playing", "paused"].includes(practice.status) &&
-        tab !== "manifest" && (
-          <div ref={miniRef} className="mini-player">
-            <span>{practice.plan?.name}</span>
-            <button
-              onClick={() =>
-                practice.status === "playing"
-                  ? manifestPlayer.pause()
-                  : manifestPlayer.resume()
-              }
-            >
-              {practice.status === "playing"
-                ? "Pause practice"
-                : "Resume practice"}
-            </button>
-            <button onClick={() => manifestPlayer.stop()}>Stop practice</button>
-          </div>
-        )}
-      {!["playing", "paused"].includes(practice.status) &&
-        activeCount > 0 &&
-        tab !== "studio" &&
-        tab !== "chakras" && (
-          <div ref={miniRef} className="mini-player">
-            <AudioLines size={20} />
-            <span>{activeCount} layers playing</span>
-            <button onClick={() => engine.stopAll()}>Stop all</button>
-          </div>
-        )}
+      {showPlaybackBar &&
+        !isStudio &&
+        !isChakras &&
+        tab !== "manifest" &&
+        playbackBar}
       <nav className="bottom-nav" aria-label="Main navigation">
         {tabs.map(([id, label, Icon]) => (
           <button
@@ -1399,6 +1586,7 @@ export default function App() {
                 Manage content
               </button>
             )}
+            <ConnectionPanel online={online} offlineReady={offlineReady} />
             <button className="wide" onClick={update}>
               Check for updates
             </button>
@@ -1407,6 +1595,7 @@ export default function App() {
             <button
               className="wide"
               onClick={() => {
+                manifestPlayer.stop();
                 engine.stopAll();
                 setUpdateStatus("All audio stopped.");
               }}

@@ -76,7 +76,20 @@ export function PreviewButton({
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">
-          {error || state.error}
+          <span>{error || state.error}</span>
+          <button
+            onClick={(event) => {
+              const panel = event.currentTarget
+                .closest(".manifest-workspace")
+                ?.querySelector<HTMLDetailsElement>(".voice-panel");
+              if (panel) {
+                panel.open = true;
+                panel.scrollIntoView({ block: "start" });
+              }
+            }}
+          >
+            Voice settings
+          </button>
         </span>
       )}
     </>
@@ -324,6 +337,7 @@ export function PersonalVoices({
   const panel = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(initiallyOpen);
   useEffect(() => {
+    setOpen(initiallyOpen);
     if (initiallyOpen) panel.current?.scrollIntoView({ block: "start" });
   }, [initiallyOpen]);
   const playback = useSyncExternalStore(

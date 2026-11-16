@@ -168,3 +168,17 @@ bash ops/verify.sh 0.17.0
 ```
 
 Open Settings → Update app in the PWA and confirm 0.17.0. Home is the new starting screen; tap Home if an existing link reopens Manifest. Verify category shortcuts, saved-practice Play/Pause, upcoming reminder time, exact quick-tone frequency and sentence edit/preview. Themes and existing device data are preserved. Native apps require the newly built package because they bundle the interface.
+
+## Release 0.18.0: navigation and playback continuity
+
+```bash
+cd ~/core-aura
+git pull --ff-only origin main
+git fetch origin release/v0.18.0-flow-continuity
+sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/start-backend.sh
+sudo bash ops/update-site.sh --enable-api
+bash ops/verify.sh 0.18.0
+```
+
+Update the installed PWA in Settings and confirm 0.18.0. Check Home → Schedule → reload and browser Back, category → selection → editor → Back, draft replacement cancellation, saved practice → Schedule practice, and paused Studio → Home → Resume audio. Switch between a running practice and Sounds to confirm controls do not overlap. Settings → Stop all audio must stop spoken practice as well as tones. Expand Connection & offline readiness and confirm the API, voices and web-push states reflect the deployed backend. The sound workspace restores settings after reload and requires an explicit Play action. No database migration is added.
