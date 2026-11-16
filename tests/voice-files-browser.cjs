@@ -33,11 +33,13 @@ function wav() {
       p = await c.newPage(),
       errors = [];
     p.on("pageerror", (e) => errors.push(e.message));
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#manifest");
+    await p.locator(".custom-sentence > summary").click();
     await p
       .getByLabel("Your own sentence", { exact: true })
       .fill("I make steady progress.");
     await p.getByRole("button", { name: "Add sentence", exact: true }).click();
+    await p.getByLabel("Edit sentence 1", { exact: true }).click();
     await p.getByRole("button", { name: "Record voice", exact: true }).click();
     const input = p.getByLabel("Import sentence WAV", { exact: true });
     await input.setInputFiles({
@@ -140,6 +142,7 @@ function wav() {
     await p
       .getByRole("button", { name: "Use selection (1)", exact: true })
       .click();
+    await p.getByLabel("Edit sentence 1", { exact: true }).click();
     await p.getByRole("button", { name: "Record again", exact: true }).click();
     await p.getByLabel("Import sentence WAV", { exact: true }).setInputFiles({
       name: "restored.wav",

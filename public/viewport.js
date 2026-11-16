@@ -27,7 +27,7 @@
   root.dataset.resolvedTheme = theme;
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta)
-    meta.content = { light: "#f3f5f7", dark: "#14191f", contrast: "#000000" }[
+    meta.content = { light: "#f5f6f8", dark: "#14161c", contrast: "#000000" }[
       theme
     ];
 })();

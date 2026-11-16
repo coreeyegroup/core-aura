@@ -44,7 +44,7 @@ const assert = require("node:assert/strict");
         }
       };
     });
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#manifest");
     await p
       .getByRole("button", { name: "Choose affirmations", exact: true })
       .click();
@@ -90,6 +90,7 @@ const assert = require("node:assert/strict");
     await p
       .getByRole("button", { name: "Stop preview: " + text, exact: true })
       .click();
+    await p.getByLabel("Edit sentence 1", { exact: true }).click();
     await p.getByRole("button", { name: "Record voice", exact: true }).click();
     await p
       .getByRole("button", { name: "Start recording", exact: true })
@@ -173,6 +174,7 @@ const assert = require("node:assert/strict");
           new DOMException("Microphone denied", "NotAllowedError"),
         );
     });
+    await p.getByLabel("Edit sentence 1", { exact: true }).click();
     await p.getByRole("button", { name: "Record voice", exact: true }).click();
     await p
       .getByRole("button", { name: "Start recording", exact: true })

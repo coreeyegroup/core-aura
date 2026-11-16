@@ -316,7 +316,16 @@ export function RecordSentence({
     </dialog>
   );
 }
-export function PersonalVoices() {
+export function PersonalVoices({
+  initiallyOpen = false,
+}: {
+  initiallyOpen?: boolean;
+}) {
+  const panel = useRef<HTMLDetailsElement>(null);
+  const [open, setOpen] = useState(initiallyOpen);
+  useEffect(() => {
+    if (initiallyOpen) panel.current?.scrollIntoView({ block: "start" });
+  }, [initiallyOpen]);
   const playback = useSyncExternalStore(
     manifestPlayer.subscribe,
     manifestPlayer.snapshot,
@@ -343,7 +352,12 @@ export function PersonalVoices() {
     };
   }, []);
   return (
-    <details className="personal-voices">
+    <details
+      className="personal-voices"
+      ref={panel}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
       <summary>My voice recordings ({clips.length})</summary>
       <p className="content-note">
         Stored on this device, up to 100 clips / 50 MB. Practice JSON backups

@@ -23,13 +23,14 @@ const { chromium } = require("playwright"),
         .getByRole("button", { name: "Close settings", exact: true })
         .click();
       for (const tab of [
+        "Home",
         "Manifest",
         "Library",
         "Studio",
         "Chakras",
         "Explore",
       ]) {
-        if (tab === "Manifest" || tab === "Library")
+        if (tab === "Home" || tab === "Manifest" || tab === "Library")
           await p
             .getByRole("button", { name: tab, exact: true })
             .last()
@@ -57,14 +58,12 @@ const { chromium } = require("playwright"),
             () => document.documentElement.scrollWidth <= innerWidth,
           ),
         );
-        const buttons = await p
-          .locator("button:visible")
-          .evaluateAll((rows) =>
-            rows.map((e) => ({
-              label: e.getAttribute("aria-label") || e.textContent,
-              height: e.getBoundingClientRect().height,
-            })),
-          );
+        const buttons = await p.locator("button:visible").evaluateAll((rows) =>
+          rows.map((e) => ({
+            label: e.getAttribute("aria-label") || e.textContent,
+            height: e.getBoundingClientRect().height,
+          })),
+        );
         assert.ok(
           buttons.every((b) => b.height >= 43.9),
           JSON.stringify(buttons.filter((b) => b.height < 43.9)),
@@ -109,8 +108,8 @@ const { chromium } = require("playwright"),
       "22.4px",
     );
     await p.setViewportSize({ width: 320, height: 852 });
-    for (const tab of ["Manifest", "Library", "Studio", "Chakras"]) {
-      if (tab === "Manifest" || tab === "Library")
+    for (const tab of ["Home", "Manifest", "Library", "Studio", "Chakras"]) {
+      if (tab === "Home" || tab === "Manifest" || tab === "Library")
         await p.getByRole("button", { name: tab, exact: true }).last().click();
       else await navigate(p, tab);
       assert.ok(
@@ -139,7 +138,7 @@ const { chromium } = require("playwright"),
       await p.evaluate(
         () => document.querySelector('meta[name="theme-color"]').content,
       ),
-      "#f3f5f7",
+      "#f5f6f8",
     );
     await p.setViewportSize({ width: 1366, height: 900 });
     await navigate(p, "Studio");

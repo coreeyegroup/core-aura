@@ -1,4 +1,6 @@
-# Release 0.16.0 status
+# Release 0.17.0 status
+
+Added a real-data Home dashboard, eight functional tool shortcuts, category routing, saved-practice transport, upcoming reminders and quick tone setup. Reworked visual hierarchy with neutral surfaces, amber actions, filled controls and five-destination navigation. Added compact sentence queues with inline preview and edit disclosure, plus the live Studio pitch/waveform monitor.
 
 Rebuilt the shared interface around compact rows and grouped controls. Added saved System, Light, Dark and High Contrast themes, pre-paint appearance restoration and live system-theme tracking. Removed decorative catalog cards and idle practice banners; voice options use one expandable panel. Text scaling and comfortable spacing remain adjustable. Browser checks cover five screens in three explicit themes, small screens, enlarged text, contrast and touch targets. See [interface guide](interface.md).
 
@@ -10,7 +12,7 @@ Pending: physical Android/iOS microphone/notification/lock-screen acceptance; pr
 
 ## Current implementation coverage
 
-Release 0.16.0 makes manifestation the opening workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
+Release 0.17.0 makes Home the opening dashboard and Manifest the practice workspace, with an affirmation library, custom sentence sequences, spoken/silent repetition, saved practices and local schedules. Existing sound, chakra, content administration and display features remain available.
 
 | Requirement            | Implemented in this release                                                                                                                                                                             | Remaining acceptance                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |

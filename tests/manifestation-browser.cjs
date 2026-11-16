@@ -50,7 +50,7 @@ function speechMock() {
       });
       const p = await c.newPage();
       await p.addInitScript(speechMock);
-      await p.goto("http://localhost:8089");
+      await p.goto("http://localhost:8089/#manifest");
       await p
         .getByRole("heading", { name: "Manifestation", exact: true })
         .waitFor();
@@ -133,7 +133,7 @@ function speechMock() {
       errors = [];
     p.on("pageerror", (e) => errors.push(e.message));
     await p.addInitScript(speechMock);
-    await p.goto("http://localhost:8089");
+    await p.goto("http://localhost:8089/#manifest");
     await p
       .getByRole("button", { name: "Choose affirmations", exact: true })
       .click();

@@ -1,3 +1,4 @@
+import { BookOpen, Pencil } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -65,15 +66,22 @@ function NumberField({
     />
   );
 }
-export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
+export function Manifestation({
+  onLibrary,
+  initialView = "practice",
+}: {
+  onLibrary: () => void;
+  initialView?: string;
+}) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
       manifestPlayer.subscribe,
       manifestPlayer.snapshot,
     );
-  const [view, setView] = useState("practice"),
+  const [view, setView] = useState(initialView),
     [custom, setCustom] = useState(""),
     [message, setMessage] = useState("");
+  useEffect(() => setView(initialView), [initialView]);
   const [recordLine, setRecordLine] = useState<Line>();
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -164,6 +172,27 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
               {state.error && <p role="status">{state.error}</p>}
             </div>
           )}
+          <div
+            className="workspace-summary"
+            aria-label="Practice configuration summary"
+          >
+            <div>
+              <small>Sentences</small>
+              <strong>{p.lines.length}/50</strong>
+            </div>
+            <div>
+              <small>Repetitions</small>
+              <strong>{p.repeats} rounds</strong>
+            </div>
+            <div>
+              <small>Session limit</small>
+              <strong>{p.seconds / 60} min</strong>
+            </div>
+            <div>
+              <small>Voice level</small>
+              <strong>{Math.round(p.volume * 100)}%</strong>
+            </div>
+          </div>
           <VoicePanel />
           <div className="practice-grid">
             <div className="practice-editor">
@@ -181,104 +210,147 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
                 <div className="manifest-lines">
                   {p.lines.map((line, i) => (
                     <article className="manifest-line" key={line.id}>
-                      <label>
-                        Sentence {i + 1}
-                        <textarea
-                          rows={2}
-                          aria-label={"Sentence " + (i + 1)}
-                          disabled={active}
-                          value={line.text}
-                          maxLength={300}
-                          onChange={(e) =>
-                            change({
-                              lines: p.lines.map((l, n) =>
-                                n === i
-                                  ? { id: l.id, text: e.target.value }
-                                  : l,
-                              ),
-                            })
-                          }
-                        />
-                      </label>
-                      <div className="line-actions">
+                      <div className="sentence-queue-head">
+                        <span className="queue-index">
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <div className="queue-copy">
+                          <p>{line.text}</p>
+                          <small>
+                            {line.recordingId
+                              ? "Personal voice"
+                              : "Selected voice"}
+                          </small>
+                        </div>
                         <PreviewButton
                           line={line}
                           id={line.id}
                           recorded={p.useRecordings}
                         />
-                        <button
-                          disabled={active || !line.text.trim()}
-                          onClick={() => setRecordLine(line)}
-                        >
-                          {line.recordingId ? "Record again" : "Record voice"}
-                        </button>
-                        {line.recordingId && (
-                          <span className="content-note">
-                            Personal voice saved
-                          </span>
-                        )}
-                        <button
-                          disabled={active || i === 0}
-                          aria-label={"Move sentence " + (i + 1) + " up"}
-                          onClick={() => {
-                            const lines = [...p.lines];
-                            [lines[i - 1], lines[i]] = [lines[i], lines[i - 1]];
-                            change({ lines });
-                          }}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          disabled={active || i === p.lines.length - 1}
-                          aria-label={"Move sentence " + (i + 1) + " down"}
-                          onClick={() => {
-                            const lines = [...p.lines];
-                            [lines[i + 1], lines[i]] = [lines[i], lines[i + 1]];
-                            change({ lines });
-                          }}
-                        >
-                          ↓
-                        </button>
-                        <button
-                          disabled={active}
-                          aria-label={"Remove sentence " + (i + 1)}
-                          onClick={() =>
-                            change({ lines: p.lines.filter((_, n) => n !== i) })
-                          }
-                        >
-                          Remove
-                        </button>
                       </div>
+                      <details className="sentence-editor">
+                        <summary
+                          aria-label={"Edit sentence " + (i + 1)}
+                          title={"Edit sentence " + (i + 1)}
+                        >
+                          <Pencil size={16} />
+                        </summary>
+                        <label>
+                          Sentence {i + 1}
+                          <textarea
+                            rows={2}
+                            aria-label={"Sentence " + (i + 1)}
+                            disabled={active}
+                            value={line.text}
+                            maxLength={300}
+                            onChange={(e) =>
+                              change({
+                                lines: p.lines.map((l, n) =>
+                                  n === i
+                                    ? { id: l.id, text: e.target.value }
+                                    : l,
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                        <div className="line-actions">
+                          <button
+                            disabled={active || !line.text.trim()}
+                            onClick={() => setRecordLine(line)}
+                          >
+                            {line.recordingId ? "Record again" : "Record voice"}
+                          </button>
+                          {line.recordingId && (
+                            <span className="content-note">
+                              Personal voice saved
+                            </span>
+                          )}
+                          <button
+                            disabled={active || i === 0}
+                            aria-label={"Move sentence " + (i + 1) + " up"}
+                            onClick={() => {
+                              const lines = [...p.lines];
+                              [lines[i - 1], lines[i]] = [
+                                lines[i],
+                                lines[i - 1],
+                              ];
+                              change({ lines });
+                            }}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            disabled={active || i === p.lines.length - 1}
+                            aria-label={"Move sentence " + (i + 1) + " down"}
+                            onClick={() => {
+                              const lines = [...p.lines];
+                              [lines[i + 1], lines[i]] = [
+                                lines[i],
+                                lines[i + 1],
+                              ];
+                              change({ lines });
+                            }}
+                          >
+                            ↓
+                          </button>
+                          <button
+                            disabled={active}
+                            aria-label={"Remove sentence " + (i + 1)}
+                            onClick={() =>
+                              change({
+                                lines: p.lines.filter((_, n) => n !== i),
+                              })
+                            }
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </details>
                     </article>
                   ))}
                 </div>
-                <label>
-                  Your own sentence
-                  <textarea
-                    disabled={active}
-                    rows={2}
-                    value={custom}
-                    maxLength={300}
-                    placeholder="Write the words you want to repeat"
-                    onChange={(e) => setCustom(e.target.value)}
-                  />
-                </label>
-                <div className="admin-actions">
-                  <button
-                    disabled={active || !custom.trim() || p.lines.length >= 50}
-                    onClick={() => {
-                      change({
-                        lines: [
-                          ...p.lines,
-                          { id: crypto.randomUUID(), text: custom.trim() },
-                        ],
-                      });
-                      setCustom("");
-                    }}
-                  >
-                    Add sentence
-                  </button>
-                </div>
+                {!p.lines.length && (
+                  <div className="queue-empty">
+                    <BookOpen size={21} />
+                    <p>
+                      Your sequence is empty. Choose affirmations from the
+                      library or write your own below.
+                    </p>
+                  </div>
+                )}
+                <details className="custom-sentence">
+                  <summary>Write your own affirmation</summary>
+                  <label>
+                    Your own sentence
+                    <textarea
+                      disabled={active}
+                      rows={2}
+                      value={custom}
+                      maxLength={300}
+                      placeholder="Write the words you want to repeat"
+                      onChange={(e) => setCustom(e.target.value)}
+                    />
+                  </label>
+                  <div className="admin-actions">
+                    <button
+                      disabled={
+                        active || !custom.trim() || p.lines.length >= 50
+                      }
+                      onClick={() => {
+                        change({
+                          lines: [
+                            ...p.lines,
+                            { id: crypto.randomUUID(), text: custom.trim() },
+                          ],
+                        });
+                        setCustom("");
+                      }}
+                    >
+                      Add sentence
+                    </button>
+                  </div>
+                </details>
                 {!p.lines.length && (
                   <button
                     onClick={() => {
@@ -567,7 +639,15 @@ export function Manifestation({ onLibrary }: { onLibrary: () => void }) {
     </section>
   );
 }
-export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
+export function ManifestLibrary({
+  onPractice,
+  initialCategory = "Health",
+  recordingsOpen = false,
+}: {
+  onPractice: () => void;
+  initialCategory?: string;
+  recordingsOpen?: boolean;
+}) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
       manifestPlayer.subscribe,
@@ -580,7 +660,7 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
   const [editing, setEditing] = useState<EditLibrary>(),
     [manage, setManage] = useState(false);
   const libraryInput = useRef<HTMLInputElement>(null);
-  const [category, setCategory] = useState<string>("Health"),
+  const [category, setCategory] = useState<string>(initialCategory),
     [query, setQuery] = useState(""),
     [message, setMessage] = useState("");
   useEffect(() => {
@@ -816,7 +896,7 @@ export function ManifestLibrary({ onPractice }: { onPractice: () => void }) {
             </div>
           ))}
       </div>
-      <PersonalVoices />
+      <PersonalVoices initiallyOpen={recordingsOpen} />
       <div className="section-heading">
         <h2>Saved practices</h2>
         <button onClick={() => input.current?.click()}>Import practice</button>

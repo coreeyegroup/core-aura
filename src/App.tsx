@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AudioLines,
+  LayoutDashboard,
   Flower2,
   Library,
   Settings,
@@ -32,6 +33,7 @@ import {
 import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
+import { Dashboard, Tool } from "./components/Dashboard";
 import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
@@ -69,6 +71,7 @@ function note(hz: number) {
   );
 }
 const tabs = [
+  ["home", "Home", LayoutDashboard],
   ["manifest", "Manifest", Sparkles],
   ["studio", "Sounds", AudioLines],
   ["chakras", "Chakras", Flower2],
@@ -78,6 +81,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>(() => {
     const route = location.hash.slice(1);
     return [
+      "home",
       "manifest",
       "explore",
       "studio",
@@ -86,8 +90,11 @@ export default function App() {
       "admin",
     ].includes(route)
       ? (route as Tab)
-      : "manifest";
+      : "home";
   });
+  const [manifestSection, setManifestSection] = useState("practice");
+  const [category, setCategory] = useState("Health");
+  const [recordingsOpen, setRecordingsOpen] = useState(false);
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(
     "explore",
   );
@@ -127,6 +134,7 @@ export default function App() {
         manifestPlayer.stop();
         manifestationStore.open(id);
       }
+      setManifestSection("practice");
       setTab("manifest");
       history.replaceState(null, "", "#manifest");
       setDue(null);
@@ -402,11 +410,40 @@ export default function App() {
       navigator.mediaDevices.removeEventListener("devicechange", changed);
   }, []);
   function navigate(value: Tab) {
+    if (value === "library") setRecordingsOpen(false);
+    if (value === "manifest") setManifestSection("practice");
     if (value === "explore" || value === "studio") setLastSoundTab(value);
     setTab(value);
     history.replaceState(null, "", "#" + value);
     setMessage("");
     window.scrollTo({ top: 0 });
+  }
+  function openTool(tool: Tool) {
+    if (tool === "display") {
+      setSettings(true);
+      return;
+    }
+    if (tool === "schedule") {
+      navigate("manifest");
+      setManifestSection("schedule");
+      return;
+    }
+    if (tool === "packs") {
+      setExploreView("packs");
+      navigate("explore");
+      return;
+    }
+    if (
+      tool === "affirmations" ||
+      tool === "recordings" ||
+      tool === "sessions"
+    ) {
+      setLibraryView(tool === "sessions" ? "audio" : "manifestation");
+      navigate("library");
+      setRecordingsOpen(tool === "recordings");
+      return;
+    }
+    navigate(tool);
   }
   function patch(updated: Channel) {
     const spec = sounds[updated.sound];
@@ -416,9 +453,11 @@ export default function App() {
       : setLayers;
     setter((rows) => rows.map((c) => (c.id === updated.id ? updated : c)));
   }
-  function openSound(sound: Sound) {
+  function openSound(sound: Sound, frequency?: number) {
     layers.forEach((c) => engine.stop(c.id));
-    const hz = ["yaman", "mohanam", "tanpura"].includes(sound) ? 216 : 432;
+    const hz =
+      frequency ??
+      (["yaman", "mohanam", "tanpura"].includes(sound) ? 216 : 432);
     setLayers([channel(sound, hz)]);
     navigate("studio");
   }
@@ -547,23 +586,25 @@ export default function App() {
     <div className="app" data-screen={tab}>
       <header className="app-header">
         <a
-          href="#manifest"
+          href="#home"
           onClick={(e) => {
             e.preventDefault();
-            navigate("manifest");
+            navigate("home");
           }}
           className="brand"
         >
-          <span aria-hidden="true">◉</span> core-aura
+          <span className="brand-mark" aria-hidden="true">
+            <AudioLines size={21} />
+          </span>
+          <span className="brand-name">
+            CORE AURA<small>PERSONAL WORKSPACE</small>
+          </span>
         </a>
         <div className="header-actions">
-          <span className="build-status">
-            v{VERSION} ·{" "}
-            {appearance.theme === "contrast"
-              ? "High contrast"
-              : appearance.theme}
+          <span className={"connection-status " + (online ? "connected" : "")}>
+            <i aria-hidden="true" />
+            {online ? "Online" : "Offline"}
           </span>
-          {!online && <WifiOff aria-label="Offline" size={18} />}
           <button
             className="icon-button"
             onClick={() => setSettings(true)}
@@ -590,8 +631,23 @@ export default function App() {
             </button>
           </div>
         )}
+        {tab === "home" && (
+          <Dashboard
+            sessions={sessions.length}
+            onTool={openTool}
+            onContinue={() => navigate("manifest")}
+            onPractice={openManifest}
+            onTone={(hz) => openSound("sine", hz)}
+            onCategory={(value) => {
+              setCategory(value);
+              setLibraryView("manifestation");
+              navigate("library");
+            }}
+          />
+        )}
         {tab === "manifest" && (
           <Manifestation
+            initialView={manifestSection}
             onLibrary={() => {
               setLibraryView("manifestation");
               navigate("library");
@@ -727,12 +783,30 @@ export default function App() {
                 Save
               </button>
             </div>
+            <section className="studio-monitor" aria-label="Sound monitor">
+              <div>
+                <span className="eyebrow">{sounds[focus.sound].name}</span>
+                <strong className="monitor-hz">
+                  {focus.hz}
+                  <small> Hz</small>
+                </strong>
+                <p>{note(focus.hz)}</p>
+              </div>
+              <div>
+                <Waveform />
+                <span className="monitor-status">
+                  {activeCount
+                    ? `${activeCount} layers playing`
+                    : "Ready to play"}{" "}
+                  · {Math.round(master * 100)}% master
+                </span>
+              </div>
+            </section>
             <details className="tuner">
               <summary id="tuner-heading">
                 Visual tuning · {focus.hz} Hz <span>{note(focus.hz)}</span>
               </summary>
               <div className="tuner-content">
-                <Waveform />
                 <label className="sr-only" htmlFor="visual-tuning">
                   Tune frequency
                 </label>
@@ -998,7 +1072,11 @@ export default function App() {
               </button>
             </div>
             {libraryView === "manifestation" ? (
-              <ManifestLibrary onPractice={() => navigate("manifest")} />
+              <ManifestLibrary
+                initialCategory={category}
+                recordingsOpen={recordingsOpen}
+                onPractice={() => navigate("manifest")}
+              />
             ) : (
               <>
                 <input
