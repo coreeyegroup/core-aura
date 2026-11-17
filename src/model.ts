@@ -1,4 +1,5 @@
-export const VERSION = "0.22.0";
+import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
+export const VERSION = "0.23.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -9,7 +10,9 @@ export type Sound =
   | "bowl"
   | "tanpura"
   | "yaman"
-  | "mohanam";
+  | "mohanam"
+  | "hum" | "shruti" | "harp" | "chime"
+  | AmbienceSound;
 export type Tab =
   | "home"
   | "manifest"
@@ -25,19 +28,23 @@ export type Channel = {
   volume: number;
   muted: boolean;
   seconds: number;
+  intensity?: number;
+  focus?: boolean;
+  focusQ?: number;
+  interval?: number;
 };
 export type Session = {
   schemaVersion: 2;
   engineVersion: string;
   id: string;
   name: string;
-  kind: "studio" | "chakras";
+  kind: "studio" | "chakras" | "nature";
   channels: Channel[];
   master: number;
   createdAt: string;
 };
-export const sounds: Record<
-  Sound,
+const instrumentSounds: Record<
+  Exclude<Sound, AmbienceSound>,
   { name: string; detail: string; min: number; max: number; type: string }
 > = {
   sine: {
@@ -103,7 +110,16 @@ export const sounds: Record<
     max: 600,
     type: "Raga",
   },
+  hum: {name:"Harmonic hum",detail:"Original sustained vocal-like synthesis",min:80,max:600,type:"Voice"},
+  shruti: {name:"Shruti-style drone",detail:"Original sustained reed-like drone",min:80,max:600,type:"Drone"},
+  harp: {name:"Soft harp",detail:"Original gentle plucked-string synthesis",min:100,max:1200,type:"Instrument"},
+  chime: {name:"Tuned chime",detail:"Original slowly struck chime resonance",min:100,max:2000,type:"Instrument"},
+
 };
+export const sounds = {
+  ...instrumentSounds,
+  ...Object.fromEntries(Object.entries(natureCatalog).map(([id,spec])=>[id,{name:spec.name,detail:spec.detail,min:80,max:8000,type:"Nature"}]))
+} as Record<Sound,{name:string;detail:string;min:number;max:number;type:string}>;
 export const chakraSounds: Sound[] = ["sine", "triangle", "bowl", "flute", "bell"];
 export const chakras = [
   {
@@ -188,6 +204,10 @@ export function validChannel(value: unknown): value is Channel {
       c.volume >= 0 &&
       c.volume <= 1 &&
       typeof c.muted === "boolean" &&
+      (c.interval === undefined || (Number.isFinite(c.interval) && c.interval>=.25 && c.interval<=30)) &&
+      (c.intensity === undefined || (Number.isFinite(c.intensity) && c.intensity >= 0 && c.intensity <= 1)) &&
+      (c.focus === undefined || typeof c.focus === "boolean") &&
+      (c.focusQ === undefined || (Number.isFinite(c.focusQ) && c.focusQ >= .3 && c.focusQ <= 8)) &&
       Number.isInteger(c.seconds) &&
       c.seconds >= 1 &&
       c.seconds <= 7200,
@@ -204,7 +224,7 @@ export function parseSession(value: unknown): Session {
     s.name.length > 80 ||
     typeof s.id !== "string" ||
     s.id.length > 100 ||
-    !["studio", "chakras"].includes(s.kind) ||
+    !["studio", "chakras", "nature"].includes(s.kind) ||
     !Array.isArray(s.channels) ||
     s.channels.length < 1 ||
     s.channels.length > 12 ||
@@ -224,5 +244,7 @@ export function parseSession(value: unknown): Session {
     )
   )
     throw Error("This chakra session uses unsupported settings.");
+  if (s.kind === "nature" && (s.channels.length>8 || s.channels.some(c=>!/^nature:[a-zA-Z0-9-]{1,80}$/.test(c.id))))
+    throw Error("This nature mix uses unsupported channel identifiers.");
   return { ...s, channels: s.channels.map((c) => ({ ...c })) };
 }

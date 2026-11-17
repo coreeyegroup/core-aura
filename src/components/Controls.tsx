@@ -1,3 +1,4 @@
+import { isNature } from "../nature/catalog";
 import { useState } from "react";
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
 import { Channel, sounds } from "../model";
@@ -133,10 +134,10 @@ export function ChannelEditor({
           </select>
         </label>
         <label>
-          {["yaman", "mohanam", "tanpura"].includes(value.sound)
+          {isNature(value.sound) ? "Filter centre (Hz)" : ["yaman", "mohanam", "tanpura", "shruti"].includes(value.sound)
             ? "Tonic · Sa (Hz)"
             : value.sound === "bell" ||
-                value.sound === "bowl" ||
+                value.sound === "bowl" || value.sound === "chime" ||
                 value.sound === "drum"
               ? "Resonance (Hz)"
               : "Frequency (Hz)"}
@@ -146,6 +147,7 @@ export function ChannelEditor({
             min={spec.min}
             max={spec.max}
             step="0.01"
+            disabled={isNature(value.sound) && !value.focus}
             value={value.hz}
             onChange={(e) => {
               const hz = e.target.valueAsNumber;
@@ -160,6 +162,11 @@ export function ChannelEditor({
           />
         </label>
       </div>
+      {isNature(value.sound) && <>
+        <label className="check"><input type="checkbox" checked={value.focus ?? false} onChange={e=>onChange({...value,focus:e.target.checked})}/> Enable frequency focus</label>
+        <label className="range-label">Texture intensity <output>{Math.round((value.intensity ?? .5)*100)}%</output><input type="range" min="0" max="100" value={(value.intensity ?? .5)*100} onChange={e=>onChange({...value,intensity:Number(e.target.value)/100})}/></label>
+        <p className="content-note">The Hz value controls a filter when frequency focus is enabled. Add a pure-tone layer for a separate exact frequency.</p>
+      </>}
       <label className="range-label">
         Volume <output>{Math.round(value.volume * 100)}%</output>
         <input
