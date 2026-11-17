@@ -1,3 +1,5 @@
+import { NatureLibrary } from "./nature/NatureLibrary";
+import { isNature } from "./nature/catalog";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AudioLines,
@@ -256,6 +258,7 @@ export default function App() {
   const [seconds, setSeconds] = useState(workspace.data?.seconds || 300);
   const [master, setMaster] = useState(workspace.data?.master ?? 0.5);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [natureSessionToLoad,setNatureSessionToLoad] = useState<Session>();
   const [starred, setStarred] = useState<Sound[]>(favorites);
   const [message, setMessage] = useState(workspace.error);
   useEffect(() => {
@@ -367,6 +370,7 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
+  const isNatureView = tab === "explore" && exploreView === "nature";
   const miniRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = miniRef.current;
@@ -584,7 +588,9 @@ export default function App() {
     engine.stopAll();
     setMaster(row.master);
     setSeconds(row.channels[0].seconds);
-    if (row.kind === "chakras") {
+    if (row.kind === "nature") {
+      setNatureSessionToLoad(row);navigate("explore",{exploreView:"nature"});
+    } else if (row.kind === "chakras") {
       const map = new Map(row.channels.map((c) => [c.id, c]));
       setChakraChannels(
         chakras.map(
@@ -674,9 +680,10 @@ export default function App() {
   );
   const showPlaybackBar = practiceBusy
     ? tab !== "manifest"
-    : soundStates.length > 0 && !(isStudio || isChakras);
+    : soundStates.length > 0 && !(isStudio || isChakras || isNatureView);
   const playingSounds = soundStates.some((state) => state.status === "playing");
   function openPlayingSound() {
+    if(soundStates.some(s=>s.id.startsWith("nature:"))) {navigate("explore",{exploreView:"nature"});return;}
     if (soundStates.some((state) => state.id.startsWith("pack:") || state.id.startsWith("track:")))
       navigate("library", { libraryView: "audio", librarySection: "all" });
     else
@@ -692,20 +699,7 @@ export default function App() {
     try {
       if (playingSounds) soundStates.forEach((state) => engine.pause(state.id));
       else {
-        await Promise.all(soundStates.filter(state=>state.id.startsWith("track:")).map(state=>engine.resumeSoundtrack(state.id)));
-        const pack = soundStates.find((state) => state.id.startsWith("pack:"));
-        if (pack)
-          await engine.toggleRecording(pack.id, async () => {
-            throw Error("Reopen the downloaded track from Library.");
-          });
-        else
-          await engine.toggle(
-            [...layers, ...chakraChannels]
-              .filter((channel) =>
-                soundStates.some((state) => state.id === channel.id),
-              )
-              .map((channel) => ({ ...channel, seconds })),
-          );
+        await Promise.all(soundStates.map(state=>engine.resume(state.id)));
       }
     } catch (e) {
       setMessage((e as Error).message);
@@ -715,7 +709,7 @@ export default function App() {
     <div
       ref={miniRef}
       className={
-        isStudio || isChakras || tab === "manifest"
+        isStudio || isChakras || isNatureView || tab === "manifest"
           ? "playback-banner"
           : "mini-player"
       }
@@ -733,7 +727,9 @@ export default function App() {
           ? isPreview(practice)
             ? "Sentence preview"
             : practice.plan?.name
-          : soundStates.some((s) => s.id.startsWith("track:"))
+          : soundStates.some((s) => s.id.startsWith("nature:"))
+            ? "Nature mix"
+            : soundStates.some((s) => s.id.startsWith("track:"))
             ? "Sound tracks"
             : soundStates.some((s) => s.id.startsWith("pack:"))
               ? "Downloaded audio"
@@ -819,7 +815,7 @@ export default function App() {
       </header>
       <main id="main" tabIndex={-1}>
         {showPlaybackBar &&
-          (isStudio || isChakras || (tab === "manifest" && !practiceBusy)) &&
+          (isStudio || isChakras || isNatureView || (tab === "manifest" && !practiceBusy)) &&
           playbackBar}
         {due && (
           <div className="notice" role="status">
@@ -881,13 +877,15 @@ export default function App() {
         {tab === "admin" && <Admin />}
         {tab === "explore" && (
           <>
+            {exploreView !== "nature" && <>
             <div className="page-heading">
               <h1>Sound catalog</h1>
               <p>
-                {Object.keys(sounds).length} instruments and studies ·
+                {Object.keys(sounds).length} generated sounds and studies ·
                 adjustable tuning · layered playback
               </p>
             </div>
+            </>}
             <div className="segmented" aria-label="Explore collection">
               <button
                 aria-pressed={exploreView === "sounds"}
@@ -901,9 +899,12 @@ export default function App() {
               >
                 Sound packs
               </button>
+              <button aria-pressed={exploreView === "nature"} onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature library</button>
             </div>
             {exploreView === "packs" ? (
               <PacksPanel />
+            ) : exploreView === "nature" ? (
+              <NatureLibrary master={master} onMaster={setMaster} sessions={sessions} onSave={row=>storeRows([...sessions,row])} initialSession={natureSessionToLoad} onLoaded={()=>setNatureSessionToLoad(undefined)} onLibrary={()=>navigate("library",{libraryView:"audio",librarySection:"all"})}/>
             ) : (
               <>
                 <label className="search">
@@ -917,10 +918,11 @@ export default function App() {
                 </label>
                 <div className="section-heading">
                   <h2>Sounds &amp; studies</h2>
-                  <span>{Object.keys(sounds).length} sounds</span>
+                  <span>{Object.keys(sounds).filter(id=>!isNature(id)).length} sounds</span>
                 </div>
                 <div className="sound-grid">
                   {(Object.entries(sounds) as [Sound, (typeof sounds)[Sound]][])
+                    .filter(([id]) => !isNature(id))
                     .filter(([id, s]) =>
                       (s.name + " " + s.type)
                         .toLowerCase()
@@ -995,10 +997,10 @@ export default function App() {
               <div>
                 <span className="eyebrow">{sounds[focus.sound].name}</span>
                 <strong className="monitor-hz">
-                  {focus.hz}
-                  <small> Hz</small>
+                  {isNature(focus.sound) && !focus.focus ? "Natural" : focus.hz}
+                  {(!isNature(focus.sound) || focus.focus) && <small> Hz</small>}
                 </strong>
-                <p>{note(focus.hz)}</p>
+                <p>{isNature(focus.sound) ? (focus.focus ? "Frequency-focus filter" : "Full texture · frequency focus off") : note(focus.hz)}</p>
               </div>
               <div>
                 <Waveform />
@@ -1010,7 +1012,7 @@ export default function App() {
                 </span>
               </div>
             </section>
-            <details className="tuner">
+            {!isNature(focus.sound) && <details className="tuner">
               <summary id="tuner-heading">
                 Visual tuning · {focus.hz} Hz <span>{note(focus.hz)}</span>
               </summary>
@@ -1061,7 +1063,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </details>
+            </details>}
             {layers.map((c, i) => (
               <ChannelEditor
                 key={c.id}
@@ -1200,7 +1202,7 @@ export default function App() {
                   <div className="empty">
                     <Library size={36} />
                     <h3>Your practice, saved.</h3>
-                    <p>Build a session in Studio or Chakras, then tap Save.</p>
+                    <p>Build a session in Studio, Chakras or Nature library, then save it.</p>
                     <button onClick={() => navigate("studio")}>
                       Open Studio <ArrowRight size={18} />
                     </button>
@@ -1281,7 +1283,8 @@ export default function App() {
             )}
           </>
         )}
-        {(isStudio || isChakras || (tab === "library" && libraryView === "audio")) && <SoundTracks />}
+        {(isStudio || isChakras) && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
+        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature") || (tab === "library" && libraryView === "audio")) && <SoundTracks />}
         {isChakras && <details className="generated-track-panel">
           <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
           <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
@@ -1365,6 +1368,7 @@ export default function App() {
       {showPlaybackBar &&
         !isStudio &&
         !isChakras &&
+        !isNatureView &&
         tab !== "manifest" &&
         playbackBar}
       <nav className="bottom-nav" aria-label="Main navigation">

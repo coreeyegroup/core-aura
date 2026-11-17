@@ -245,6 +245,15 @@ export class AudioEngine {
     }
     this.refresh();
   }
+  async resume(id: string) {
+    const token=this.generation, voice=this.voiceGeneration.get(id)||0;
+    await this.connect();
+    if(token!==this.generation || voice!==(this.voiceGeneration.get(id)||0) || !this.states.some(s=>s.id===id && s.status!=="stopping"))return;
+    if(id.startsWith("track:")) {await this.tracks.resume(id);return;}
+    if(this.recording?.id===id) {this.startRecording();return;}
+    this.node!.port.postMessage({type:"resume",id});
+    this.voiceStates=this.voiceStates.map(s=>s.id===id?{...s,status:"playing"}:s);this.refresh();
+  }
   async toggle(channels: Channel[]) {
     if (
       channels.some(
@@ -279,6 +288,8 @@ export class AudioEngine {
       this.stopRecording();
       return;
     }
+    this.voiceStates=this.voiceStates.map(s=>s.id===id?{...s,status:"stopping"}:s);
+    this.refresh();
     this.node?.port.postMessage({ type: "stop", id });
   }
   stopAll() {
@@ -287,13 +298,15 @@ export class AudioEngine {
     this.generation++;
     this.voiceGeneration.clear();
     this.stopRecording();
+    this.voiceStates=this.voiceStates.map(s=>({...s,status:"stopping"}));
+    this.refresh();
     this.node?.port.postMessage({ type: "clear" });
   }
   patch(channel: Channel) {
     this.node?.port.postMessage({
       type: "patch",
       id: channel.id,
-      patch: { hz: channel.hz, volume: channel.volume, muted: channel.muted },
+      patch: { hz: channel.hz, volume: channel.volume, muted: channel.muted, intensity: channel.intensity ?? .5, focus: channel.focus ?? false, focusQ: channel.focusQ ?? .7, interval: channel.interval },
     });
   }
   readWaveform(data: Float32Array<ArrayBuffer>) {

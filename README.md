@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.22.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.23.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -36,6 +36,10 @@ The master mixer uses one audio context. Pitch changes preserve the percussion p
 Use the named release and exact deployment commands in its handoff. ops/deploy.sh builds an archived source revision and switches the live directory atomically. ops/verify.sh verifies the public version. Existing PWA installations update through /update.html or Settings.
 
 The PostgreSQL/FastAPI catalog is optional for the on-device player and required for closed-app web push reminders. See [operations](docs/operations.md) before starting it.
+
+## Nature and sound library
+
+Explore → Nature library offers 28 original generated nature textures and 13 tones, instrument models and raga studies. Preview sounds, mix up to eight layers, set each level and optional frequency-focus filter, add a separate exact-frequency tone, and save generated mixes for offline playback or WAV export. Rain, water, ocean, wind, bird-like calls, fire and noise are procedural approximations rather than field recordings. [Library controls and catalogue](docs/nature-library.md).
 
 ## Sound packs
 

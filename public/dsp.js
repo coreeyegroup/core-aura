@@ -1,3 +1,4 @@
+import { isAmbience, ambienceSample } from "./ambience.js";
 export const patterns = {
   yaman: [
     [-1, 0.8],
@@ -115,7 +116,8 @@ export function sample(state, rate) {
     (state.phase + 2 * Math.PI * state.currentHz * dt) % (2 * Math.PI * 10000);
   const phase = state.phase;
   let value;
-  if (s === "sine") value = Math.sin(phase);
+  if (isAmbience(s)) value = ambienceSample(state, rate);
+  else if (s === "sine") value = Math.sin(phase);
   else if (s === "triangle") {
     value = 0;
     for (let n = 1; n <= 15 && n * target < rate * 0.45; n += 2)
@@ -148,8 +150,15 @@ export function sample(state, rate) {
           [3, 0.2, Infinity],
         ]);
     }
+  } else if (s === "hum") {
+    value=partials(phase,target,rate,[[1,.75,Infinity],[2,.16,Infinity],[3,.06,Infinity]])*(.85+.1*Math.sin(2*Math.PI*.12*state.time));
+  } else if (s === "shruti") {
+    value=partials(phase,target,rate,[[1,.55,Infinity],[2,.2,Infinity],[3,.12,Infinity],[4,.07,Infinity],[5,.04,Infinity]])*(.9+.06*Math.sin(state.time*.7));
+  } else if (s === "harp" || s === "chime") {
+    const period=state.interval??3,age=state.time%period,edge=Math.min(1,age/.008,(period-age)/.05);
+    value=partials(2*Math.PI*state.currentHz*age,target,rate,s === "harp"?[[1,.65,1.2],[2,.2,.55],[3,.08,.3]]:[[1,.55,1.8],[2.02,.25,1.1],[3.03,.12,.7]],age)*edge;
   } else {
-    const period = s === "drum" ? 0.9 : s === "bell" ? 3 : 5;
+    const period = state.interval ?? (s === "drum" ? 0.9 : s === "bell" ? 3 : 5);
     const age = state.time % period;
     const edge = Math.min(
       1,
