@@ -28,9 +28,10 @@ class Context {
   close = async () => {};
   createAnalyser = () => ({
     fftSize: 0,
-    connect: () => ({}),
+    connect: (node: any) => node,
     getFloatTimeDomainData: () => {},
   });
+  createDynamicsCompressor = () => ({threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect: () => ({})});
   createGain = () => ({
     gain: {
       value: 0,

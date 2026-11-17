@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
-import { Channel, chakras, sounds } from "../model";
+import { Channel, sounds } from "../model";
 import { engine, VoiceState } from "../audio/engine";
 export function Transport({
   channels,
@@ -31,17 +31,12 @@ export function Transport({
           if (busy) return;
           setBusy(true);
           if (!playing && channels.length) {
-            const chakra = channels.every((c) =>
-              chakras.some((k) => k.id === c.id),
-            );
             if (exclusive) stopChannels.filter(c=>!channels.some(target=>target.id===c.id)).forEach(c=>engine.stop(c.id));
             engine
               .snapshot()
               .filter(
                 (state) =>
-                  state.id.startsWith("pack:") ||
-                  (state.id !== "manifest-background" &&
-                    chakras.some((k) => k.id === state.id) !== chakra),
+                  state.id.startsWith("pack:"),
               )
               .forEach((state) => engine.stop(state.id));
           }

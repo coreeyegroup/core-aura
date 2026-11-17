@@ -34,6 +34,7 @@ import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
 import { ChakraMixer } from "./components/ChakraMixer";
+import { SoundTracks } from "./tracks/SoundTracks";
 import { AndroidUpdates } from "./android/AndroidUpdates";
 import { ConnectionPanel } from "./components/ConnectionPanel";
 import { readWorkspace, saveWorkspace } from "./workspace";
@@ -676,7 +677,7 @@ export default function App() {
     : soundStates.length > 0 && !(isStudio || isChakras);
   const playingSounds = soundStates.some((state) => state.status === "playing");
   function openPlayingSound() {
-    if (soundStates.some((state) => state.id.startsWith("pack:")))
+    if (soundStates.some((state) => state.id.startsWith("pack:") || state.id.startsWith("track:")))
       navigate("library", { libraryView: "audio", librarySection: "all" });
     else
       navigate(
@@ -691,6 +692,7 @@ export default function App() {
     try {
       if (playingSounds) soundStates.forEach((state) => engine.pause(state.id));
       else {
+        await Promise.all(soundStates.filter(state=>state.id.startsWith("track:")).map(state=>engine.resumeSoundtrack(state.id)));
         const pack = soundStates.find((state) => state.id.startsWith("pack:"));
         if (pack)
           await engine.toggleRecording(pack.id, async () => {
@@ -731,8 +733,10 @@ export default function App() {
           ? isPreview(practice)
             ? "Sentence preview"
             : practice.plan?.name
-          : soundStates.some((s) => s.id.startsWith("pack:"))
-            ? "Downloaded audio"
+          : soundStates.some((s) => s.id.startsWith("track:"))
+            ? "Sound tracks"
+            : soundStates.some((s) => s.id.startsWith("pack:"))
+              ? "Downloaded audio"
             : `${soundStates.length} sound layers`}
         <small>
           {practiceBusy
@@ -1277,6 +1281,13 @@ export default function App() {
             )}
           </>
         )}
+        {(isStudio || isChakras || (tab === "library" && libraryView === "audio")) && <SoundTracks />}
+        {isChakras && <details className="generated-track-panel">
+          <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
+          <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
+          {layers.map((value,i)=><ChannelEditor key={value.id} title={"Generated layer "+(i+1)} value={{...value,seconds}} states={states} onChange={patch} onError={setMessage} remove={layers.length>1 ? ()=>{engine.stop(value.id);setLayers(rows=>rows.filter(c=>c.id!==value.id));} : undefined}/>)}
+          <button disabled={layers.length>=8} onClick={()=>setLayers(rows=>[...rows,channel("bowl",432)])}>Add generated layer</button>
+        </details>}
         {message && (
           <div role="status" className="notice">
             <span>{message}</span>
