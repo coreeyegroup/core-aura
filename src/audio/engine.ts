@@ -1,9 +1,11 @@
 import { Channel } from "../model";
+import { TrackPlayer, TrackLevel } from "./tracks";
 import { signalOtherAudio } from "./activity";
 export type VoiceState = {
   id: string;
   status: "playing" | "paused" | "pausing" | "stopping";
   time: number;
+  duration?: number;
 };
 export class AudioEngine {
   private context?: AudioContext;
@@ -22,11 +24,23 @@ export class AudioEngine {
     source?: AudioBufferSourceNode;
     gain: GainNode;
   };
+  private tracks = new TrackPlayer(async () => {
+    await this.connect();
+    return {context: this.context!, analyser: this.analyser!};
+  }, () => this.refresh());
+  async toggleSoundtrack(id: string, load: () => Promise<Blob>, level: TrackLevel) {
+    signalOtherAudio();
+    await this.tracks.toggle(id, load, level);
+  }
+  resumeSoundtrack(id: string) { return this.tracks.resume(id); }
+  patchSoundtrack(id: string, level: TrackLevel) { this.tracks.patch(id,level); }
+  seekSoundtrack(id: string, seconds: number) { this.tracks.seek(id,seconds); }
   private voiceStates: VoiceState[] = [];
   private refresh() {
     const r = this.recording;
     this.states = [
       ...this.voiceStates,
+      ...this.tracks.snapshot(),
       ...(r
         ? [
             {
@@ -182,7 +196,13 @@ export class AudioEngine {
         });
         const analyser = context.createAnalyser();
         analyser.fftSize = 1024;
-        node.connect(analyser).connect(context.destination);
+        const limiter = context.createDynamicsCompressor();
+        limiter.threshold.value = -3;
+        limiter.knee.value = 6;
+        limiter.ratio.value = 20;
+        limiter.attack.value = .003;
+        limiter.release.value = .15;
+        node.connect(analyser).connect(limiter).connect(context.destination);
         this.analyser = analyser;
         node.port.onmessage = ({ data }) => {
           this.voiceStates = data;
@@ -237,6 +257,7 @@ export class AudioEngine {
     }
   }
   pause(id: string) {
+    if (id.startsWith("track:")) { this.tracks.pause(id); return; }
     const r = this.recording;
     if (r?.id === id && r.source) {
       r.offset += this.context!.currentTime - r.startedAt;
@@ -252,6 +273,7 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "pause", id });
   }
   stop(id: string) {
+    if (id.startsWith("track:")) { this.tracks.stop(id); return; }
     this.voiceGeneration.set(id, (this.voiceGeneration.get(id) || 0) + 1);
     if (this.recording?.id === id) {
       this.stopRecording();
@@ -261,6 +283,7 @@ export class AudioEngine {
   }
   stopAll() {
     signalOtherAudio();
+    this.tracks.stopAll();
     this.generation++;
     this.voiceGeneration.clear();
     this.stopRecording();
@@ -279,6 +302,7 @@ export class AudioEngine {
   }
   setMaster(value: number) {
     this.master = value;
+    this.tracks.setMaster(value);
     if (this.recording)
       this.recording.gain.gain.setTargetAtTime(
         value,

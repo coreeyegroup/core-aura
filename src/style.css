@@ -1996,3 +1996,33 @@ progress {
 .chakra-row-menu > div { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:4px 0; }
 .chakra-row-menu p { flex:1; min-width:100px; font-size:calc(13px * var(--text-scale)); }
 [data-text-size="large"] .chakra-console-controls { grid-template-columns:minmax(0,1fr) 44px 44px; }
+/* Local audio tracks share the existing compact display controls. */
+.soundtrack-panel,.generated-track-panel { border:1px solid var(--line);border-radius:var(--radius);padding:0 var(--pad);background:var(--surface);min-width:0;scroll-margin-top:80px; }
+.soundtrack-panel > summary,.generated-track-panel > summary { gap:8px;font-size:calc(14px * var(--text-scale)); }
+.soundtrack-panel > summary span,.generated-track-panel > summary span { margin-left:auto;font-size:calc(11px * var(--text-scale));color:var(--muted);font-weight:400; }
+.soundtrack-panel[open],.generated-track-panel[open] { padding-bottom:8px; }
+.track-toolbar { display:flex;flex-wrap:wrap;gap:4px; }
+.track-toolbar button { flex:1 1 auto;font-size:calc(13px * var(--text-scale)); }
+.track-list { display:grid;gap:0; }
+.soundtrack-row { min-width:0;border-top:1px solid var(--line);padding:5px 0; }
+.track-head { display:flex;align-items:center;gap:5px; }
+.track-head > div { flex:1;min-width:0; }
+.track-head strong { font-size:calc(14px * var(--text-scale));display:block;overflow-wrap:anywhere; }
+.track-head small { display:block;font-size:calc(11px * var(--text-scale));color:var(--muted); }
+.track-head button { min-width:44px;flex-shrink:0; }
+.track-seek { display:flex;align-items:center;gap:6px; }
+.track-seek input { width:100%;min-width:0; }
+.track-seek output { font-size:calc(11px * var(--text-scale));white-space:nowrap;font-variant-numeric:tabular-nums; }
+.track-levels { display:flex;align-items:center;gap:5px; }
+.track-levels label { display:flex;align-items:center;gap:4px;min-width:0;flex:1; }
+.track-levels input { width:100%;min-width:0; }
+.track-levels output { font-size:calc(12px * var(--text-scale));min-width:3em;text-align:right; }
+.track-levels > button { flex-shrink:0; }
+.track-options > summary { font-size:calc(12px * var(--text-scale));margin:0; }
+.track-rename { display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px 0; }
+.track-rename label { grid-column:1/-1; }
+.track-message { font-size:calc(13px * var(--text-scale));overflow-wrap:anywhere; }
+.generated-track-panel .layer { margin-bottom:5px; }
+[data-text-size="large"] .soundtrack-panel > summary,[data-text-size="large"] .generated-track-panel > summary { flex-wrap:wrap; }
+[data-text-size="large"] .track-levels { flex-wrap:wrap; }
+[data-text-size="large"] .track-levels label { flex-basis:100%; }
