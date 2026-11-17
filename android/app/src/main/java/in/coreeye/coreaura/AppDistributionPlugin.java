@@ -130,6 +130,7 @@ public class AppDistributionPlugin extends Plugin {
             worker.execute(()->{try {UpdateSession.commit(getContext(),verified,pending,cancelled::get);}catch(Exception error){fail(call,error);}});
             return;
         }
+        if(!getActivity().getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {finish(call,"confirmation-required");return;}
         Uri uri=FileProvider.getUriForFile(getContext(),getContext().getPackageName()+".fileprovider",verified);
         Intent intent=new Intent(Intent.ACTION_VIEW);intent.setDataAndType(uri,"application/vnd.android.package-archive");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("Core-aura update",uri));
@@ -149,6 +150,7 @@ public class AppDistributionPlugin extends Plugin {
         if(status==PackageInstaller.STATUS_PENDING_USER_ACTION) {
             report("confirming",received,total);
             if(confirmation==null) {if(call!=null)fail(call,new Exception("Android did not provide an update confirmation. Please retry."));return;}
+            if(call!=null && !getActivity().getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {finish(call,"confirmation-required");return;}
             try {
                 if(call!=null) startActivityForResult(call,confirmation,"updateInstallerResult");
                 else {confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);getContext().startActivity(confirmation);}
