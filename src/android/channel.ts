@@ -45,7 +45,7 @@ export function parseAndroidRelease(value: unknown): AndroidRelease {
   const url = new URL(r.url);
   if (
     url.origin !== ANDROID_ORIGIN ||
-    !url.pathname.startsWith("/android/releases/" + r.sha256 + "/") ||
+    url.pathname !== `/android/releases/${r.sha256}/core-aura-${r.versionName}.apk` ||
     url.username ||
     url.password ||
     url.search ||

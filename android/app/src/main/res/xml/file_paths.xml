@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="core_aura_exports" path="core-aura-exports/" />
+    <cache-path name="core_aura_updates" path="core-aura-updates/" />
 </paths>
