@@ -1,70 +1,47 @@
-# Android APK hosting and updates — v0.19.0
+# Android hosting and native updates — v0.22.0
 
-## Customer URLs
+## Customer flow
+
+**Settings → Android app updates → Update latest** is the single app action. It checks the HTTPS release channel and installed identity, downloads the newer APK into private app cache, verifies size/SHA-256/package/version/certificate, then opens Android's installer. It does not send the user to a browser, Downloads folder or a separate APK-opening step. The installer updates the existing package in place with its saved data.
+
+Android requires installation approval. On Android 8+ it may first ask once to allow Core-aura as an installation source. Returning after granting permission continues to the installer automatically. If permission is declined, retry through the same button. Installer cancellation keeps the verified APK for retry without a second APK download. This is direct website distribution, not Google Play's in-app update API or a silent privileged installer.
+
+Progress and the in-flight operation survive closing/reopening Settings in the same app process. Cancel stops checking/downloading/verification; cancellation inside the Android installer belongs to Android. Incomplete or invalid files never reach the installer. A cancelled/failed transfer deletes its partial file. If the app process is restarted, the same button checks the channel again and reuses a complete verified cached file. No resumable partial-download or automatic background update claim is made.
+
+## One-time upgrade to this updater
+
+Versions 0.19.0–0.21.0 contain the older browser-download updater. Install 0.22.0 over that stable app once through its existing update/download path. Do not uninstall it. Future releases use Update latest inside Core-aura. Installing this release does not retroactively change the old APK before that initial upgrade.
+
+The earlier 0.18.0 test APK used a different temporary signing key. It still requires the documented one-time test-to-stable migration: export saved content and voice/audio files outside the app before replacing that test app. Stable installations keep the permanent signing identity.
+
+## URLs and publication
 
 - Download page: https://core-aura.coreeye.in/download.html
 - Latest APK: https://core-aura.coreeye.in/android/core-aura-latest.apk
-- Update channel: https://core-aura.coreeye.in/android/latest.json
+- Update metadata: https://core-aura.coreeye.in/android/latest.json
 
-The download page is linked from the website header and Settings. It shows the published Android version, file size, supported Android level and a checksum. APKs are served from a persistent directory outside atomic web releases; a web deployment does not remove them.
-
-## Publish on the Ubuntu VPS
-
-The verified main-branch workflow publishes unsigned Android build inputs as the GitHub prerelease `android-v0.19.0`. These inputs are not installable customer APKs. Wait for the main workflow's android-publish job to succeed before running the publisher.
+The website remains the first-install/recovery route. APK hosting is independent of atomic web releases. Wait for the verified main workflow's android-publish job to publish `android-v0.22.0` inputs, then run:
 
 ```bash
 cd ~/core-aura
 git pull --ff-only origin main
-git fetch origin release/v0.19.0-android-channel
-sudo bash ops/deploy.sh FETCH_HEAD
+sudo bash ops/deploy.sh origin/main
 sudo bash ops/start-backend.sh
-sudo bash ops/update-site.sh --enable-api
 sudo bash ops/publish-android.sh
-bash ops/verify.sh 0.19.0
+bash ops/verify.sh 0.22.0
 curl -fsS https://core-aura.coreeye.in/android/latest.json
 ```
 
-`publish-android.sh` installs Java 17 runtime/keytool if missing. Android Studio and the Android SDK are not required on the VPS. It downloads the exact-version unsigned APK and signer tool from the repository's verified build, checks their hashes and native source digest against the checkout, signs and verifies the APK, then switches the public Android pointer atomically. It refuses a downgrade, changed code under an existing versionCode, altered signing identity or invalid input. A failed publication preserves the prior public APK. Run it again safely after a transient failure.
+The VPS validates exact-version CI input hashes/source digest, signs the release with its existing permanent private key, verifies it and atomically publishes metadata/immutable APK paths. Java runtime/keytool are installed if missing; no Android SDK is needed on the VPS. Failed publication preserves the current release. Both app version and Android versionCode must increase for changed releases.
 
-For future releases use the same sequence with that release's version/ref. Every changed native release must increment both the numeric Android versionCode and the application version. Publishing web code alone cannot update installed APK code.
+## Signing and native restrictions
 
-## Permanent signing identity
+Keep `/var/lib/core-aura/android-signing/release.p12`, its `password` file, and the private `/var/lib/core-aura/android-signing-backup.tar.gz` backup. Copy the backup to protected independent storage; never put it in Git or public hosting. A missing/changed identity after publication is rejected. Credentials stay on the VPS; CI uses disposable identities only for smoke tests.
 
-The private key and generated password are created once on the VPS at:
+The native updater accepts only the fixed Core-aura package ID and exact official HTTPS immutable APK path matching its expected version/hash. Redirects, credentials, query strings, malformed metadata, wrong size/hash, another package, another certificate, old versions and unsupported Android metadata are rejected. Archive identity is checked again after installation-source permission is granted. Android verifies the signed package at installation. Files are bounded to 150 MB, streamed with connection/read/overall deadlines, and stored under a narrow private cache FileProvider path with temporary read permission. Core-aura requests REQUEST_INSTALL_PACKAGES solely to update itself; it exposes no arbitrary package-install endpoint or silent-install privilege.
 
-- `/var/lib/core-aura/android-signing/release.p12`
-- `/var/lib/core-aura/android-signing/password`
+## Verification and handset acceptance
 
-The directory is private and files are restricted to their owner. The initial private backup is `/var/lib/core-aura/android-signing-backup.tar.gz`. Copy that archive to protected independent storage. It contains signing credentials; never put it in Git, the public website or a public share. Keep the original signing identity throughout the app's life. If the state is missing or incomplete after publication, the script stops and asks for its original backup instead of generating an incompatible key.
+Unit tests cover single-action orchestration, current versions, active audio, signature mismatch, duplicate actions, progress across subscriptions, cancellation and permission retry. JVM tests exercise exact URL/identity checks, real file checksums, cached reuse, truncated/oversized/corrupt/redirected downloads, cancellation cleanup and retry. Browser tests use a mocked native bridge to verify the actual Settings interface, one-button behavior, progress across closing Settings, cancellation and the absence of external browser downloads. Native compilation and real APK signing/publication run in CI.
 
-Private release credentials do not enter GitHub Actions. CI only uses a disposable test key for its publication smoke test. GitHub stores unsigned build inputs; the VPS signs the customer APK with the permanent identity.
-
-## Android app update flow
-
-1. Open Settings → Android app updates.
-2. Tap Check for app updates. The app reads its installed package, version/build, Android API and certificate from a local native plugin.
-3. The HTTPS channel must identify the same package, a supported Android version and the same signing certificate. Only a higher versionCode produces an update offer.
-4. Tap Download & update. The official immutable APK URL opens outside the app for download.
-5. Open the downloaded APK and approve Update in Android. A matching signed update preserves the app's existing local data.
-
-Android requires an explicit installation decision. This direct website distribution flow does not install silently and does not request self-install privileges in Core-aura. A Google Play distribution channel would use its own store update mechanism.
-
-The native bridge restricts download intents to the official HTTPS domain and the app download page or immutable APK paths. The update metadata is validated, bounded, fetched without cache and tied to an APK hash path. The operating system verifies the signed APK when it is installed. Downloads can be cancelled through the browser/system download controls. Audio must be stopped before the update action.
-
-## One-time move from the earlier test APK
-
-The previously supplied 0.18.0 test APK used an ephemeral debug signing identity. It cannot be updated in place with the new permanent release key. This is a one-time signing transition, not the future update procedure.
-
-Before replacing that test app, export practices, sound sessions, the affirmation library and personal voice WAVs. Complete the share/save to Downloads or other storage outside the test app. Then uninstall the test APK once, install the stable APK from the domain and import those files. Browser/PWA data lives separately and is not automatically copied to the native app. Later stable APKs keep the same signing identity and update over the installed stable app without uninstalling it.
-
-## Public files and recovery
-
-Published files live under `/var/www/core-aura/android/releases/<apk-sha256>/`. `current` is an atomic symlink; `latest.json` and `core-aura-latest.apk` follow it. The versioned metadata uses an immutable APK URL so a concurrent publication cannot replace the bytes named by an update offer. Caddy gives the public channel CORS access and a no-store response, with APK download content headers.
-
-Do not manually change a published version or its certificate. Restore a verified channel/signing backup for recovery, or issue a higher build number. Keep old immutable APK paths while clients may be downloading them. No database migration or new public port is introduced by this distribution feature.
-
-## Verification
-
-The pipeline builds debug and unsigned release APKs, compiles Java policy tests, signs a real release APK with an ephemeral test key, verifies its certificate, repeats publication idempotently and checks failure preservation and web/native directory independence. Web tests cover the download page, missing channel, retry, immutable URL, phone layout and accessibility. Unit tests cover version ordering, identity mismatch, test migration, unsupported Android and invalid metadata/URLs. Caddy upgrades are tested for idempotence and rollback and both deployed site templates are validated.
-
-Physical Android acceptance: install the stable APK, confirm the native installed version/build is shown, tap Check for app updates and confirm the current-version message. On the next higher build, download and approve Update without uninstalling; confirm saved practices, recordings and sound sessions remain available. Download approval, Android installation confirmation and device-specific prompts need this actual phone check. iOS APK installation is not supported; its store distribution remains separate.
+Actual Android installer and installation-source permission dialogs require handset acceptance. Install this release over the stable app, confirm stored tracks/practices remain and Update latest reports current. On the next higher signed release, verify private download → one-time permission if needed → Android Update confirmation, with no browser/manual file step or second app icon. Test cancelling/retrying, offline errors and saved-data preservation. OEM-specific installer behavior and process replacement cannot be proven by the mocked browser test. iOS has its own distribution flow and does not install APKs.

@@ -2026,3 +2026,5 @@ progress {
 [data-text-size="large"] .soundtrack-panel > summary,[data-text-size="large"] .generated-track-panel > summary { flex-wrap:wrap; }
 [data-text-size="large"] .track-levels { flex-wrap:wrap; }
 [data-text-size="large"] .track-levels label { flex-basis:100%; }
+.android-updates progress { width:100%;height:10px;accent-color:var(--accent); }
+.android-updates > output { font-size:calc(12px * var(--text-scale));font-variant-numeric:tabular-nums; }

@@ -24,7 +24,7 @@ from .content import (
 )
 
 app = FastAPI(
-    title="Core-aura catalog", version="0.21.0", docs_url=None, redoc_url=None
+    title="Core-aura catalog", version="0.22.0", docs_url=None, redoc_url=None
 )
 
 app.add_middleware(
@@ -136,7 +136,7 @@ def health():
             db.execute(text("SELECT 1"))
     except Exception:
         raise HTTPException(503, "Database unavailable")
-    return {"status": "ok", "version": "0.21.0"}
+    return {"status": "ok", "version": "0.22.0"}
 
 
 @app.get("/api/catalog")
