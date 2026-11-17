@@ -10,9 +10,11 @@ export function SoundTracks() {
     const input = useRef<HTMLInputElement>(null), alive = useRef(true), states = useSyncExternalStore(engine.subscribe, engine.snapshot);
     useEffect(() => {
         alive.current = true;
-        const refresh = () => tracks().then(rows => { if (alive.current)
-            setRows(rows); }).catch(e => { if (alive.current)
-            setMessage(e.message); });
+        const refresh = () => tracks().then(rows => {
+            if (alive.current) {
+                setRows(rows);
+            }
+        }).catch(e => { if (alive.current) setMessage(e.message); });
         const error = (event: Event) => setMessage((event as CustomEvent<string>).detail);
         void refresh();
         addEventListener(trackEvent, refresh);
@@ -63,8 +65,8 @@ export function SoundTracks() {
     }
     async function patch(row: Track, patch: Partial<Track>) {
         try {
-            await changeTrack(row.id, patch);
-            engine.patchSoundtrack(row.id, { ...row, ...patch });
+            const updated = await changeTrack(row.id, patch);
+            if (updated) engine.patchSoundtrack(row.id, updated);
         }
         catch (e) {
             setMessage((e as Error).message);

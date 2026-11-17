@@ -2,7 +2,7 @@ const {chromium}=require("playwright"),assert=require("node:assert/strict"),fs=r
 function wav(hz){const rate=16000,seconds=25,b=Buffer.alloc(44+rate*seconds*2);b.write("RIFF");b.writeUInt32LE(b.length-8,4);b.write("WAVEfmt ",8);b.writeUInt32LE(16,16);b.writeUInt16LE(1,20);b.writeUInt16LE(1,22);b.writeUInt32LE(rate,24);b.writeUInt32LE(rate*2,28);b.writeUInt16LE(2,32);b.writeUInt16LE(16,34);b.write("data",36);b.writeUInt32LE(b.length-44,40);for(let n=0;n<rate*seconds;n++)b.writeInt16LE(Math.round(Math.sin(n*2*Math.PI*hz/rate)*4000),44+n*2);return b;}
 (async()=>{const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:["--no-sandbox"]});try{
  const c=await browser.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true}),p=await c.newPage(),errors=[];
- p.on("pageerror",e=>errors.push(e.message));await p.addInitScript(()=>{const original=AudioContext.prototype.createAnalyser;AudioContext.prototype.createAnalyser=function(){const a=original.call(this);window.__trackAnalyser=a;return a;};});await p.goto("http://localhost:8089/#chakras");
+ p.on("pageerror",e=>errors.push(e.message));await p.addInitScript(()=>{const original=AudioContext.prototype.createAnalyser;AudioContext.prototype.createAnalyser=function(){const a=original.call(this);window.__trackAnalyser=a;return a;};const gain=AudioContext.prototype.createGain;AudioContext.prototype.createGain=function(){const node=gain.call(this);(window.__trackGains ||= []).push(node);return node;};});await p.goto("http://localhost:8089/#chakras");
  await p.locator(".soundtrack-panel > summary").click();
  const input=p.getByLabel("Import sound tracks",{exact:true});
  await input.setInputFiles([{name:"rain.wav",mimeType:"audio/wav",buffer:wav(222)},{name:"river.wav",mimeType:"audio/wav",buffer:wav(333)}]);
@@ -14,7 +14,7 @@ function wav(hz){const rate=16000,seconds=25,b=Buffer.alloc(44+rate*seconds*2);b
  await river.getByRole("button",{name:"Play river",exact:true}).click();await river.getByRole("button",{name:"Pause river",exact:true}).waitFor();
  await rain.getByRole("button",{name:"Pause rain",exact:true}).click();await rain.getByRole("button",{name:"Resume rain",exact:true}).waitFor();
  await rain.getByLabel("rain position",{exact:true}).press("End");assert.ok(Number(await rain.getByLabel("rain position",{exact:true}).inputValue())>=20);
- await rain.getByRole("button",{name:"Repeat rain",exact:true}).click();await rain.getByRole("button",{name:"Mute rain",exact:true}).click();await rain.getByRole("button",{name:"Unmute rain",exact:true}).waitFor();
+ await rain.getByLabel("rain volume",{exact:true}).press("End");await rain.getByRole("button",{name:"Repeat rain",exact:true}).click();await p.waitForFunction(()=>Math.abs(window.__trackGains[0].gain.value-.1)<.005);await rain.getByRole("button",{name:"Mute rain",exact:true}).click();await rain.getByRole("button",{name:"Unmute rain",exact:true}).waitFor();
  await rain.getByRole("button",{name:"Resume rain",exact:true}).click();
  // Starting an extra generated layer keeps chakra and imported audio playing.
  await p.locator(".generated-track-panel > summary").click();await p.locator(".generated-track-panel").getByRole("button",{name:"Play",exact:true}).first().click();

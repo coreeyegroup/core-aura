@@ -74,9 +74,10 @@ export async function trackBlob(id: string) {
 }
 export async function changeTrack(id: string, value: Partial<Track> | null) {
     const patch = value === null ? null : trackSettings(value), db = await open();
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<Track | undefined>((resolve, reject) => {
         const tx = db.transaction("tracks", "readwrite"), store = tx.objectStore("tracks");
         const request = store.get(id);
+        let updated: Track | undefined;
         request.onsuccess = () => {
             if (!request.result) {
                 tx.abort();
@@ -84,10 +85,14 @@ export async function changeTrack(id: string, value: Partial<Track> | null) {
             }
             if (patch === null)
                 store.delete(id);
-            else
-                store.put({ ...request.result, ...patch });
+            else {
+                const next = { ...request.result, ...patch };
+                store.put(next);
+                const {blob: _blob, ...metadata} = next;
+                updated = metadata;
+            }
         };
-        tx.oncomplete = () => { db.close(); dispatchEvent(new Event(trackEvent)); resolve(); };
+        tx.oncomplete = () => { db.close(); dispatchEvent(new Event(trackEvent)); resolve(updated); };
         tx.onabort = tx.onerror = () => { db.close(); reject(Error("Track changes could not be saved. The previous file was kept.")); };
     });
 }
