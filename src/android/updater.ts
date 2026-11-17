@@ -31,7 +31,9 @@ const messages: Record<string, string> = {
     downloading: "Downloading the latest update inside Core-aura…",
     verifying: "Verifying the update and app signature…",
     permission: "Allow updates from Core-aura in Android, then return here to continue.",
-    installing: "Confirm Update in Android. Your installed app and saved data will be retained.",
+    installing: "Installing the latest version… The app may close while it updates. Android may request confirmation.",
+    confirming: "Confirm Update in Android to finish.",
+    "confirmation-required": "Android needs confirmation. Tap Update latest to continue using the verified download.",
     "permission-required": "Update permission was not enabled. Tap Update latest to retry; the verified file is kept.",
     closed: "The installation screen closed. If you cancelled, tap Update latest to retry.",
     installed: "Core-aura was updated. Reopen the app if Android asks you to.",
@@ -116,7 +118,7 @@ export class AndroidUpdateController {
         }
     }
     async cancel() {
-        if (!this.value.busy || this.value.phase === "installing")
+        if (!this.value.busy || ["installing", "confirming"].includes(this.value.phase))
             return;
         this.cancelling = true;
         this.set({ message: "Cancelling the update…" });

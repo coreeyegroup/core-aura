@@ -4,6 +4,7 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.content.pm.PackageInstaller;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.net.Uri;
@@ -34,6 +35,12 @@ public class AppDistributionPlugin extends Plugin {
     private volatile long received=0,total=0;
     private UpdatePolicy.Spec pending;
     private File verified;
+    private PluginCall updateCall;
+    @Override public void load() {
+        UpdateResultReceiver.listener=new java.lang.ref.WeakReference<>(this);
+        phase=UpdateSession.preferences(getContext()).getString("phase","idle");
+        if ("installing".equals(phase) || "confirming".equals(phase)) phase="confirmation-required";
+    }
     private int signatureFlags() { return Build.VERSION.SDK_INT>=28 ? PackageManager.GET_SIGNING_CERTIFICATES : PackageManager.GET_SIGNATURES; }
     private PackageInfo installed() throws Exception { return getContext().getPackageManager().getPackageInfo(getContext().getPackageName(),signatureFlags()); }
     private long code(PackageInfo info) { return Build.VERSION.SDK_INT>=28 ? info.getLongVersionCode() : info.versionCode; }
@@ -54,13 +61,13 @@ public class AppDistributionPlugin extends Plugin {
         phase=value;received=count;total=size;notifyListeners("updateProgress",status(),true);
     }
     private void finish(PluginCall call,String result) {
-        busy.set(false);report(result,received,total);
+        busy.set(false);updateCall=null;report(result,received,total);
         JSObject value=new JSObject();value.put("status",result);call.resolve(value);
     }
     private void fail(PluginCall call,Exception error) {
         String message=cancelled.get() ? "Update cancelled." : error.getMessage();
         if (message==null || message.length()>300) message="The update could not complete. Retry after checking your connection and free storage.";
-        busy.set(false);report(cancelled.get()?"cancelled":"error",received,total);
+        busy.set(false);updateCall=null;report(cancelled.get()?"cancelled":"error",received,total);
         call.reject(message,cancelled.get()?"CANCELLED":"UPDATE_FAILED",error);
     }
     @PluginMethod public void info(PluginCall call) {
@@ -73,14 +80,15 @@ public class AppDistributionPlugin extends Plugin {
     }
     @PluginMethod public void updateStatus(PluginCall call) { call.resolve(status()); }
     @PluginMethod public void cancelUpdate(PluginCall call) {
-        if (!"installing".equals(phase)) {
-            cancelled.set(true);HttpURLConnection active=connection;if (active!=null) active.disconnect();
+        if (!"installing".equals(phase) && !"confirming".equals(phase)) {
+            if(UpdateResultReceiver.listener.get()==this) UpdateResultReceiver.listener.clear();
+        cancelled.set(true);HttpURLConnection active=connection;if (active!=null) active.disconnect();
         }
         call.resolve();
     }
     @PluginMethod public void installUpdate(PluginCall call) {
         if (!busy.compareAndSet(false,true)) { call.reject("An update is already in progress.");return; }
-        cancelled.set(false);received=0;total=0;
+        cancelled.set(false);received=0;total=0;updateCall=call;
         try {
             JSObject r=call.getObject("release");if(r==null) throw new Exception("Missing update information.");
             pending=new UpdatePolicy.Spec(r.getString("applicationId"),r.getString("versionName"),r.getLong("versionCode"),r.getInt("minSdk"),r.getString("url"),r.getString("sha256"),r.getString("certificateSha256"),r.getLong("size"));
@@ -117,6 +125,11 @@ public class AppDistributionPlugin extends Plugin {
     }
     private void launchInstaller(PluginCall call) throws Exception {
         VerifiedUpdate.check(cancelled::get);
+        if (Build.VERSION.SDK_INT>=31) {
+            report("installing",pending.size,pending.size);
+            worker.execute(()->{try {UpdateSession.commit(getContext(),verified,pending,cancelled::get);}catch(Exception error){fail(call,error);}});
+            return;
+        }
         Uri uri=FileProvider.getUriForFile(getContext(),getContext().getPackageName()+".fileprovider",verified);
         Intent intent=new Intent(Intent.ACTION_VIEW);intent.setDataAndType(uri,"application/vnd.android.package-archive");
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("Core-aura update",uri));
@@ -131,12 +144,32 @@ public class AppDistributionPlugin extends Plugin {
             catch(Exception error) { fail(call,error); }
         });
     }
+    void installationResult(int status,Intent confirmation) {
+        PluginCall call=updateCall;
+        if(status==PackageInstaller.STATUS_PENDING_USER_ACTION) {
+            report("confirming",received,total);
+            if(confirmation==null) {if(call!=null)fail(call,new Exception("Android did not provide an update confirmation. Please retry."));return;}
+            try {
+                if(call!=null) startActivityForResult(call,confirmation,"updateInstallerResult");
+                else {confirmation.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);getContext().startActivity(confirmation);}
+            } catch(Exception error) {if(call!=null)finish(call,"confirmation-required");else {busy.set(false);report("confirmation-required",received,total);}}
+        } else if(status==PackageInstaller.STATUS_SUCCESS) {
+            if(call!=null)finish(call,"installed");else {busy.set(false);report("installed",received,total);}
+        } else if(status==PackageInstaller.STATUS_FAILURE_ABORTED) {
+            if(call!=null)finish(call,"closed");else {busy.set(false);report("closed",received,total);}
+        } else {
+            if(call!=null)fail(call,new Exception("Android could not finish the update. The installed app was kept. Check free storage and retry."));
+            else {busy.set(false);report("error",received,total);}
+        }
+    }
     @ActivityCallback private void updateInstallerResult(PluginCall call,ActivityResult result) {
+        if(Build.VERSION.SDK_INT>=31) return; // The PackageInstaller status receiver owns the final outcome.
         if(call==null) { busy.set(false);report("closed",received,total);return; }
         try { finish(call,pending!=null && code(installed())>=pending.versionCode ? "installed":"closed"); }
         catch(Exception error) { fail(call,error); }
     }
     @Override protected void handleOnDestroy() {
+        if(UpdateResultReceiver.listener.get()==this) UpdateResultReceiver.listener.clear();
         cancelled.set(true);HttpURLConnection active=connection;if(active!=null)active.disconnect();worker.shutdownNow();
     }
     // Retained only for the one-time debug-key migration help page.

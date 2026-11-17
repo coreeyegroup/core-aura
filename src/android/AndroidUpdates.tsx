@@ -20,10 +20,10 @@ export function AndroidUpdates({ audioActive }: {
     {state.busy && <>
       <progress aria-label="App update progress" max="100" value={state.percent}/>
       {state.phase === "downloading" && <output>{state.percent}% downloaded</output>}
-      {state.phase !== "installing" && state.phase !== "permission" && <button className="wide" onClick={() => void updater.cancel()}>Cancel update</button>}
+      {!["installing", "confirming", "permission"].includes(state.phase) && <button className="wide" onClick={() => void updater.cancel()}>Cancel update</button>}
     </>}
     {state.message && <p role="status" className="content-note">{state.message}</p>}
     {state.migration && <button className="wide" onClick={() => void distribution.openDownload({ url: ANDROID_ORIGIN + "/download.html" })}>Open stable app download</button>}
-    <p className="content-note">Updates download inside Core-aura. Android asks you to confirm Update; it may ask once to allow updates from this app.</p>
+    <p className="content-note">Updates download inside Core-aura. Supported Android versions can update directly; Android may ask for confirmation or one-time permission.</p>
   </section>;
 }
