@@ -80,7 +80,7 @@ export function SoundTracks() {
     </div>
     <input ref={input} className="sr-only" aria-label="Import sound tracks" type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
         void add(files); }}/>
-    <p className="content-note">Add your audio files, then mix up to three tracks with generated sounds. Format support depends on this device. Files stay here for offline use. Track playback has its own timeline; Stop all audio ends every layer.</p>
+    <p className="content-note">Mix up to 3 audio files with chakra or generated layers.</p>
     {!rows.length && <p className="content-note">No sound tracks yet. Add music, nature sounds or a recording from your device.</p>}
     <div className="track-list">{rows.map(row => {
             const state = states.find(s => s.id === row.id), playing = state?.status === "playing", position = state?.time || 0;
@@ -102,11 +102,12 @@ export function SoundTracks() {
           <button disabled={Boolean(busy)} onClick={() => { if (confirm("Remove " + row.title + " from this device? Export its original first if you need a backup."))
                 void run(async () => { await changeTrack(row.id, null); engine.stop(row.id); setEditing(""); }, row.id); }}>Delete track</button>
         </div>
+        <p className="content-note">Files and settings stay on this device. Supported formats depend on the device. Export original for a backup; generated-session exports do not include imported audio.</p>
         {editing === row.id && <form className="track-rename" onSubmit={e => { e.preventDefault(); void run(async () => { await changeTrack(row.id, { title }); setEditing(""); }, row.id); }}><label>Track name<input aria-label="Track name" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}/></label><button disabled={Boolean(busy)}>Save name</button><button type="button" onClick={() => setEditing("")}>Cancel</button></form>}
         </details>
       </article>;
         })}</div>
-    <p className="content-note">Track levels and repeat settings are saved on this device. Export original files separately; sound-session exports do not include imported audio.</p>
+    <p className="content-note">Tracks run separately from the session timer. Stop tracks when finished.</p>
     {message && <p role="status" className="track-message">{message}</p>}
   </details>;
 }
