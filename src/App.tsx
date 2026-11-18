@@ -17,7 +17,7 @@ import { isNature } from "./nature/catalog";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AudioLines,
-  LayoutDashboard,
+  House,
   Flower2,
   Library,
   Settings,
@@ -99,7 +99,7 @@ function note(hz: number) {
   );
 }
 const tabs = [
-  ["home", "Home", LayoutDashboard],
+  ["home", "Home", House],
   ["manifest", "Manifest", Sparkles],
   ["studio", "Sounds", AudioLines],
   ["chakras", "Chakras", Flower2],
@@ -848,7 +848,7 @@ export default function App() {
             <AudioLines size={21} />
           </span>
           <span className="brand-name">
-            CORE AURA<small>MEDITATION & MANIFESTATION</small>
+            Core Aura
           </span>
         </a>
         <div className="header-actions">
@@ -1459,7 +1459,7 @@ export default function App() {
             }
             onClick={() => navigate(id === "studio" ? lastSoundTab : id)}
           >
-            <Icon size={22} />
+            <span className="nav-icon" aria-hidden="true"><Icon size={21} /></span>
             <span>{label}</span>
           </button>
         ))}
@@ -1467,7 +1467,7 @@ export default function App() {
       {settings && (
         <div className="modal-backdrop">
           <section
-            className="sheet"
+            className="sheet settings-sheet"
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-title"
@@ -1483,7 +1483,6 @@ export default function App() {
                 <X />
               </button>
             </div>
-            <p>Core-aura · v{VERSION}</p>
             <p className="content-note">
               Keep your device volume comfortable. Stop if listening feels
               uncomfortable.
@@ -1510,6 +1509,22 @@ export default function App() {
               </label>
 
               <label>
+                Spacing
+                <select
+                  aria-label="Spacing"
+                  value={appearance.density}
+                  onChange={(e) =>
+                    changeAppearance({
+                      ...appearance,
+                      density: e.target.value as Appearance["density"],
+                    })
+                  }
+                >
+                  <option value="compact">Compact</option>
+                  <option value="comfortable">Comfortable</option>
+                </select>
+              </label>
+              <label>
                 Text size <output>{appearance.textSize}%</output>
                 <input
                   aria-label="Text size"
@@ -1525,22 +1540,6 @@ export default function App() {
                     })
                   }
                 />
-              </label>
-              <label>
-                Spacing
-                <select
-                  aria-label="Spacing"
-                  value={appearance.density}
-                  onChange={(e) =>
-                    changeAppearance({
-                      ...appearance,
-                      density: e.target.value as Appearance["density"],
-                    })
-                  }
-                >
-                  <option value="compact">Compact</option>
-                  <option value="comfortable">Comfortable</option>
-                </select>
               </label>
               <button
                 onClick={() =>
@@ -1619,6 +1618,7 @@ export default function App() {
               Built-in sounds are synthesis studies. Clinical claims and
               cultural content require their respective review.
             </p>
+            <p className="content-note">Core-aura · v{VERSION}</p>
           </section>
         </div>
       )}

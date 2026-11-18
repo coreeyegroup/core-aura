@@ -13,6 +13,12 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),AxeB
  await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByLabel('Theme',{exact:true}).selectOption('light');await p.getByRole('button',{name:'Close settings',exact:true}).click();
  for(const width of [320,393,430]){await p.setViewportSize({width,height:852});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-home-'+width+'.png'});}
  await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByRole('slider',{name:'Text size',exact:true}).press('End');await p.getByRole('button',{name:'Close settings',exact:true}).click();await p.setViewportSize({width:320,height:852});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-home-large-320.png'});await p.getByRole('button',{name:'Play selected manifestation',exact:true}).click();await p.getByRole('button',{name:'Pause playlist',exact:true}).waitFor();assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-player-large-320.png'});const largeAudit=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(largeAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
+ await p.getByRole('button',{name:'Settings',exact:true}).click();
+ const settings=p.getByRole('dialog',{name:'Settings',exact:true});
+ await settings.getByLabel('Theme',{exact:true}).waitFor();
+ assert.equal(await settings.evaluate(el=>el.contains(document.activeElement)),true);
+ assert.equal(await settings.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+ await settings.getByRole('button',{name:'Close settings',exact:true}).click();
  await p.getByRole('button',{name:'Stop playlist',exact:true}).click();
  await p.getByRole('button',{name:'Settings',exact:true}).click();
  await p.getByRole('button',{name:'Reset display',exact:true}).click();

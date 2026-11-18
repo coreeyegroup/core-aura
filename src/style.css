@@ -1,11 +1,6 @@
 /* Core-aura workspace: semantic colors, responsive data modules and accessible controls. */
 :root {
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-synthesis: none;
   --text-scale: 1;
   --nav: calc(58px * var(--text-scale));
@@ -13,21 +8,21 @@
   --pad: 12px;
   --radius: 8px;
   --app-width: 1440px;
-  --paper: #f6f4f1;
+  --paper: #f4f6f8;
   --surface: #ffffff;
-  --surface-alt: #efedf0;
-  --input: #faf9fb;
-  --action: #594776;
+  --surface-alt: #eaf0f2;
+  --input: #f8fafb;
+  --action: #16645d;
   --on-action: #ffffff;
   --positive: #087962;
   --positive-soft: #e5f5ee;
-  --ink: #24212c;
-  --muted: #625b6b;
-  --line: #e6e0e7;
-  --control-line: #958a9b;
-  --accent: #594776;
+  --ink: #18232e;
+  --muted: #526270;
+  --line: #dce4e8;
+  --control-line: #82939e;
+  --accent: #16645d;
   --on-accent: #ffffff;
-  --accent-soft: #eee7f7;
+  --accent-soft: #def0eb;
   --danger: #a12727;
   --focus: #0866c9;
   --overlay: #111c2bb3;
@@ -36,21 +31,21 @@
   background: var(--paper);
 }
 :root[data-resolved-theme="dark"] {
-  --paper: #15141c;
-  --surface: #201e28;
-  --surface-alt: #2b2835;
-  --input: #2c2937;
+  --paper: #10161d;
+  --surface: #18212a;
+  --surface-alt: #222e39;
+  --input: #202b35;
   --positive: #42cba2;
   --positive-soft: #183b32;
-  --ink: #f2eff6;
-  --muted: #bbb2c7;
-  --line: #3f384a;
-  --control-line: #84768f;
-  --action: #d7c2ed;
-  --on-action: #231933;
-  --accent: #ddc8f3;
-  --on-accent: #231933;
-  --accent-soft: #3c304d;
+  --ink: #edf3f7;
+  --muted: #aebcc9;
+  --line: #344451;
+  --control-line: #6e8493;
+  --action: #a3e0d1;
+  --on-action: #132b28;
+  --accent: #a3e0d1;
+  --on-accent: #132b28;
+  --accent-soft: #24403c;
   --danger: #ffb0ab;
   --focus: #b2d7ff;
   --overlay: #000000bb;
@@ -2086,8 +2081,8 @@ progress {
 :root[data-density="compact"] {
   --gap: 4px;
   --pad: 8px;
-  --radius: 4px;
-  --nav: calc(48px * var(--text-scale));
+  --radius: 8px;
+  --nav: calc(54px * var(--text-scale));
   --control: 36px;
 }
 :root[data-density="compact"][data-text-size="large"] { --control: 44px; }
@@ -2118,8 +2113,8 @@ progress {
 :root[data-density="compact"] .segmented button { font-size:calc(12px * var(--text-scale));padding:3px 4px; }
 :root[data-density="compact"] .app main { padding-top:4px; }
 :root[data-density="compact"] .player-dock { padding:4px var(--pad); }
-:root[data-density="compact"] .bottom-nav { --nav:calc(48px * var(--text-scale)); }
-:root[data-density="compact"] .app { --nav:calc(48px * var(--text-scale)); }
+:root[data-density="compact"] .bottom-nav { --nav:calc(54px * var(--text-scale)); }
+:root[data-density="compact"] .app { --nav:calc(54px * var(--text-scale)); }
 :root[data-density="compact"] .bottom-nav button { font-size:calc(10px * var(--text-scale));gap:1px;padding:2px; }
 :root[data-density="compact"] .bottom-nav svg { width:18px;height:18px; }
 :root[data-density="compact"] .compact-transport { grid-template-columns:repeat(2,var(--control));gap:2px; }
@@ -2251,10 +2246,9 @@ progress {
   margin-bottom: 14px;
 }
 :root .dashboard .dashboard-title h1 {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: calc(clamp(28px, 5vw, 43px) * var(--text-scale));
-  font-weight: 400;
-  letter-spacing: -0.035em;
+  font-size: calc(clamp(27px, 4vw, 36px) * var(--text-scale));
+  font-weight: 760;
+  letter-spacing: -0.045em;
   line-height: 1.14;
 }
 .dashboard-title > span {
@@ -2263,29 +2257,12 @@ progress {
 }
 .home-listening { display: grid; gap: 12px; }
 .home-playlists {
-  --feature-ink: #fff8fc;
-  --feature-muted: #dfd3e8;
-  --feature-action: #f0e5f6;
-  --feature-on-action: #362347;
-  --focus: #f3d6a5;
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
   display: grid;
-  gap: 14px;
-  padding: 15px;
-  color: var(--feature-ink);
-  background: linear-gradient(112deg, #30243d, #463252);
-  border: 1px solid #594567;
-  border-radius: 16px;
-}
-.home-playlists::before {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  background: repeating-radial-gradient(circle at 93% 9%, transparent 0 21px, #eee1f217 22px 23px);
-  mask-image: linear-gradient(110deg, transparent 15%, #000);
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
 .home-playlist-intro { display: flex; align-items: start; gap: 11px; }
 .home-feature-mark,
@@ -2293,45 +2270,29 @@ progress {
 .home-feature-mark {
   width: 40px;
   height: 40px;
-  border: 1px solid #f6e8fa52;
   border-radius: 11px;
-  color: var(--feature-ink);
-  background: #f6e8fa17;
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 :root .home-playlists h2 {
-  font-size: calc(23px * var(--text-scale));
-  font-weight: 650;
+  font-size: calc(19px * var(--text-scale));
+  font-weight: 720;
   letter-spacing: -0.03em;
 }
 .home-playlists p {
   margin-top: 3px;
-  color: var(--feature-muted);
+  color: var(--muted);
   font-size: calc(13px * var(--text-scale));
-}
-.home-playlists .primary {
-  background: var(--feature-action);
-  border-color: var(--feature-action);
-  color: var(--feature-on-action);
-}
-.home-playlists .primary:not(:disabled):hover { background: var(--feature-action); }
-.home-playlists select {
-  color: #2d2238;
-  border-color: #d9c7e3;
-  background: #fffaff;
-  color-scheme: light;
 }
 .home-playlists .home-create-playlist { justify-self: start; padding-inline: 12px; }
 .home-playlist-actions { display: grid; align-content: center; align-items: start; gap: 5px; }
 .home-playlist-footer { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
-.home-playlist-footer .text-button,
-.home-playlist-preview summary { color: var(--feature-ink); }
-.home-playlist-footer .text-button:hover { background: #ffffff20; }
-.home-playlist-preview summary { justify-content: start; border-color: #ffffff50; }
+.home-playlist-preview summary { justify-content: start; }
 .home-playlist-preview summary::after { margin-left: 2px; }
 .home-playlist-preview ol {
   margin: 0;
   padding-inline-start: 22px;
-  color: var(--feature-muted);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 .home-playlist-warning { font-weight: 600; }
@@ -2415,22 +2376,6 @@ progress {
 .playlist-items { font-size: calc(14px * var(--text-scale)); }
 :root[data-density="comfortable"] .home-play-section > summary { padding-block: 9px; }
 :root[data-density="comfortable"] .home-module-content { padding-bottom: 9px; }
-:root[data-resolved-theme="contrast"] .home-playlists {
-  --feature-ink: var(--ink);
-  --feature-muted: var(--muted);
-  --feature-action: var(--action);
-  --feature-on-action: var(--on-action);
-  --focus: #00e5ff;
-  background: var(--surface);
-  border-color: var(--line);
-}
-:root[data-resolved-theme="contrast"] .home-playlists::before { display: none; }
-:root[data-resolved-theme="contrast"] .home-playlists select {
-  background: var(--input);
-  color: var(--ink);
-  border-color: var(--control-line);
-  color-scheme: dark;
-}
 @media (min-width: 560px) {
   .home-saved { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -2446,8 +2391,6 @@ progress {
 }
 @media (min-width: 930px) {
   .home-saved { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .app:has(.dashboard) .bottom-nav { justify-content: center; }
-  .app:has(.dashboard) .bottom-nav button { max-width: 164px; }
 }
 @media (max-width: 400px) {
   [data-text-size="large"] .home-list-row { flex-wrap: wrap; }
@@ -2485,3 +2428,102 @@ progress {
 :root[data-text-size="large"] .home-continue > div { flex-basis:100%; }
 :root[data-text-size="large"] .bottom-nav button { font-size:calc(10px * var(--text-scale)); padding-left:1px; padding-right:1px; }
 @media(max-width:360px) { .queue-toggle-text { display:none; } }
+
+/* Shared mobile chrome, workspace tabs and settings. */
+:root .app .app-header { padding-inline: clamp(12px, 3vw, 28px); }
+:root .app .brand { gap: 8px; }
+:root .app .brand-mark { width: 30px; height: 30px; border-radius: 9px; }
+.brand-name {
+  font-size: calc(16px * var(--text-scale));
+  font-weight: 740;
+  letter-spacing: -0.025em;
+}
+.app-header .icon-button,
+.app-header .header-download { border-radius: 9px; }
+.app-header .header-download:hover { background: var(--surface-alt); }
+:root .app main { width: min(100%, 1160px); margin-inline: auto; }
+:root .app main h1:not(.dashboard-title h1) { letter-spacing: -0.025em; }
+:root .bottom-nav { justify-content: center; }
+:root .bottom-nav button {
+  max-width: 156px;
+  gap: 2px;
+  font-weight: 650;
+}
+.nav-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  max-width: 100%;
+  height: 25px;
+  border-radius: 9px;
+}
+.bottom-nav [aria-current="page"] .nav-icon { background: var(--accent-soft); }
+.bottom-nav [aria-current="page"] > span:last-child { font-weight: 750; }
+.bottom-nav button:focus-visible { outline-offset: -2px; }
+:root .app .segmented {
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+:root .app .segmented button { border: 1px solid transparent; border-radius: 7px; }
+:root .app .segmented button[aria-pressed="true"] {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--accent);
+}
+.app .modal-backdrop { z-index: 40; }
+.app .settings-sheet {
+  max-width: 580px;
+  border: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  gap: 9px;
+  background: var(--paper);
+}
+.settings-sheet > .section-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-content: space-between;
+  background: var(--paper);
+}
+:root .settings-sheet h2 { font-size: calc(22px * var(--text-scale)); letter-spacing: -0.035em; }
+.settings-sheet .appearance-controls {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+.settings-sheet .appearance-controls label:has(input[type="range"]) { grid-column: 1/-1; }
+.settings-sheet .appearance-controls button { grid-column: 1/-1; justify-self: start; }
+.settings-sheet .workbench-panel,
+.settings-sheet .info-panel { border-radius: 10px; }
+.queue-artwork {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 9px;
+}
+.queue-time { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.queue-transport button[aria-expanded="true"] { background: var(--accent-soft); color: var(--accent); }
+@media (max-width: 559px) {
+  .home-saved {
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+  .home-play-section { border: 0; border-radius: 0; background: transparent; }
+  .home-play-section + .home-play-section { border-top: 1px solid var(--line); }
+}
+@media (min-width: 760px) {
+  .app .settings-sheet { border-radius: 18px; }
+}
