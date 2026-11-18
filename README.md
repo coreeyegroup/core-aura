@@ -1,6 +1,6 @@
 # Core-aura
 
-Core-aura 0.23.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.24.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
 ## Development
 
@@ -25,7 +25,7 @@ Nested workspace routes restore Schedule, category filters, saved practices, rec
 
 ## Screens
 
-Sounds includes Explore for built-in sounds/favorites and Studio for synthesis. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library separates affirmations/saved manifestation practices from audio sessions, packs and offline readiness. Settings contains update, listening and display controls. System, Light, Dark and High Contrast themes, text size (90–140%) and Compact/Comfortable spacing are saved independently. The interface uses a responsive dashboard, five persistent navigation destinations, compact modules, filled controls and clear selected states. Sentence queues keep preview available while text, voice recording and ordering open through Edit. Studio includes a live signal monitor. The app does not force a 360-pixel viewport.
+Sounds includes Explore for built-in sounds/favorites and Studio for synthesis. Studio supports up to eight independently controlled sound layers. Chakras supports individual, selected and all-seven playback with one Play/Pause/Resume button and a separate Stop button. Library separates affirmations/saved manifestation practices from audio sessions, packs and offline readiness. Settings contains update, listening and display controls. System, Light, Dark and High Contrast themes, text size (90–140%) and Compact/Comfortable spacing are saved independently. Compact uses shorter 36-pixel controls, tighter modules and headings, inline nature-layer options and a smaller header/player/navigation. Comfortable retains 44-pixel controls; enlarged text restores taller controls. The interface uses a responsive dashboard, five persistent navigation destinations, compact modules, filled controls and clear selected states. Sentence queues keep preview available while text, voice recording and ordering open through Edit. Studio includes a live signal monitor. The app does not force a 360-pixel viewport.
 
 Library distinguishes Settings JSON (editable session backup) from WAV audio (rendered sound). WAV export works offline on web/PWA, uses a cancellable background worker and supports up to 10 minutes per export. Native builds can open the share sheet for WAV audio, settings JSON, practice JSON and calendar files; physical-device acceptance remains pending.
 

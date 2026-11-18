@@ -34,3 +34,12 @@ Eight tool shortcuts open Affirmations, Sound Studio, Chakras, Schedule, Recordi
 The visual hierarchy uses charcoal surfaces in Dark, neutral light surfaces in Light, amber primary actions, consistent icons and compact secondary type. Theme choices and 90–140% text scaling remain available. Each sentence queue row exposes preview immediately; its Edit icon reveals text, recording, ordering and removal. Custom text entry is an explicit Write your own affirmation panel. Studio's monitor shows the actual selected pitch and mixed waveform.
 
 Additional browser tests verify real dashboard counts, schedule ordering, category routing, saved-practice transport, recording/packs shortcuts, exact tone setup and sentence editing. Physical phone readability and interaction acceptance remain the owner's final check.
+
+
+## Compact density — v0.24.0
+
+Compact is the default density profile and remains separate from text size (90–140%) and theme. Existing Comfortable preferences are preserved. Compact controls are at least 36 pixels tall, with 24-pixel checkbox inputs; Comfortable retains the existing 44-pixel controls. At enlarged text sizes, Compact restores 44-pixel controls and wraps modules rather than forcing a small viewport.
+
+Compact reduces headings, header/navigation and dock padding, dashboard module spacing and oversized shortcut tiles. Nature-library actions share one toolbar; saved mixes sit beside the heading. Closed layer options share the volume row, while expanding options uses the full available width. Names, frequency, playback, volume, mute and remove remain visible. Chakra mix status and Mix tools share a row. The frequency explanation is shortened without relabelling broadband ambience as a single tone.
+
+Acceptance compares identical five-layer mixes in Compact and Comfortable at 393×852, measuring fully visible rows and row height. Phone checks cover 320, 393 and 430 pixels, enlarged text, themes, accessibility and existing audio flows. Physical-device comfort should still be reviewed using the adjustable display settings.

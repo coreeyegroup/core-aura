@@ -65,7 +65,7 @@ const fs=require("node:fs");
    await p.setViewportSize({width,height:852});
    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Overflow at "+width);
    const buttons=await rows.first().locator(".compact-transport button").evaluateAll(es=>es.map(e=>({w:e.getBoundingClientRect().width,h:e.getBoundingClientRect().height})));
-   assert.ok(buttons.every(b=>b.w>=44&&b.h>=44));
+   assert.ok(buttons.every(b=>b.w>=36&&b.h>=36));
    await p.getByRole("heading",{name:"Chakra meditation"}).scrollIntoViewIfNeeded();
    fs.mkdirSync("mobile-verification",{recursive:true});
    await p.screenshot({path:"mobile-verification/chakra-mixer-"+width+".png"});
