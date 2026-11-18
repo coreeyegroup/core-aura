@@ -76,6 +76,13 @@ export const manifestationStore = {
     commit({ ...state.data, plans: [...others, p] });
     return p;
   },
+  copy: (id?:string) => {
+    const original=id?state.data.plans.find(p=>p.id===id):state.data.draft;
+    if(!original)throw Error("Practice unavailable.");
+    if(state.data.plans.length>=100)throw Error("The library supports up to 100 practices.");
+    const p=parsePlan({...structuredClone(original),id:crypto.randomUUID(),name:(original.name+" copy").slice(0,80)});
+    commit({...state.data,plans:[...state.data.plans,p],draft:p});return p;
+  },
   open: (id: string) => {
     const p = state.data.plans.find((row) => row.id === id);
     if (!p) throw Error("This practice is unavailable.");
@@ -90,12 +97,13 @@ export const manifestationStore = {
       draft: state.data.draft.id === id ? newPlan() : state.data.draft,
     }),
   import: (value: unknown) => {
-    const p = withoutRecordings(parsePlan(value));
-    p.id = crypto.randomUUID();
-    if (state.data.plans.length >= 100)
-      throw Error("The library supports up to 100 practices.");
-    commit({ ...state.data, plans: [...state.data.plans, p], draft: p });
+    const v=value as {kind?:string;schemaVersion?:number;practices?:unknown[]};
+    const items=v?.kind==="core-aura-practice-collection"&&v.schemaVersion===1?v.practices:[value];
+    if(!Array.isArray(items)||!items.length||items.length>100||state.data.plans.length+items.length>100)throw Error("The library supports up to 100 practices.");
+    const rows=items.map(value=>({...withoutRecordings(parsePlan(value)),id:crypto.randomUUID()}));
+    commit({...state.data,plans:[...state.data.plans,...rows],draft:rows[0]});
   },
+  removeMany:(ids:string[])=>commit({...state.data,plans:state.data.plans.filter(p=>!ids.includes(p.id)),reminders:state.data.reminders.filter(r=>!ids.includes(r.planId)),draft:ids.includes(state.data.draft.id)?newPlan():state.data.draft}),
   detachRecording: (id: string) => {
     const clean = (p: Plan) => ({
       ...p,

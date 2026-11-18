@@ -82,7 +82,7 @@ export function sample(state, rate) {
   if (state.status === "paused" || state.status === "ended") return 0;
   const stopping = state.status === "stopping";
   const pausing = state.status === "pausing";
-  state.fade += (stopping || pausing ? -1 : 1) / (rate * 0.03);
+  state.fade += (stopping || pausing ? -1 : 1) / (rate * (state.fadeSeconds ?? .03));
   state.fade = Math.max(0, Math.min(1, state.fade));
   if (pausing && state.fade === 0) {
     state.status = "paused";

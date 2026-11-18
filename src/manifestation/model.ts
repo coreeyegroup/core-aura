@@ -103,6 +103,7 @@ export type Plan = {
     volume: number;
   } | null;
   backgroundDucking?: boolean;
+  backgroundMuted?: boolean;
   backgroundDuckLevel?: number;
   background: null | {
     sound: "sine" | "bowl" | "tanpura";
@@ -118,8 +119,11 @@ export type Reminder = {
   days: number[];
   enabled: boolean;
   autoStart?: boolean;
+  oneOff?: string;
+  skipDates?: string[];
 };
 export function newPlan(): Plan {
+  let defaults={voice:"",rate:.9,volume:.7};try{const d=JSON.parse(localStorage.getItem("core-aura.voice-defaults.v1")||"null");if(d&&typeof d.voice==="string"&&d.voice.length<=300&&Number.isFinite(d.rate)&&d.rate>=.5&&d.rate<=1.5&&Number.isFinite(d.volume)&&d.volume>=0&&d.volume<=1)defaults=d;}catch{}
   return {
     schemaVersion: 1,
     id: crypto.randomUUID(),
@@ -130,9 +134,7 @@ export function newPlan(): Plan {
     gap: 2,
     readSeconds: 5,
     mode: "speech",
-    voice: "",
-    rate: 0.9,
-    volume: 0.7,
+    ...defaults,
     seconds: 600,
     background: null,
   };
@@ -204,6 +206,7 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
         !finite(m.master,0,1) || !finite(m.volume,0,1))
       throw Error("The attached background mix has invalid settings.");
   }
+  if(p.backgroundMuted!==undefined&&typeof p.backgroundMuted!=="boolean")throw Error("Invalid background mute setting.");
   if ((p.backgroundDucking !== undefined && typeof p.backgroundDucking !== "boolean") ||
       (p.backgroundDuckLevel !== undefined && !finite(p.backgroundDuckLevel,0,1)))
     throw Error("Invalid background voice-reduction settings.");
@@ -238,6 +241,8 @@ export function parseReminders(value: unknown, plans: Plan[]): Reminder[] {
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time) ||
         typeof r.enabled !== "boolean" ||
         (r.autoStart !== undefined && typeof r.autoStart !== "boolean") ||
+        (r.oneOff!==undefined && (typeof r.oneOff!=="string"||!Number.isFinite(Date.parse(r.oneOff)))) ||
+        (r.skipDates!==undefined && (!Array.isArray(r.skipDates)||r.skipDates.length>30||r.skipDates.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)))) ||
         !Array.isArray(r.days) ||
         r.days.length < 1 ||
         r.days.length > 7 ||
@@ -260,7 +265,10 @@ export function position(plan: Plan, step: number) {
       };
 }
 export function occurrence(reminder: Reminder, now: Date) {
-  if (!reminder.enabled || !reminder.days.includes(now.getDay())) return null;
+  if(!reminder.enabled)return null;
+  if(reminder.oneOff){const due=new Date(reminder.oneOff),age=+now-+due;return age>=0&&age<=900000?{key:reminder.id+"|"+reminder.oneOff,due}:null;}
+  const dateKey=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+  if(!reminder.days.includes(now.getDay())||reminder.skipDates?.includes(dateKey))return null;
   const [h, m] = reminder.time.split(":").map(Number),
     due = new Date(now);
   due.setHours(h, m, 0, 0);
@@ -282,12 +290,14 @@ export function occurrence(reminder: Reminder, now: Date) {
 }
 export function nextOccurrence(reminder: Reminder, now: Date) {
   if (!reminder.enabled) return null;
-  for (let offset = 0; offset < 8; offset++) {
+  if(reminder.oneOff){const date=new Date(reminder.oneOff);return date>now?date:null;}
+  for (let offset = 0; offset < 40; offset++) {
     const date = new Date(now);
     date.setDate(date.getDate() + offset);
     const [h, m] = reminder.time.split(":").map(Number);
     date.setHours(h, m, 0, 0);
-    if (reminder.days.includes(date.getDay()) && date > now) return date;
+    const key=date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");
+    if (reminder.days.includes(date.getDay()) && date > now && !reminder.skipDates?.includes(key)) return date;
   }
   return null;
 }

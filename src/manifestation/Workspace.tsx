@@ -1,3 +1,7 @@
+import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
+import {PinButton} from "../workbench/PinButton";
+import {Presets} from "../workbench/Presets";
+import {HistoryPanel} from "../workbench/HistoryPanel";
 import { BackgroundControls } from "./BackgroundControls";
 import { Session } from "../model";
 import { BookOpen, Pencil } from "lucide-react";
@@ -105,6 +109,7 @@ export function Manifestation({
     [message, setMessage] = useState("");
   useEffect(() => setView(initialView), [initialView]);
   const [recordLine, setRecordLine] = useState<Line>();
+  const [selectedLines,setSelectedLines]=useState<string[]>([]);
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
     const element = dock.current;
@@ -233,6 +238,7 @@ export function Manifestation({
               <strong>{Math.round(p.volume * 100)}%</strong>
             </div>
           </div>
+          <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
           <VoicePanel />
           <div className="practice-grid">
             <div className="practice-editor">
@@ -247,10 +253,12 @@ export function Manifestation({
                     onChange={(e) => change({ name: e.target.value })}
                   />
                 </label>
+                <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>
                 <div className="manifest-lines">
                   {p.lines.map((line, i) => (
                     <article className="manifest-line" key={line.id}>
                       <div className="sentence-queue-head">
+                        <input aria-label={"Select sentence "+(i+1)} type="checkbox" disabled={active} checked={selectedLines.includes(line.id)} onChange={e=>setSelectedLines(e.target.checked?[...selectedLines,line.id]:selectedLines.filter(id=>id!==line.id))}/>
                         <span className="queue-index">
                           {String(i + 1).padStart(2, "0")}
                         </span>
@@ -345,6 +353,7 @@ export function Manifestation({
                           >
                             Remove
                           </button>
+                          <button disabled={active||p.lines.length>=50} aria-label={"Duplicate sentence "+(i+1)} onClick={()=>change({lines:[...p.lines.slice(0,i+1),{...line,id:crypto.randomUUID()},...p.lines.slice(i+1)]})}>Duplicate sentence</button>
                         </div>
                       </details>
                     </article>
@@ -433,6 +442,7 @@ export function Manifestation({
                 >
                   Save practice
                 </button>
+                <button disabled={active||!p.lines.length} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
                 <button
                   disabled={active}
                   onClick={() => {
@@ -629,6 +639,8 @@ export function ManifestLibrary({
   onPractice,
   initialCategory = "Health",
   recordingsOpen = false,
+  search = "",
+  sort = "recent",
   section = "all",
   onCategory,
 }: {
@@ -637,6 +649,8 @@ export function ManifestLibrary({
   section?: "all" | "saved" | "recordings";
   onCategory?: (category: string) => void;
   recordingsOpen?: boolean;
+  search?:string;
+  sort?:string;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
@@ -659,6 +673,7 @@ export function ManifestLibrary({
   }, [section]);
   const [category, setCategory] = useState<string>(initialCategory),
     [query, setQuery] = useState(""),
+    [selectedPlans,setSelectedPlans]=useState<string[]>([]),
     [message, setMessage] = useState("");
   useEffect(() => setCategory(initialCategory), [initialCategory]);
   useEffect(() => {
@@ -699,7 +714,8 @@ export function ManifestLibrary({
     try {
       if (file.size > 100000)
         throw Error("Choose a practice file under 100 KB.");
-      const value = parsePlan(JSON.parse(await file.text()));
+      const value = JSON.parse(await file.text());
+      if(value.kind!=="core-aura-practice-collection")parsePlan(value);
       if (!confirmDraftReplacement(data.draft, data.plans)) return;
       manifestPlayer.stop();
       store.import(value);
@@ -763,6 +779,8 @@ export function ManifestLibrary({
           move it to another device.
         </p>
         <div className="admin-actions">
+          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,-1);}catch(e){setMessage((e as Error).message);}}}>Move category up</button>
+          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,1);}catch(e){setMessage((e as Error).message);}}}>Move category down</button>
           <button
             disabled={active}
             onClick={() => setEditing({ kind: "category-add", category })}
@@ -859,7 +877,7 @@ export function ManifestLibrary({
           .filter(
             (a) =>
               a.category === category &&
-              a.text.toLowerCase().includes(query.toLowerCase()),
+              a.text.toLowerCase().includes((query+" "+search).trim().toLowerCase()),
           )
           .map((a) => (
             <div className="affirmation-row" key={a.id}>
@@ -888,6 +906,7 @@ export function ManifestLibrary({
                   >
                     Edit / Move
                   </button>
+                  <button disabled={active} onClick={()=>setEditing({kind:"affirmation-add",category,item:a})}>Duplicate and edit</button>
                   <button
                     disabled={active}
                     aria-label={"Delete affirmation: " + a.text}
@@ -927,14 +946,16 @@ export function ManifestLibrary({
           aria-label="Import manifestation practice"
           onChange={(e) => void importPlan(e.target.files?.[0])}
         />
+        <div className="home-actions"><button disabled={!data.plans.length} onClick={()=>setSelectedPlans(data.plans.filter(p=>matchesItem(p.name,"practice",p.id,search)).map(p=>p.id))}>Select shown practices</button><button onClick={()=>setSelectedPlans([])}>Clear practice selection</button><button disabled={!selectedPlans.length} onClick={()=>{const text=JSON.stringify({kind:"core-aura-practice-collection",schemaVersion:1,practices:data.plans.filter(p=>selectedPlans.includes(p.id)).map(withoutRecordings)});if(text.length>100000){setMessage("Select fewer practices or use a backup ZIP.");return;}void download(text,"core-aura-practices.json","application/json").then(setMessage).catch(e=>setMessage(e.message));}}>Export selected practices</button><button disabled={!selectedPlans.length} onClick={()=>{if(!confirm("Delete selected practices and their reminders?"))return;try{store.removeMany(selectedPlans);setSelectedPlans([]);void syncPhoneReminders().then(setMessage).catch(e=>setMessage(e.message));}catch(e){setMessage((e as Error).message);}}}>Delete selected practices</button></div>
         {!data.plans.length && (
           <p className="content-note">
             Save your selected sentences as a practice to schedule them.
             Practices stay on this device; export backups to keep a copy.
           </p>
         )}
-        {data.plans.map((plan) => (
+        {data.plans.filter(plan=>matchesItem(plan.name,"practice",plan.id,search)).slice().sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):0).map((plan) => (
           <article className="saved-card" key={plan.id}>
+            <label className="check"><input aria-label={"Select practice "+plan.name} type="checkbox" checked={selectedPlans.includes(plan.id)} onChange={e=>setSelectedPlans(e.target.checked?[...selectedPlans,plan.id]:selectedPlans.filter(id=>id!==plan.id))}/> Select</label>
             <div>
               <h3>{plan.name}</h3>
               <p>
@@ -981,6 +1002,9 @@ export function ManifestLibrary({
                     ? "Resume"
                     : "Play"}
               </button>
+              <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
+              <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
+              <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{const copy={...plan,name:name.trim()};store.draft(copy);store.save();setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
               <button
                 onClick={() =>
                   download(
@@ -1047,6 +1071,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
   const [autoStart, setAutoStart] = useState(false);
+  const [editingId,setEditingId]=useState<string|null>(null);
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   async function update(rows: Reminder[]) {
     setBusy(true);
@@ -1061,7 +1086,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
   }
   function add(event: FormEvent) {
     event.preventDefault();
-    const slot = Array.from({ length: 8 }, (_, i) => i).find(
+    const slot = editingId ? data.reminders.find(r=>r.id===editingId)?.slot : Array.from({ length: 8 }, (_, i) => i).find(
       (n) => !data.reminders.some((r) => r.slot === n),
     );
     if (slot === undefined) {
@@ -1069,9 +1094,9 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
       return;
     }
     void update([
-      ...data.reminders,
+      ...data.reminders.filter(r=>r.id!==editingId),
       {
-        id: crypto.randomUUID(),
+        id: editingId??crypto.randomUUID(),
         slot,
         planId,
         time,
@@ -1080,6 +1105,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
         autoStart,
       },
     ]);
+    setEditingId(null);
   }
   return (
     <section
@@ -1208,8 +1234,9 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
             className="primary"
             disabled={busy || !days.length || !planId}
           >
-            Add schedule
+            {editingId?"Save schedule":"Add schedule"}
           </button>
+          {editingId&&<button type="button" onClick={()=>setEditingId(null)}>Cancel editing</button>}
         </form>
       )}
       {data.reminders.map((r) => {
@@ -1241,6 +1268,10 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
               {r.enabled ? "Disable" : "Enable"}
             </button>
             <div className="saved-actions">
+              <button disabled={busy} onClick={()=>{setEditingId(r.id);setPlanId(r.planId);setTime(r.time);setDays([...r.days]);setAutoStart(!!r.autoStart);document.querySelector('[aria-label="Saved practice"]')?.scrollIntoView({block:"center"});}}>Edit schedule</button>
+              <button disabled={busy||data.reminders.length>=8} onClick={()=>{const slot=Array.from({length:8},(_,i)=>i).find(i=>!data.reminders.some(r=>r.slot===i));if(slot!==undefined)void update([...data.reminders,{...r,id:crypto.randomUUID(),slot,enabled:false}]);}}>Duplicate schedule</button>
+              <button disabled={busy||data.reminders.length>=8} onClick={()=>{const slot=Array.from({length:8},(_,i)=>i).find(i=>!data.reminders.some(r=>r.slot===i)),date=new Date(Date.now()+600000);if(slot!==undefined)void update([...data.reminders,{id:crypto.randomUUID(),slot,planId:r.planId,time:date.toTimeString().slice(0,5),days:[date.getDay()],enabled:true,oneOff:date.toISOString()}]);}}>Remind in 10 min</button>
+              <button disabled={busy||!next||Capacitor.isNativePlatform()||!!r.oneOff} title={Capacitor.isNativePlatform()?"Skip-next exceptions are supported by in-app/web push; disable the native schedule instead.":undefined} onClick={()=>{if(!next)return;const date=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+"-"+String(next.getDate()).padStart(2,"0");void update(data.reminders.map(v=>v.id===r.id?{...v,skipDates:[...(v.skipDates??[]).filter(d=>d>=date),date].slice(-30)}:v));}}>Skip next</button>
               <button
                 onClick={() =>
                   download(

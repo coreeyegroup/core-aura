@@ -15,7 +15,7 @@ export async function cleanupExports() {
     for (const f of files) {
       if (
         f.type === "file" &&
-        /^\d{13}-[a-zA-Z0-9_.-]+\.(wav|json|ics|mp3|m4a|aac|ogg|flac)$/.test(f.name) &&
+        /^\d{13}-[a-zA-Z0-9_.-]+\.(wav|json|ics|mp3|m4a|aac|ogg|flac|zip)$/.test(f.name) &&
         typeof f.mtime === "number" &&
         f.mtime < Date.now() - 86400000
       )
@@ -46,7 +46,7 @@ export async function deliverFile(blob: Blob, name: string): Promise<string> {
     .replace(/[^a-zA-Z0-9_.-]/g, "-")
     .replace(/^\.+/, "")
     .slice(0, 100);
-  if (!safe || !/^.+\.(wav|json|ics|mp3|m4a|aac|ogg|flac)$/.test(safe))
+  if (!safe || !/^.+\.(wav|json|ics|mp3|m4a|aac|ogg|flac|zip)$/.test(safe))
     throw Error("Unsupported export filename.");
   if (!Capacitor.isNativePlatform()) {
     const url = URL.createObjectURL(blob),

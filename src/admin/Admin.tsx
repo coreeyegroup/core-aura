@@ -26,6 +26,7 @@ export function Admin() {
   const [key, setKey] = useState(""),
     [operator, setOperator] = useState(""),
     [api, setApi] = useState<AdminApi | null>(null);
+  const [identity,setIdentity]=useState<{name:string;role:string;verified:boolean}|null>(null);
   const [rows, setRows] = useState<ManagedPack[]>([]),
     [uploads, setUploads] = useState<PackAsset[]>([]),
     [events, setEvents] = useState<PackEvent[]>([]);
@@ -57,11 +58,13 @@ export function Admin() {
   const loading = busy || uploadProgress !== null;
   async function refresh(client = api) {
     if (!client) return;
-    const [packs, assets] = await Promise.all([
+    const [packs, assets, identity] = await Promise.all([
       client.request<{ packs: ManagedPack[] }>("packs"),
       client.request<{ assets: PackAsset[] }>("assets"),
+      client.request<{name:string;role:string;verified:boolean}>("me"),
     ]);
     if (active.current) {
+      setIdentity(identity);
       setRows(packs.packs);
       setUploads(assets.assets);
     }
@@ -325,11 +328,10 @@ export function Admin() {
       ) : (
         <>
           <p className="content-note">
-            Operator: {operator}. This shared-key workflow records the entered
-            name; it does not provide separate verified reviewer accounts.
+            Identity: {identity?.verified?identity.name:operator} · {identity?.role}. {identity?.verified?"Identity and permissions are verified by the server.":"Legacy shared-key access. Configure named accounts for independent editor/reviewer identities."}
           </p>
           <div className="admin-actions">
-            <button disabled={loading} onClick={() => select()}>
+            <button disabled={loading||identity?.role==="reviewer"} onClick={() => select()}>
               New pack
             </button>
             <button
@@ -499,7 +501,7 @@ export function Admin() {
                 </article>
               ))}
             </fieldset>
-            <button className="primary" disabled={loading}>
+            <button className="primary" disabled={loading||identity?.role==="reviewer"}>
               {editing ? "Save new version" : "Save draft"}
             </button>
           </form>
@@ -553,7 +555,7 @@ export function Admin() {
               />
             </label>
             <button
-              disabled={loading || !file || !assetId || !assetTitle}
+              disabled={loading || !file || !assetId || !assetTitle || identity?.role==="reviewer"}
               onClick={upload}
             >
               Upload and attach
@@ -646,7 +648,7 @@ export function Admin() {
               <div className="admin-actions">
                 {["draft", "withdrawn"].includes(editing.status) && (
                   <button
-                    disabled={loading || dirty}
+                    disabled={loading || dirty || identity?.role==="editor"}
                     onClick={() => review("reviewed")}
                   >
                     Mark reviewed
@@ -655,7 +657,7 @@ export function Admin() {
                 {editing.status === "reviewed" && (
                   <button
                     className="primary"
-                    disabled={loading || dirty}
+                    disabled={loading || dirty || identity?.role!=="administrator"}
                     onClick={() => review("published")}
                   >
                     Publish pack
@@ -663,7 +665,7 @@ export function Admin() {
                 )}
                 {["reviewed", "published"].includes(editing.status) && (
                   <button
-                    disabled={loading || dirty}
+                    disabled={loading || dirty || identity?.role!=="administrator"}
                     onClick={() => review("withdrawn")}
                   >
                     Withdraw pack

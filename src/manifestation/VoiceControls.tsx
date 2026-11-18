@@ -48,9 +48,9 @@ export function PreviewButton({
         onClick={() => {
           try {
             setError("");
-            if (playing) manifestPlayer.stop();
+            if (playing) manifestPlayer.endPreview();
             else
-              manifestPlayer.start({
+              manifestPlayer.preview({
                 ...store.snapshot().data.draft,
                 id: `preview-${id}`,
                 name: "Sentence preview",

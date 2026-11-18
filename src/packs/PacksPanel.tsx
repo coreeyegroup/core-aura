@@ -1,3 +1,4 @@
+import {prepareSound} from "../workbench/actions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Capacitor } from "@capacitor/core";
 import { engine } from "../audio/engine";
@@ -133,6 +134,7 @@ export function PacksPanel({
   }
   async function play(pack: InstalledPack, assetId: string) {
     const id = "pack:" + pack.id + ":" + assetId;
+    if(!engine.snapshot().some(s=>s.id===id)&&!prepareSound([id]))return;
     setLoading(id);
     setMessage("");
     try {

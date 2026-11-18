@@ -1,3 +1,4 @@
+import {prepareSound} from "../workbench/actions";
 import { isNature } from "../nature/catalog";
 import { useState } from "react";
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
@@ -30,6 +31,7 @@ export function Transport({
         className="primary"
         onClick={async () => {
           if (busy) return;
+          if(!playing&&!active&&!prepareSound(channels.map(c=>c.id)))return;
           setBusy(true);
           if (!playing && channels.length) {
             if (exclusive) stopChannels.filter(c=>!channels.some(target=>target.id===c.id)).forEach(c=>engine.stop(c.id));

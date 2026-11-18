@@ -22,6 +22,7 @@ export class ManifestPlayer {
   private listeners = new Set<() => void>();
   private token = 0;
   private speaking = false;
+  private previewParent?: {plan:Plan;step:number;elapsed:number};
   private clock?: ReturnType<typeof setInterval>;
   private wait?: ReturnType<typeof setTimeout>;
   private started = 0;
@@ -32,6 +33,7 @@ export class ManifestPlayer {
     private audio: Pick<AudioEngine, "stopAll" | "play" | "pause" | "stop"> & {
       unlock?: () => Promise<void>;
       patch?: (channel: Channel) => void;
+      snapshot?: () => {id:string;status:string}[];
     } = engine,
   ) {
     this.unsubscribe = onOtherAudio(() => this.stop());
@@ -61,9 +63,12 @@ export class ManifestPlayer {
       if (elapsed >= this.state.plan!.seconds) this.finish();
     }, 250);
   }
-  start(value: Plan) {
+  start(value: Plan, options: {replace?:boolean;preview?:boolean} = {}) {
     const plan = parsePlan(value);
-    this.audio.stopAll();
+    const active=["playing","paused"].includes(this.state.status),audio=this.audio.snapshot?.().some(s=>s.status!=="stopping");
+    if(!options.replace && typeof window!=="undefined" && (active||audio) && !window.confirm("Replace current playback? This stops the active audio. Draft settings will be kept."))return;
+    this.previewParent=undefined;
+    if(!options.preview)this.audio.stopAll();
     this.stop();
     this.accumulated = 0;
     this.update({ status: "playing", plan, step: 0, elapsed: 0, error: "" });
@@ -74,6 +79,17 @@ export class ManifestPlayer {
     this.background();
     void this.run(this.token);
   }
+  preview(value:Plan) {
+    const previous=this.previewParent;
+    const active=this.state.plan && !this.state.plan.id.startsWith("preview-") && ["playing","paused"].includes(this.state.status);
+    if(active && this.state.status==="playing")this.pause();
+    const parent=previous ?? (active?{plan:structuredClone(this.state.plan!),step:this.state.step,elapsed:this.state.elapsed}:undefined);
+    this.audio.snapshot?.().filter(s=>s.status==="playing").forEach(s=>this.audio.pause(s.id));
+    this.start(value,{replace:true,preview:true});this.previewParent=parent;
+  }
+  endPreview(){const parent=this.previewParent;this.previewParent=undefined;this.stop();if(parent)this.restorePreview(parent);}
+  private restorePreview(parent:{plan:Plan;step:number;elapsed:number}){this.accumulated=parent.elapsed;this.update({status:"paused",plan:parent.plan,step:parent.step,elapsed:parent.elapsed,error:"Preview finished. Resume the paused practice when ready."});}
+  setVoiceLevel(volume:number){if(this.state.plan && ["playing","paused"].includes(this.state.status))this.update({plan:parsePlan({...this.state.plan,volume})});}
   private background() {
     const p = this.state.plan, token = this.token;
     if (!p) return;
@@ -101,6 +117,7 @@ export class ManifestPlayer {
     const next = parsePlan({...current,
       background:current.background ? {...current.background,volume:patch.background?.volume ?? current.background.volume} : null,
       backgroundMix:current.backgroundMix ? {...current.backgroundMix,volume:patch.backgroundMix?.volume ?? current.backgroundMix.volume} : null,
+      backgroundMuted:patch.backgroundMuted ?? current.backgroundMuted,
       backgroundDucking:patch.backgroundDucking ?? current.backgroundDucking,
       backgroundDuckLevel:patch.backgroundDuckLevel ?? current.backgroundDuckLevel});
     this.update({plan:next});
@@ -161,6 +178,7 @@ export class ManifestPlayer {
     void this.run(this.token);
   }
   stop() {
+    this.previewParent=undefined;
     if (this.state.status === "idle") return;
     this.token++;
     this.clear();
@@ -170,6 +188,7 @@ export class ManifestPlayer {
     this.update({ status: "idle", elapsed: 0, step: 0, error: "" });
   }
   private finish() {
+    const parent=this.previewParent;this.previewParent=undefined;
     this.token++;
     this.clear();
     this.voice.stop();
@@ -181,6 +200,7 @@ export class ManifestPlayer {
         this.accumulated + (Date.now() - this.started) / 1000,
       ),
     });
+    if(parent)this.restorePreview(parent);
   }
   dispose() {
     this.stop();

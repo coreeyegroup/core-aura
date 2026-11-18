@@ -1,5 +1,5 @@
 import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
-export const VERSION = "0.25.0";
+export const VERSION = "0.26.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -32,6 +32,7 @@ export type Channel = {
   focus?: boolean;
   focusQ?: number;
   interval?: number;
+  fadeSeconds?: number;
 };
 export type Session = {
   schemaVersion: 2;
@@ -180,7 +181,9 @@ export const chakras = [
   },
 ];
 export function channel(sound: Sound = "sine", hz = 432): Channel {
+  let fadeSeconds=.03;try{const value=JSON.parse(localStorage.getItem("core-aura.audio-defaults.v1")||"{}").fadeSeconds;if(Number.isFinite(value)&&value>=.01&&value<=5)fadeSeconds=value;}catch{}
   return {
+    fadeSeconds,
     id: crypto.randomUUID(),
     sound,
     hz,
@@ -204,6 +207,7 @@ export function validChannel(value: unknown): value is Channel {
       c.volume >= 0 &&
       c.volume <= 1 &&
       typeof c.muted === "boolean" &&
+      (c.fadeSeconds===undefined || (Number.isFinite(c.fadeSeconds)&&c.fadeSeconds>=.01&&c.fadeSeconds<=5)) &&
       (c.interval === undefined || (Number.isFinite(c.interval) && c.interval>=.25 && c.interval<=30)) &&
       (c.intensity === undefined || (Number.isFinite(c.intensity) && c.intensity >= 0 && c.intensity <= 1)) &&
       (c.focus === undefined || typeof c.focus === "boolean") &&

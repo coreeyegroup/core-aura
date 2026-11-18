@@ -7,7 +7,7 @@ export function attachMix(value: Session): NonNullable<Plan["backgroundMix"]> {
   return { name: session.name, channels: session.channels.map(c=>({...c})), master: session.master, volume: .4 };
 }
 export function backgroundChannels(plan: Plan, speaking = false): Channel[] {
-  const factor = speaking && (plan.backgroundDucking ?? true) ? (plan.backgroundDuckLevel ?? .25) : 1;
+  const factor = pMuted(plan) ? 0 : speaking && (plan.backgroundDucking ?? true) ? (plan.backgroundDuckLevel ?? .25) : 1;
   if (plan.backgroundMix) {
     const mix = plan.backgroundMix;
     return mix.channels.map((c,index)=>({...c,id:"manifest-background:"+index,seconds:plan.seconds,
@@ -15,3 +15,5 @@ export function backgroundChannels(plan: Plan, speaking = false): Channel[] {
   }
   return plan.background ? [{...plan.background,id:"manifest-background",muted:false,seconds:plan.seconds,volume:plan.background.volume*factor}] : [];
 }
+
+function pMuted(plan:Plan){return plan.backgroundMuted??false;}

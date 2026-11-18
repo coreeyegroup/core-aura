@@ -82,6 +82,7 @@ export const affirmationLibrary = {
       listeners.delete(f);
     };
   },
+  reorderCategory: (name:string,direction:number)=>{const rows=[...state.data.categories],index=rows.indexOf(name),next=index+direction;if(index<0||next<0||next>=rows.length)return;[rows[index],rows[next]]=[rows[next],rows[index]];commit({...state.data,categories:rows});},
   addCategory: (name: string) => {
     const category = name.trim();
     commit({ ...state.data, categories: [...state.data.categories, category] });

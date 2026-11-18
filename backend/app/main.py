@@ -24,7 +24,7 @@ from .content import (
 )
 
 app = FastAPI(
-    title="Core-aura catalog", version="0.25.0", docs_url=None, redoc_url=None
+    title="Core-aura catalog", version="0.26.0", docs_url=None, redoc_url=None
 )
 
 app.add_middleware(
@@ -86,19 +86,36 @@ class ReviewInput(BaseModel):
     expected_revision: int = Field(ge=1)
 
 
-def admin(authorization: str = Header(default="")):
+def admin(request: Request, authorization: str = Header(default="")):
+    import json
+    configured = os.environ.get("CORE_AURA_ADMIN_USERS", "{}") or "{}"
+    try:
+        users = json.loads(configured)
+        if not isinstance(users, dict) or len(users) > 100:
+            raise ValueError()
+    except (ValueError, TypeError):
+        raise HTTPException(503, "Administrative account configuration is invalid")
+    identity = None
+    for name, user in users.items():
+        if not isinstance(user, dict) or user.get("role") not in {"administrator", "editor", "reviewer"} or not isinstance(user.get("token"), str) or len(user["token"]) < 32:
+            raise HTTPException(503, "Administrative account configuration is invalid")
+        if hmac.compare_digest(authorization.encode(), ("Bearer " + user["token"]).encode()):
+            identity = {"name": str(name)[:200], "role": user["role"], "verified": True}
     expected = os.environ.get("CORE_AURA_ADMIN_TOKEN", "")
-    if not expected or not hmac.compare_digest(
-        authorization.encode("utf-8"), ("Bearer " + expected).encode("utf-8")
-    ):
+    if identity is None and expected and hmac.compare_digest(authorization.encode(), ("Bearer " + expected).encode()):
+        identity = {"name": "Administrator", "role": "administrator", "verified": False}
+    if identity is None:
         raise HTTPException(401, "Administrative access required")
+    if request.method in {"POST", "PUT", "DELETE"} and identity["role"] == "reviewer":
+        raise HTTPException(403, "Reviewers cannot upload or edit content")
+    if request.method == "PATCH" and identity["role"] == "editor":
+        raise HTTPException(403, "Editors cannot review or publish content")
+    return identity
 
 
-def operator(
-    x_core_aura_operator: str = Header(
-        default="Administrator", min_length=1, max_length=2000
-    )
-):
+def operator(identity: dict = Depends(admin), x_core_aura_operator: str = Header(default="Administrator", min_length=1, max_length=2000)):
+    if identity["verified"]:
+        return identity["name"]
     try:
         value = unquote(x_core_aura_operator, encoding="utf-8", errors="strict").strip()
     except UnicodeError:
@@ -106,6 +123,11 @@ def operator(
     if len(value) > 200:
         raise HTTPException(422, "Operator name is too long")
     return value or "Administrator"
+
+
+@app.get("/api/admin/me")
+def admin_identity(identity: dict = Depends(admin)):
+    return identity
 
 
 def event(db, pack_id, revision, action, actor, details):
@@ -136,7 +158,7 @@ def health():
             db.execute(text("SELECT 1"))
     except Exception:
         raise HTTPException(503, "Database unavailable")
-    return {"status": "ok", "version": "0.25.0"}
+    return {"status": "ok", "version": "0.26.0"}
 
 
 @app.get("/api/catalog")
@@ -215,7 +237,11 @@ def replace(pack_id: str, data: PackUpdate, actor: str = Depends(operator)):
 
 
 @app.patch("/api/admin/packs/{pack_id}/review", dependencies=[Depends(admin)])
-def review(pack_id: str, data: ReviewInput, actor: str = Depends(operator)):
+def review(pack_id: str, data: ReviewInput, actor: str = Depends(operator), identity: dict = Depends(admin)):
+    if identity["role"] == "reviewer" and data.status != "reviewed":
+        raise HTTPException(403, "Only administrators can publish or withdraw content")
+    if identity["verified"]:
+        data.reviewer = identity["name"]
     allowed = {
         "draft": {"reviewed"},
         "reviewed": {"published", "withdrawn"},
