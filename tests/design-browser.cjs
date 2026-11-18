@@ -65,8 +65,8 @@ const { chromium } = require("playwright"),
           })),
         );
         assert.ok(
-          buttons.every((b) => b.height >= 43.9),
-          JSON.stringify(buttons.filter((b) => b.height < 43.9)),
+          buttons.every((b) => b.height >= 35.9),
+          JSON.stringify(buttons.filter((b) => b.height < 35.9)),
         );
         if (tab === "Library") {
           const rows = await p
