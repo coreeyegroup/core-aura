@@ -30,6 +30,7 @@ export async function syncPhoneReminders(requestPermission = false) {
   for (const r of reminders.filter((r) => r.enabled)) {
     const p = plans.find((p) => p.id === r.planId);
     if (!p) continue;
+    if(r.oneOff){if(new Date(r.oneOff)>new Date())notifications.push({id:base+r.slot*7,title:"Manifestation practice",body:p.name,schedule:{at:new Date(r.oneOff),allowWhileIdle:true},extra:{planId:p.id,scheduleId:r.id}});continue;}
     const [hour, minute] = r.time.split(":").map(Number);
     for (const day of r.days)
       notifications.push({
@@ -248,4 +249,11 @@ export function calendarFile(r: Reminder, name: string, now = new Date()) {
       })
       .join("\r\n") + "\r\n"
   );
+}
+
+export async function testNotification(){
+ if(Capacitor.isNativePlatform()){const permission=await LocalNotifications.requestPermissions();if(permission.display!=="granted")throw Error("Notification permission was not granted.");await LocalNotifications.schedule({notifications:[{id:319999,title:"Core-aura notification test",body:"Notifications are available on this device.",schedule:{at:new Date(Date.now()+1500)}}]});return "Test notification scheduled.";}
+ if(!("Notification" in window)||!isSecureContext)throw Error("Notifications need a supported HTTPS browser.");
+ if(await Notification.requestPermission()!=="granted")throw Error("Notification permission was not granted.");
+ const registration=await navigator.serviceWorker.ready;await registration.showNotification("Core-aura notification test",{body:"Notifications are available on this device.",icon:"/icon-192.png"});return "Test notification sent.";
 }

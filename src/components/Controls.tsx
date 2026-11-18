@@ -1,3 +1,4 @@
+import {prepareSound} from "../workbench/actions";
 import { isNature } from "../nature/catalog";
 import { useState } from "react";
 import { Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
@@ -10,6 +11,7 @@ export function Transport({
   compact = false,
   stopChannels = channels,
   exclusive = false,
+  allowMix = false,
 }: {
   channels: Channel[];
   states: VoiceState[];
@@ -17,6 +19,7 @@ export function Transport({
   compact?: boolean;
   stopChannels?: Channel[];
   exclusive?: boolean;
+  allowMix?: boolean;
 }) {
   const [busy,setBusy] = useState(false);
   const stoppable = stopChannels.some(c=>states.some(s=>s.id===c.id));
@@ -30,6 +33,7 @@ export function Transport({
         className="primary"
         onClick={async () => {
           if (busy) return;
+          if(!playing&&!active&&!prepareSound(channels.map(c=>c.id),allowMix))return;
           setBusy(true);
           if (!playing && channels.length) {
             if (exclusive) stopChannels.filter(c=>!channels.some(target=>target.id===c.id)).forEach(c=>engine.stop(c.id));
@@ -80,6 +84,7 @@ export function ChannelEditor({
   remove,
   title,
   showTransport = true,
+  allowMix = false,
 }: {
   value: Channel;
   onChange: (c: Channel) => void;
@@ -88,6 +93,7 @@ export function ChannelEditor({
   remove?: () => void;
   title: string;
   showTransport?: boolean;
+  allowMix?: boolean;
 }) {
   const spec = sounds[value.sound];
   const state = states.find((s) => s.id === value.id);
@@ -181,7 +187,7 @@ export function ChannelEditor({
       </label>
       {showTransport && (
         <div className="layer-actions">
-          <Transport channels={[value]} states={states} onError={onError} />
+          <Transport allowMix={allowMix} channels={[value]} states={states} onError={onError} />
         </div>
       )}
     </article>

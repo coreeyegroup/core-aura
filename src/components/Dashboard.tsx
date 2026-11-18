@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore, ReactNode } from "react";
 import {
   AudioLines,
   Bell,
@@ -47,6 +47,7 @@ export function Dashboard({
   onContinue,
   onTone,
   sessions,
+  controls,
 }: {
   onTool: (tool: Tool) => void;
   onCategory: (category: string) => void;
@@ -54,6 +55,7 @@ export function Dashboard({
   onContinue: () => void;
   onTone: (hz: number) => void;
   sessions: number;
+  controls?: ReactNode;
 }) {
   const { data, error } = useSyncExternalStore(
     manifestationStore.subscribe,
@@ -94,64 +96,9 @@ export function Dashboard({
           })}
         </span>
       </div>
-      <section
-        className="practice-overview"
-        aria-label="Current practice overview"
-      >
-        <div className="overview-top">
-          <span className="eyebrow">CURRENT PRACTICE</span>
-          <span className={"status-tag " + (active ? "is-active" : "")}>
-            {active
-              ? player.status
-              : current.lines.length
-                ? "Draft ready"
-                : "Not configured"}
-          </span>
-        </div>
-        <div className="overview-value">
-          <div>
-            <h2>{current.name}</h2>
-            <p>
-              {current.lines.length} sentences <span>·</span> {current.repeats}{" "}
-              rounds <span>·</span>{" "}
-              {current.mode === "speech" ? "Spoken voice" : "Silent reading"}
-            </p>
-          </div>
-          <div className="limit-value">
-            {current.seconds / 60}
-            <small>min limit</small>
-          </div>
-        </div>
-        <div className="overview-actions">
-          <button className="primary" onClick={onContinue}>
-            <Sparkles size={16} />
-            {active
-              ? "Open player"
-              : current.lines.length
-                ? "Continue practice"
-                : "Build a practice"}
-            <ChevronRight size={16} />
-          </button>
-          <button onClick={() => onTool("affirmations")}>
-            <BookOpen size={17} />
-            Library
-          </button>
-        </div>
-        <dl className="account-metrics">
-          <div>
-            <dt>Saved practices</dt>
-            <dd>{data.plans.length}</dd>
-          </div>
-          <div>
-            <dt>Active reminders</dt>
-            <dd>{data.reminders.filter((r) => r.enabled).length}</dd>
-          </div>
-          <div>
-            <dt>Sound sessions</dt>
-            <dd>{sessions}</dd>
-          </div>
-        </dl>
-      </section>
+      {controls}
+      <details className="workbench-panel home-secondary"><summary>Saved counts and quick tools</summary>
+      <dl className="account-metrics"><div><dt>Saved practices</dt><dd>{data.plans.length}</dd></div><div><dt>Active reminders</dt><dd>{data.reminders.filter(r=>r.enabled).length}</dd></div><div><dt>Sound sessions</dt><dd>{sessions}</dd></div></dl>
       <section className="tool-section" aria-labelledby="tools-title">
         <div className="module-title">
           <h2 id="tools-title">Your tools</h2>
@@ -361,6 +308,7 @@ export function Dashboard({
           </section>
         </div>
       </div>
+      </details>
       {(message || error || catalog.error) && (
         <p className="notice" role="status">
           {message || error || catalog.error}

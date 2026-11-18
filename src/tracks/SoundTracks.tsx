@@ -1,3 +1,4 @@
+import {prepareSound} from "../workbench/actions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play, Pause, Square, Plus, Volume2, VolumeX } from "lucide-react";
 import { engine } from "../audio/engine";
@@ -86,7 +87,7 @@ export function SoundTracks() {
             const state = states.find(s => s.id === row.id), playing = state?.status === "playing", position = state?.time || 0;
             return <article className="soundtrack-row" key={row.id} aria-label={row.title + " sound track"}>
         <div className="track-head"><div><strong>{row.title}</strong><small>{clock(row.duration)} · {(row.bytes / 1024 / 1024).toFixed(1)} MB · {row.muted ? "Muted" : state ? state.status : "Ready"}{row.loop ? " · Repeat" : ""}</small></div>
-          <button className="icon-button primary" disabled={Boolean(busy)} aria-label={(playing ? "Pause " : state ? "Resume " : "Play ") + row.title} onClick={() => void run(() => engine.toggleSoundtrack(row.id, () => trackBlob(row.id), row), row.id)}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
+          <button className="icon-button primary" disabled={Boolean(busy)} aria-label={(playing ? "Pause " : state ? "Resume " : "Play ") + row.title} onClick={() => {if(!state&&!prepareSound([row.id],true))return;void run(() => engine.toggleSoundtrack(row.id, () => trackBlob(row.id), row), row.id);}}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
           <button className="icon-button" aria-label={"Stop " + row.title} disabled={!state && busy !== row.id} onClick={() => engine.stop(row.id)}><Square size={17}/></button>
         </div>
         <label className="track-seek"><span className="sr-only">{row.title + " position"}</span><input aria-label={row.title + " position"} type="range" min="0" max={row.duration} step="0.1" value={Math.min(row.duration, position)} disabled={!state} onChange={e => engine.seekSoundtrack(row.id, Number(e.target.value))}/><output>{clock(position)} / {clock(row.duration)}</output></label>

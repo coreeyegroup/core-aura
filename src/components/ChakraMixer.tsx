@@ -1,3 +1,5 @@
+import {prepareSound} from "../workbench/actions";
+import {SequenceSetup} from "../workbench/SequenceControls";
 import { useState, type CSSProperties } from "react";
 import { Volume2, VolumeX, SlidersHorizontal } from "lucide-react";
 import { Channel, chakras, chakraSounds, Sound, sounds } from "../model";
@@ -15,6 +17,7 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
   const playing = active.filter(s=>s.status==="playing").length;
   const changeSelection = (ids:string[]) => { onTarget("selected"); onSelect(ids); };
   async function solo(value:Channel) {
+    if(!prepareSound([value.id]))return;
     setSoloBusy(true);
     try {
       engine.snapshot().filter(s=>s.id!==value.id).forEach(s=>engine.stop(s.id));
@@ -64,6 +67,7 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
         </article>;
       })}
     </div>
+    <SequenceSetup showTransport={false} channels={channels.filter(c=>target==="all"||selected.includes(c.id))}/>
     <details className="info-panel"><summary>About these frequencies</summary><p>396, 417, 528, 639, 741, 852 and 963 Hz use a modern Solfeggio meditation mapping. These are spiritual listening associations, not established medical treatment frequencies. A pure tone contains one frequency; instruments include harmonics or resonant partials. Start at a comfortable low volume.</p></details>
   </section>;
 }

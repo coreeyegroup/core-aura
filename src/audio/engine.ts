@@ -220,8 +220,8 @@ export class AudioEngine {
     })();
     return this.connecting;
   }
-  async play(channel: Channel) {
-    if (channel.id !== "manifest-background" && !channel.id.startsWith("manifest-background:")) signalOtherAudio();
+  async play(channel: Channel, options: {preview?:boolean} = {}) {
+    if (!options.preview && channel.id !== "manifest-background" && !channel.id.startsWith("manifest-background:")) signalOtherAudio();
     const token = this.generation;
     const voiceToken = this.voiceGeneration.get(channel.id) || 0;
     await this.connect();

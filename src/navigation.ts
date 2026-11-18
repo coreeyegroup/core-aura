@@ -5,7 +5,7 @@ export type Route = {
   libraryView: "manifestation" | "audio";
   librarySection: "all" | "saved" | "recordings";
   category: string;
-  exploreView: "sounds" | "packs" | "nature";
+  exploreView: "sounds" | "packs" | "nature" | "tracks";
 };
 export const defaultRoute: Route = {
   tab: "home",
@@ -34,7 +34,7 @@ export function parseRoute(hash: string, previous = defaultRoute): Route {
   if (page === "manifest")
     route.manifestSection = section === "schedule" ? "schedule" : "practice";
   if (page === "explore")
-    route.exploreView = section === "packs" ? "packs" : section === "nature" ? "nature" : "sounds";
+    route.exploreView = section === "packs" ? "packs" : section === "nature" ? "nature" : section === "tracks" ? "tracks" : "sounds";
   if (page === "library") {
     if (section)
       route.libraryView = section === "audio" ? "audio" : "manifestation";
@@ -55,7 +55,7 @@ export function routeHash(route: Route) {
       "#manifest" + (route.manifestSection === "schedule" ? "/schedule" : "")
     );
   if (route.tab === "explore")
-    return "#explore" + (route.exploreView === "packs" ? "/packs" : route.exploreView === "nature" ? "/nature" : "");
+    return "#explore" + (route.exploreView === "packs" ? "/packs" : route.exploreView === "nature" ? "/nature" : route.exploreView === "tracks" ? "/tracks" : "");
   if (route.tab === "library") {
     if (route.libraryView === "audio") return "#library/audio";
     const section =

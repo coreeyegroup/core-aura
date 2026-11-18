@@ -74,12 +74,9 @@ const { chromium } = require("playwright"),
           }),
         );
       });
-      const nav = (name) =>
-        p
-          .locator(".bottom-nav")
-          .getByRole("button", { name, exact: true })
-          .click();
-      await p.goto("http://localhost:8089");
+      const tools=async()=>{if(await p.locator('.home-secondary:not([open])').count())await p.locator('.home-secondary > summary').click();};
+      const nav=async(name)=>{await p.locator('.bottom-nav').getByRole('button',{name,exact:true}).click();if(name==='Home')await tools();};
+      await p.goto("http://localhost:8089");await tools();
       await p
         .locator(".tool-grid")
         .getByRole("button", { name: "Schedule", exact: true })
@@ -88,7 +85,7 @@ const { chromium } = require("playwright"),
       await p.reload();
       await p.getByLabel("Reminder time", { exact: true }).waitFor();
       await p.goBack();
-      await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();
+      await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();await tools();
       await p
         .locator(".intention-grid")
         .getByRole("button", { name: /Wealth/ })
@@ -223,10 +220,7 @@ const { chromium } = require("playwright"),
         .selectOption("speech");
       await p.locator(".sentence-queue-head .preview-button").click();
       await nav("Home");
-      await p
-        .locator(".practice-overview")
-        .getByRole("heading", { name: "Second updated", exact: true })
-        .waitFor();
+      assert.ok((await p.getByLabel('Home practice',{exact:true}).textContent()).includes('Second updated'));
       await nav("Manifest");
       await p
         .getByRole("button", { name: "Play practice", exact: true })

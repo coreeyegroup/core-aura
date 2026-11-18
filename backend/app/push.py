@@ -71,6 +71,27 @@ class Schedule(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     time: str = Field(pattern=r"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$")
     days: list[int] = Field(min_length=1, max_length=7)
+    oneOff: str | None = Field(default=None, max_length=60)
+    skipDates: list[str] = Field(default_factory=list, max_length=30)
+
+    @field_validator("oneOff")
+    @classmethod
+    def valid_one_off(cls, value):
+        if value is not None:
+            from datetime import datetime
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("Use an absolute timestamp")
+        return value
+
+    @field_validator("skipDates")
+    @classmethod
+    def valid_skip_dates(cls, value):
+        from datetime import date
+        for item in value:
+            if date.fromisoformat(item).isoformat() != item:
+                raise ValueError("Invalid skipped date")
+        return value
 
     @field_validator("days")
     @classmethod

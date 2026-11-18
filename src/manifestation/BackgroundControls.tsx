@@ -16,7 +16,7 @@ export function BackgroundControls({plan:p,sessions,active,onChange}:{plan:Plan;
   const setLevel=(volume:number)=>onChange(p.backgroundMix?{backgroundMix:{...p.backgroundMix,volume}}:{background:{...p.background!,volume}});
   const silent=p.backgroundMix && (p.backgroundMix.master===0 || p.backgroundMix.channels.every(c=>c.muted||c.volume===0));
   return <details className="manifest-background-controls">
-    <summary>Background sound <span className="content-note">{p.backgroundMix?.name??(p.background?sounds[p.background.sound].name:"None")}{enabled?" · "+Math.round(level*100)+"%":""}</span></summary>
+    <summary>Background sound <span className="content-note">{p.backgroundMix?.name??(p.background?sounds[p.background.sound].name:"None")}{enabled?(p.backgroundMuted?" · Muted":" · "+Math.round(level*100)+"%") : ""}</span></summary>
     <div className="fields">
       <label>Background sound<select aria-label="Background sound" disabled={active} value={source} onChange={e=>{
         const value=e.target.value;
@@ -27,6 +27,7 @@ export function BackgroundControls({plan:p,sessions,active,onChange}:{plan:Plan;
     </div>
     {!enabled&&!mixes.length&&<p className="content-note">Save a generated mix in Sounds → Nature library or Studio, then attach it here.</p>}
     {enabled&&<>
+      <button aria-pressed={p.backgroundMuted??false} onClick={()=>onChange({backgroundMuted:!p.backgroundMuted})}>{p.backgroundMuted?"Unmute background":"Mute background"}</button>
       <label className="range-label">Background level <output>{Math.round(level*100)}%</output><input aria-label="Background level" type="range" min="0" max={p.backgroundMix?100:30} value={Math.round(level*100)} onChange={e=>setLevel(Number(e.target.value)/100)}/></label>
       <div className="background-voice-controls"><label className="check"><input aria-label="Reduce background during speech" type="checkbox" checked={p.backgroundDucking??true} onChange={e=>onChange({backgroundDucking:e.target.checked})}/> Reduce during speech</label><label>While speaking<select aria-label="Background remaining during speech" disabled={!(p.backgroundDucking??true)} value={p.backgroundDuckLevel??.25} onChange={e=>onChange({backgroundDuckLevel:Number(e.target.value)})}>{![0,.1,.25,.5,1].includes(p.backgroundDuckLevel??.25)&&<option value={p.backgroundDuckLevel}>Custom</option>}<option value="0">Silent</option><option value="0.1">10% of level</option><option value="0.25">25% of level</option><option value="0.5">50% of level</option><option value="1">Full level</option></select></label></div>
       {p.backgroundMix&&<p className="content-note">{p.backgroundMix.channels.length} attached layers · original level balance and tuning · follows practice timer. Imported files are separate. {active?"Live adjustments apply to this run.":"Save practice to keep this mix, even if its source is later deleted."}</p>}

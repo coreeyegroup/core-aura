@@ -28,7 +28,13 @@ def due(device, now):
     for offset in (0, 1):
         date = (local - timedelta(days=offset)).date()
         for row in device.schedules:
-            if (date.weekday() + 1) % 7 not in row["days"]:
+            if row.get("oneOff"):
+                if offset == 0:
+                    stamp = datetime.fromisoformat(row["oneOff"].replace("Z", "+00:00")).timestamp()
+                    if 0 <= now-stamp < 900:
+                        yield digest([device.token_hash,row["id"],row["oneOff"]]), {**row,"timezone":device.timezone}, stamp+900
+                continue
+            if (date.weekday() + 1) % 7 not in row["days"] or date.isoformat() in row.get("skipDates", []):
                 continue
             hour, minute = map(int, row["time"].split(":"))
             when = datetime(

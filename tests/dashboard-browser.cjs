@@ -52,6 +52,7 @@ const assert = require("node:assert/strict");
     });
     await p.goto("http://localhost:8089");
     await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();
+    await p.locator('.home-secondary > summary').click();
     const metrics = await p.locator(".account-metrics dd").allTextContents();
     assert.deepEqual(metrics, ["1", "1", "0"]);
     await p
@@ -81,18 +82,21 @@ const assert = require("node:assert/strict");
       "Wealth",
     );
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p
       .locator(".tool-grid")
       .getByRole("button", { name: "Schedule", exact: true })
       .click();
     await p.getByLabel("Reminder time", { exact: true }).waitFor();
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p
       .locator(".tool-grid")
       .getByRole("button", { name: "Recordings", exact: true })
       .click();
     assert.equal(await p.locator(".personal-voices").getAttribute("open"), "");
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p
       .locator(".tool-grid")
       .getByRole("button", { name: "Sound packs", exact: true })
@@ -101,14 +105,16 @@ const assert = require("node:assert/strict");
       .getByRole("heading", { name: "Sound packs", exact: true })
       .waitFor();
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p.locator(".tone-grid").getByRole("button", { name: /528/ }).click();
     assert.equal(
       await p.getByLabel("Frequency (Hz)", { exact: true }).inputValue(),
       "528",
     );
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p
-      .getByRole("button", { name: "Continue practice", exact: true })
+      .locator('[data-module="manifest"]').getByRole("button", { name: "Open editor", exact: true })
       .click();
     assert.equal(await p.locator(".sentence-editor[open]").count(), 0);
     await p.getByLabel("Edit sentence 1", { exact: true }).click();
@@ -124,6 +130,7 @@ const assert = require("node:assert/strict");
       path: "mobile-verification/dashboard-practice-queue-393.png",
     });
     await p.getByRole("button", { name: "Home", exact: true }).click();
+    await p.locator('.home-secondary > summary').click();
     await p.setViewportSize({ width: 1366, height: 900 });
     await p.screenshot({ path: "mobile-verification/dashboard-desktop.png" });
     assert.ok(

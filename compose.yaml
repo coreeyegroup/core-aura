@@ -20,6 +20,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://core_aura:${CORE_AURA_DATABASE_PASSWORD}@database/core_aura
       CORE_AURA_ADMIN_TOKEN: ${CORE_AURA_ADMIN_TOKEN:?Set an admin token}
+      CORE_AURA_ADMIN_USERS: ${CORE_AURA_ADMIN_USERS:-}
       CORE_AURA_VAPID_PUBLIC_KEY: ${CORE_AURA_VAPID_PUBLIC_KEY:-}
       CORE_AURA_PUBLIC_ORIGIN: ${CORE_AURA_PUBLIC_ORIGIN:-https://core-aura.coreeye.in}
       CORE_AURA_CONTENT_ROOT: /data/content
