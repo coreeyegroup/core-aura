@@ -1004,7 +1004,7 @@ export function ManifestLibrary({
               </button>
               <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
               <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
-              <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{const copy={...plan,name:name.trim()};store.draft(copy);store.save();setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
+              <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
               <button
                 onClick={() =>
                   download(

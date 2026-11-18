@@ -578,9 +578,16 @@ export default function App() {
     setOpenedSoundName(sounds[sound].name);setLayers([channel(sound,hz)]);
   }
   function homeSession(row:Session){
+    if(row.kind!=="chakras"&&!replaceSoundDraft())return;
+    const target=row.kind==="chakras"?chakraChannels:layers;
+    if(engine.snapshot().some(v=>target.some(c=>c.id===v.id)&&v.status!=="stopping")){
+      if(!confirm("Replace current playback? This stops the active audio. Draft settings will be kept."))return;
+      if(row.kind==="chakras")chakraSequence.stop();
+      target.forEach(c=>engine.stop(c.id));
+    }
     if(row.kind==="chakras"){
       const ids=row.channels.map(c=>c.id);setSelected(ids);setMixTarget("selected");setChakraSeconds(row.channels[0].seconds);setChakraChannels(chakras.map(c=>row.channels.find(v=>v.id===c.id)??{...channel("sine",c.hz),id:c.id}));
-    }else{if(!replaceSoundDraft())return;layers.forEach(c=>engine.stop(c.id));setLayers(row.channels.map(c=>({...c,id:crypto.randomUUID()})));setStudioSeconds(row.channels[0].seconds);}
+    }else{layers.forEach(c=>engine.stop(c.id));setLayers(row.channels.map(c=>({...c,id:crypto.randomUUID()})));setStudioSeconds(row.channels[0].seconds);}
     setOpenedSoundName(row.name);setMaster(row.master);remember({kind:"session",id:row.id});
   }
   function selectHomePractice(id:string){
@@ -888,7 +895,7 @@ export default function App() {
         {tab === "home" && (
           <Dashboard
             sessions={sessions.length}
-            controls={<HomeControls sessions={sessions} layers={layers} states={states} soundSeconds={studioSeconds} chakraSeconds={chakraSeconds} master={master} chakraChannels={chakraChannels} selected={selected} target={mixTarget} onLayer={patch} onSound={configureSound} onSession={homeSession} onSoundSeconds={setStudioSeconds} onChakraSeconds={setChakraSeconds} onMaster={setMaster} onSelected={setSelected} onTarget={setMixTarget} onChakra={patch} onSelectPractice={selectHomePractice} onPractice={openManifest} onOpen={page=>page==="schedule"?navigate("manifest",{manifestSection:"schedule"}):page==="nature"?navigate("explore",{exploreView:"nature"}):navigate(page)} tools={<div className="home-actions"><button onClick={()=>openTool("affirmations")}>Affirmations</button><button onClick={()=>openTool("recordings")}>Recordings</button><button onClick={()=>openTool("packs")}>Sound packs</button><button onClick={()=>openTool("sessions")}>Saved sessions</button><button onClick={()=>setSettings(true)}>Display</button></div>}/>}
+            controls={<HomeControls sessions={sessions} layers={layers} states={states} soundSeconds={studioSeconds} chakraSeconds={chakraSeconds} master={master} chakraChannels={chakraChannels} selected={selected} target={mixTarget} onLayer={patch} onSound={configureSound} onSession={homeSession} onSoundSeconds={setStudioSeconds} onChakraSeconds={setChakraSeconds} onMaster={setMaster} onSelected={setSelected} onTarget={setMixTarget} onChakra={patch} onSelectPractice={selectHomePractice} onPractice={openManifest} onOpen={page=>page==="manifest"?navigate("manifest",{manifestSection:"practice"}):page==="schedule"?navigate("manifest",{manifestSection:"schedule"}):page==="nature"?navigate("explore",{exploreView:"nature"}):navigate(page)} tools={<div className="home-actions"><button onClick={()=>openTool("affirmations")}>Affirmations</button><button onClick={()=>openTool("recordings")}>Recordings</button><button onClick={()=>openTool("packs")}>Sound packs</button><button onClick={()=>openTool("sessions")}>Saved sessions</button><button onClick={()=>setSettings(true)}>Display</button></div>}/>}
             onTool={openTool}
             onContinue={() =>
               navigate("manifest", { manifestSection: "practice" })
@@ -1348,7 +1355,7 @@ export default function App() {
         {isChakras && <details className="generated-track-panel">
           <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
           <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
-          {layers.map((value,i)=><ChannelEditor key={value.id} title={"Generated layer "+(i+1)} value={{...value,seconds:studioSeconds}} states={states} onChange={patch} onError={setMessage} remove={layers.length>1 ? ()=>{engine.stop(value.id);setLayers(rows=>rows.filter(c=>c.id!==value.id));} : undefined}/>)}
+          {layers.map((value,i)=><ChannelEditor allowMix key={value.id} title={"Generated layer "+(i+1)} value={{...value,seconds:studioSeconds}} states={states} onChange={patch} onError={setMessage} remove={layers.length>1 ? ()=>{engine.stop(value.id);setLayers(rows=>rows.filter(c=>c.id!==value.id));} : undefined}/>)}
           <button disabled={layers.length>=8} onClick={()=>setLayers(rows=>[...rows,channel("bowl",432)])}>Add generated layer</button>
         </details>}
         {message && (

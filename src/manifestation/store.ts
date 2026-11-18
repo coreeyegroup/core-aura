@@ -83,6 +83,12 @@ export const manifestationStore = {
     const p=parsePlan({...structuredClone(original),id:crypto.randomUUID(),name:(original.name+" copy").slice(0,80)});
     commit({...state.data,plans:[...state.data.plans,p],draft:p});return p;
   },
+  rename: (id:string,name:string) => {
+    const original=state.data.plans.find(p=>p.id===id);
+    if(!original)throw Error("Practice unavailable.");
+    const updated=parsePlan({...original,name:name.trim()});
+    commit({...state.data,plans:state.data.plans.map(p=>p.id===id?updated:p),draft:state.data.draft.id===id?{...state.data.draft,name:updated.name}:state.data.draft});
+  },
   open: (id: string) => {
     const p = state.data.plans.find((row) => row.id === id);
     if (!p) throw Error("This practice is unavailable.");
