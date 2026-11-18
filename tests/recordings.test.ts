@@ -62,6 +62,13 @@ function setup() {
   return new AudioEngine();
 }
 afterEach(() => vi.unstubAllGlobals());
+it("cancels a background start still connecting when the practice is paused", async () => {
+  const engine = setup();
+  const pending = engine.play({...channel(),id:"manifest-background:0"});
+  engine.pause("manifest-background:0");
+  await pending;
+  expect(engine.snapshot()).toEqual([]);
+});
 describe("recorded playback in the shared audio context", () => {
   it("pauses at the current position, resumes and ends without losing its state to worklet reports", async () => {
     const engine = setup();

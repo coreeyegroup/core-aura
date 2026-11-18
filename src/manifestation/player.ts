@@ -1,6 +1,8 @@
 import { AudioEngine, engine } from "../audio/engine";
 import { onOtherAudio } from "../audio/activity";
 import { parsePlan, Plan, position } from "./model";
+import { backgroundChannels } from "./background";
+import { Channel } from "../model";
 import { speech, SpeechDriver } from "./speech";
 export type PracticeState = {
   status: "idle" | "playing" | "paused" | "completed" | "error";
@@ -19,6 +21,7 @@ export class ManifestPlayer {
   };
   private listeners = new Set<() => void>();
   private token = 0;
+  private speaking = false;
   private clock?: ReturnType<typeof setInterval>;
   private wait?: ReturnType<typeof setTimeout>;
   private started = 0;
@@ -28,6 +31,7 @@ export class ManifestPlayer {
     private voice: SpeechDriver = speech,
     private audio: Pick<AudioEngine, "stopAll" | "play" | "pause" | "stop"> & {
       unlock?: () => Promise<void>;
+      patch?: (channel: Channel) => void;
     } = engine,
   ) {
     this.unsubscribe = onOtherAudio(() => this.stop());
@@ -63,35 +67,52 @@ export class ManifestPlayer {
     this.stop();
     this.accumulated = 0;
     this.update({ status: "playing", plan, step: 0, elapsed: 0, error: "" });
-    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.background)
+    this.speaking = plan.mode === "speech";
+    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.background || plan.backgroundMix)
       void this.audio.unlock?.().catch(() => {});
     this.clockStart();
     this.background();
     void this.run(this.token);
   }
   private background() {
-    const p = this.state.plan;
-    if (p?.background)
-      void this.audio
-        .play({
-          id: "manifest-background",
-          ...p.background,
-          muted: false,
-          seconds: 3600,
-        })
-        .catch(() => {
-          if (this.state.status === "playing")
-            this.update({
-              error:
-                "The background sound could not start; the practice can continue.",
-            });
-        });
+    const p = this.state.plan, token = this.token;
+    if (!p) return;
+    for (const c of backgroundChannels(p,this.speaking)) {
+      void this.audio.play(c).then(()=>{
+        if (token === this.token && this.state.status === "playing") this.backgroundLevel();
+      }).catch(()=>{
+        if (token === this.token && this.state.status === "playing") {
+          this.stopBackground();
+          this.update({error:"The background sound could not start; the practice can continue."});
+        }
+      });
+    }
+  }
+  private backgroundLevel() {
+    if (this.state.plan) for (const c of backgroundChannels(this.state.plan,this.speaking)) this.audio.patch?.(c);
+  }
+  private stopBackground() {
+    if (this.state.plan) for (const c of backgroundChannels(this.state.plan)) this.audio.stop(c.id);
+    this.speaking = false;
+  }
+  updateBackground(patch: Partial<Plan>) {
+    const current = this.state.plan;
+    if (!current || !["playing","paused"].includes(this.state.status)) return;
+    const next = parsePlan({...current,
+      background:current.background ? {...current.background,volume:patch.background?.volume ?? current.background.volume} : null,
+      backgroundMix:current.backgroundMix ? {...current.backgroundMix,volume:patch.backgroundMix?.volume ?? current.backgroundMix.volume} : null,
+      backgroundDucking:patch.backgroundDucking ?? current.backgroundDucking,
+      backgroundDuckLevel:patch.backgroundDuckLevel ?? current.backgroundDuckLevel});
+    this.update({plan:next});
+    this.backgroundLevel();
   }
   private async run(token: number) {
     const p = this.state.plan;
     if (!p || token !== this.token || this.state.status !== "playing") return;
     const current = position(p, this.state.step);
     try {
+      this.speaking = p.mode === "speech";
+      this.backgroundLevel();
       if (p.mode === "speech") {
         if (this.voice.speakLine)
           await this.voice.speakLine(p.lines[current.line], p);
@@ -101,6 +122,8 @@ export class ManifestPlayer {
           this.wait = setTimeout(resolve, p.readSeconds * 1000);
         });
       if (token !== this.token || this.state.status !== "playing") return;
+      this.speaking = false;
+      this.backgroundLevel();
       if (this.state.step + 1 >= p.lines.length * p.repeats) {
         this.finish();
         return;
@@ -116,7 +139,7 @@ export class ManifestPlayer {
       this.token++;
       this.clear();
       this.voice.stop();
-      this.audio.stop("manifest-background");
+      this.stopBackground();
       this.update({ status: "error", error: (e as Error).message });
     }
   }
@@ -126,13 +149,14 @@ export class ManifestPlayer {
     this.token++;
     this.clear();
     this.voice.stop();
-    this.audio.pause("manifest-background");
+    if (this.state.plan) for (const c of backgroundChannels(this.state.plan)) this.audio.pause(c.id);
     this.update({ status: "paused", elapsed: this.accumulated });
   }
   resume() {
     if (this.state.status !== "paused") return;
     this.update({ status: "playing" });
     this.clockStart();
+    this.speaking = this.state.plan?.mode === "speech";
     this.background();
     void this.run(this.token);
   }
@@ -141,7 +165,7 @@ export class ManifestPlayer {
     this.token++;
     this.clear();
     this.voice.stop();
-    this.audio.stop("manifest-background");
+    this.stopBackground();
     this.accumulated = 0;
     this.update({ status: "idle", elapsed: 0, step: 0, error: "" });
   }
@@ -149,7 +173,7 @@ export class ManifestPlayer {
     this.token++;
     this.clear();
     this.voice.stop();
-    this.audio.stop("manifest-background");
+    this.stopBackground();
     this.update({
       status: "completed",
       elapsed: Math.min(

@@ -221,7 +221,7 @@ export class AudioEngine {
     return this.connecting;
   }
   async play(channel: Channel) {
-    if (channel.id !== "manifest-background") signalOtherAudio();
+    if (channel.id !== "manifest-background" && !channel.id.startsWith("manifest-background:")) signalOtherAudio();
     const token = this.generation;
     const voiceToken = this.voiceGeneration.get(channel.id) || 0;
     await this.connect();
@@ -279,6 +279,7 @@ export class AudioEngine {
       this.refresh();
       return;
     }
+    this.voiceGeneration.set(id, (this.voiceGeneration.get(id) || 0) + 1);
     this.node?.port.postMessage({ type: "pause", id });
   }
   stop(id: string) {

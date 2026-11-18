@@ -103,3 +103,14 @@ Choosing Core-aura voices sends the selected sentence, voice ID and rate to the 
 The speech API limits text to 300 characters, request JSON to 4 KiB, synthesis to two concurrent requests and 120 uncached requests/minute per API process. Voice IDs come from a fixed installed allowlist. Text is sent to the engine's stdin with no shell; synthesis has a timeout and canonical bounded mono PCM output. Responses use no-store. Same-origin website and native Core-aura origins are permitted; no general-purpose synthesis relay endpoint is exposed. Native cross-origin requests use the public Core-aura domain.
 
 Tests cover stalled speech, cancellation, raw error codes, category/affirmation CRUD and persistent moves. CI synthesizes actual English and installed Indic-language speech, checks non-zero PCM samples, and tests browser playback using server WAV rather than mocked speech completion. This verifies generation and the audio graph, not the sound of a physical phone speaker or linguistic quality.
+
+
+## Saved sound-mix backgrounds — v0.25.0
+
+In Manifest → Practice, open Background sound and choose Saved sound mix. Any saved generated Nature, Studio or Chakra session with up to eight layers can be attached. The practice holds an independent snapshot of channel tuning, frequency focus, texture intensity, strike intervals, relative levels, mute states and saved master level. Editing or deleting the original does not alter the attachment. Select the source again to refresh it. Imported audio files and downloaded recordings are separate; they are not embedded in practices.
+
+Background level scales the attached levels. Reduce during speech is enabled by default, leaving 25% of the chosen background level while a sentence is spoken. Choose Silent, 10%, 25%, 50% or Full level, or disable reduction. The level returns during sentence gaps. This follows the speech driver, including personal recordings and server/native speech, rather than microphone detection. Level changes use a short gain ramp. Silent reading uses the normal background level.
+
+Live level and voice-reduction changes affect the current run. Configure while stopped and Save practice to retain choices. Source and tuning changes require stopping. The background uses the practice timer, not the original mix timer, and follows group pause/resume, completion, errors and Stop. Starting another sound stops the practice as before. Normal on-device generation and attached snapshots work offline after the player is cached. Speech availability still depends on the chosen voice provider.
+
+Existing single-tone practices and JSON backups remain compatible. Practice JSON includes the attached generated settings; it does not contain audio files or a rendered speech-plus-music recording. Reminder behavior remains tap-to-start unless the existing supported idle/visible auto-start option is enabled. Closed-app automatic speech is not added by this release.
