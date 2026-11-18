@@ -2293,3 +2293,8 @@ progress {
 @media(min-width:900px) { .home-listening { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; } .home-playlists,.home-continue { grid-column:1/-1; } }
 @media(max-width:360px) { .queue-transport { gap:2px; } .queue-transport button { padding-left:5px; padding-right:5px; } }
 @media(prefers-reduced-motion:reduce) { .queue-player,.home-listening * { scroll-behavior:auto; } }
+
+:root[data-text-size="large"] .home-continue { flex-wrap:wrap; }
+:root[data-text-size="large"] .home-continue > div { flex-basis:100%; }
+:root[data-text-size="large"] .bottom-nav button { font-size:calc(10px * var(--text-scale)); padding-left:1px; padding-right:1px; }
+@media(max-width:360px) { .queue-toggle-text { display:none; } }

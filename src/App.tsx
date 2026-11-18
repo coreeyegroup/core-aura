@@ -461,9 +461,7 @@ export default function App() {
       removeEventListener("offline", changed);
     };
   }, []);
-  useEffect(() => {
-    engine.setMaster(master);
-  }, [master]);
+
   useEffect(() => {
     if (!settings && !saving && !exporting) return;
     const keyboard = (event: KeyboardEvent) => {
@@ -704,7 +702,7 @@ export default function App() {
     if (importInput.current) importInput.current.value = "";
   }
   async function update() {
-    if (states.length || ["playing", "paused"].includes(practice.status)) {
+    if (queueBusy || states.length || ["playing", "paused"].includes(practice.status)) {
       setUpdateStatus("Stop all audio before updating.");
       return;
     }
