@@ -1,19 +1,22 @@
+import type { Track } from "../tracks/storage";
 import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import {
   ArrowDownRight, ArrowRight, AudioLines, BookOpen, Clock3,
   Flower2, Heart, ListMusic, Play, Plus,
 } from "lucide-react";
-import { Session } from "../model";
+import { Session, sessionDuration } from "../model";
 import { manifestationStore as store } from "../manifestation/store";
 import { nextOccurrence } from "../manifestation/model";
-import { ItemRef, ModuleId, preferences, remember } from "./preferences";
+import { ItemRef, ModuleId, preferences } from "./preferences";
 import { playlistStore } from "../playlists/store";
-import { durationLabel, resolveItems } from "../playlists/model";
+import { durationLabel, PlaylistRef, resolveItems } from "../playlists/model";
 import { queuePlayer, startQueue } from "../playlists/runtime";
 
 type Props = {
   sessions: Session[];
+  tracks: Track[];
   onPractice: (id: string) => unknown;
+  onSession: (session: Session) => void;
   onOpen: (page: "manifest" | "studio" | "chakras" | "schedule" | "library") => void;
   tools: ReactNode;
 };
@@ -76,7 +79,7 @@ function SavedPicker({ id, name, choices, selectedId, onSelect, onPlay, onEdit }
   );
 }
 
-export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
+export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools }: Props) {
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
   const { data: lists, error: listError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
   const { value: prefs, error } = useSyncExternalStore(preferences.subscribe, preferences.snapshot);
@@ -94,7 +97,9 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
   }, []);
 
   const playlist = lists.playlists.find((item) => item.id === playlistId) ?? lists.playlists[0];
-  const itemFor = (ref: ItemRef) => ref.kind === "practice"
+  const itemFor = (ref: PlaylistRef) => ref.kind === "track"
+    ? tracks.find(track => track.id === ref.id)
+    : ref.kind === "practice"
     ? data.plans.find((plan) => plan.id === ref.id)
     : sessions.find((session) => session.id === ref.id);
   const playlistEntries = playlist?.items.map(itemFor);
@@ -116,13 +121,8 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
     }
   }
 
-  function play(refs: ItemRef[], name: string) {
-    return attempt(async () => {
-      const started = await startQueue(resolveItems(refs, data.plans, sessions), name);
-      if (started && ["playing", "paused"].includes(queuePlayer.snapshot().status)) {
-        refs.forEach(remember);
-      }
-    });
+  function play(refs: PlaylistRef[], name: string) {
+    return attempt(() => startQueue(resolveItems(refs, data.plans, sessions, tracks), name));
   }
 
   const mixChoices = (kind: "sound" | "chakra") => sessions
@@ -130,7 +130,7 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
     .map((session) => {
       const count = session.channels.length;
       const unit = kind === "sound" ? (count === 1 ? "layer" : "layers") : (count === 1 ? "chakra" : "chakras");
-      return { id: session.id, name: session.name, detail: `${count} ${unit} · ${durationLabel(Math.max(...session.channels.map((channel) => channel.seconds)))}` };
+      return { id: session.id, name: session.name, detail: `${count} ${unit} · ${durationLabel(sessionDuration(session))}` };
     });
 
   const modules: Record<ModuleId, ReactNode> = {
@@ -148,13 +148,19 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
       <SavedPicker id="sound" name="sound mix" selectedId={soundId} onSelect={setSoundId}
         choices={mixChoices("sound")}
         onPlay={(choice) => void play([{ kind: "session", id: choice.id }], choice.name)}
-        onEdit={() => onOpen("studio")} />
+        onEdit={(choice) => {
+          const session = sessions.find(item => item.id === choice?.id);
+          if (session) onSession(session); else onOpen("studio");
+        }} />
     ),
     chakra: (
       <SavedPicker id="chakra" name="chakra session" selectedId={chakraId} onSelect={setChakraId}
         choices={mixChoices("chakra")}
         onPlay={(choice) => void play([{ kind: "session", id: choice.id }], choice.name)}
-        onEdit={() => onOpen("chakras")} />
+        onEdit={(choice) => {
+          const session = sessions.find(item => item.id === choice?.id);
+          if (session) onSession(session); else onOpen("chakras");
+        }} />
     ),
     schedule: upcoming ? (
       <div className="home-list-row">
@@ -181,7 +187,7 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
             <h3>{group.name}</h3>
             {!prefs[group.key].length && <p>No {group.key === "pins" ? "favorites" : "playback history"} yet</p>}
             {prefs[group.key].slice(0, 4).map((ref) => {
-              const item = itemFor(ref);
+              const item = itemFor(ref) as Session | typeof data.plans[number] | undefined;
               return (
                 <div className="home-list-row" key={ref.kind + ref.id}>
                   <div>
@@ -235,7 +241,7 @@ export function HomeControls({ sessions, onPractice, onOpen, tools }: Props) {
               <div className="home-playlist-footer">
                 <details className="home-playlist-preview">
                   <summary>View playlist</summary>
-                  <ol>{playlistEntries?.map((item, index) => <li key={index}>{item?.name || "Unavailable item"}</li>)}</ol>
+                  <ol>{playlistEntries?.map((item, index) => <li key={index}>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</li>)}</ol>
                 </details>
                 <button className="text-button" onClick={() => onOpen("library")}>
                   Manage <ArrowRight size={14} aria-hidden="true" />

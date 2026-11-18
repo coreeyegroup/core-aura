@@ -3,7 +3,7 @@ export type Route = {
   tab: Tab;
   manifestSection: "practice" | "schedule";
   libraryView: "manifestation" | "audio";
-  librarySection: "all" | "saved" | "recordings";
+  librarySection: "all" | "saved" | "recordings" | "playlists";
   category: string;
   exploreView: "sounds" | "packs" | "nature" | "tracks";
 };
@@ -36,9 +36,10 @@ export function parseRoute(hash: string, previous = defaultRoute): Route {
   if (page === "explore")
     route.exploreView = section === "packs" ? "packs" : section === "nature" ? "nature" : section === "tracks" ? "tracks" : "sounds";
   if (page === "library") {
-    if (section)
+    if (section && section !== "playlists")
       route.libraryView = section === "audio" ? "audio" : "manifestation";
     route.librarySection =
+      section === "playlists" ? "playlists" :
       section === "practices"
         ? "saved"
         : section === "recordings"
@@ -57,6 +58,7 @@ export function routeHash(route: Route) {
   if (route.tab === "explore")
     return "#explore" + (route.exploreView === "packs" ? "/packs" : route.exploreView === "nature" ? "/nature" : route.exploreView === "tracks" ? "/tracks" : "");
   if (route.tab === "library") {
+    if (route.librarySection === "playlists") return "#library/playlists";
     if (route.libraryView === "audio") return "#library/audio";
     const section =
       route.librarySection === "saved"

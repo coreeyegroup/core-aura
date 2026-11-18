@@ -1,5 +1,5 @@
 import { createState, sample } from "./dsp.js";
-export function* renderWav(channels, master, seconds, rate = 44100) {
+export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap) {
   if (
     !Array.isArray(channels) ||
     channels.length < 1 ||
@@ -10,7 +10,8 @@ export function* renderWav(channels, master, seconds, rate = 44100) {
     !Number.isInteger(seconds) ||
     seconds < 1 ||
     seconds > 600 ||
-    ![44100, 48000].includes(rate)
+    ![44100, 48000].includes(rate) ||
+    (sequenceGap !== undefined && (!Number.isFinite(sequenceGap) || sequenceGap < 0 || sequenceGap > 30))
   )
     throw Error("Unsupported export");
   const frames = seconds * rate;
@@ -34,16 +35,23 @@ export function* renderWav(channels, master, seconds, rate = 44100) {
   const states = channels.map((c) =>
     createState({ ...c, seconds: Math.min(c.seconds, seconds) }),
   );
+  let offset = 0;
+  const starts = channels.map(channel => {
+    const start = offset;
+    if (sequenceGap !== undefined) offset += Math.round((channel.seconds + sequenceGap) * rate);
+    return start;
+  });
   for (let start = 0; start < frames; start += 8192) {
     // Match the live mixer's normalization at each rendering block.
-    const weight = states.reduce(
-      (n, c) => n + (c.muted || c.status === "ended" ? 0 : c.volume),
-      0,
-    );
+    const weight = sequenceGap === undefined ? states.reduce(
+      (n, c) => n + (c.muted || c.status === "ended" ? 0 : c.volume), 0,
+    ) : 1;
     const scale = (master * 0.65) / Math.max(1, weight);
     for (let i = start; i < Math.min(start + 8192, frames); i++) {
       let sum = 0;
-      for (const state of states) {
+      for (let index = 0; index < states.length; index++) {
+        if (i < starts[index]) continue;
+        const state = states[index];
         const value = sample(state, rate);
         if (!state.muted) sum += value * state.volume;
       }

@@ -1,7 +1,7 @@
 import { renderWav } from "./render-wav.js";
 self.onmessage = ({ data }) => {
   try {
-    const iterator = renderWav(data.channels, data.master, data.seconds);
+    const iterator = renderWav(data.channels, data.master, data.seconds, 44100, data.sequenceGap);
     let last = -1;
     while (true) {
       const next = iterator.next();

@@ -1,6 +1,10 @@
 # Core-aura
 
-Core-aura 0.29.0 is a manifestation, sound-generation and personal meditation application. Home selects saved practices and mixes for direct playback; Library builds mixed sequential playlists. A slate and teal palette pairs with compact mobile navigation, grouped Home controls and a consistent player. Detailed configuration lives in Manifest, Sounds, and Chakras. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.30.0 is a manifestation, sound-generation and personal meditation application. Home selects saved practices and mixes for direct playback; Library builds mixed sequential playlists. A slate and teal palette pairs with compact mobile navigation, grouped Home controls and a consistent player. Detailed configuration lives in Manifest, Sounds, and Chakras. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+
+## v0.30.0 audit fixes
+
+Library has a direct Playlists destination. Search and sorting apply to saved content, and bulk delete confirms the visible items and any affected playlists. Imported audio and explicitly saved Chakra sequences can play in a playlist. A Chakra sequence keeps its order and timing in playlist playback and WAV export. Existing Chakra mixes still play together. To move an imported-track playlist to another device, include the audio in the ZIP backup.
 
 ## Operating workspace
 

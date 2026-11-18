@@ -2,13 +2,30 @@ import { describe, it, expect } from "vitest";
 // @ts-ignore: shared pure JS renderer is also loaded by the export worker.
 import { renderWav } from "../public/render-wav.js";
 import { channel } from "../src/model";
-function render(channels: unknown[], master = 0.5, seconds = 1) {
-  const iterator = renderWav(channels, master, seconds);
+function render(channels: unknown[], master = 0.5, seconds = 1, sequenceGap?: number) {
+  const iterator = renderWav(channels, master, seconds, 44100, sequenceGap);
   let next = iterator.next();
   while (!next.done) next = iterator.next();
   return new DataView(next.value);
 }
 describe("WAV export", () => {
+  it("preserves the saved chakra sequence and a silent transition in the export", () => {
+    const wav = render([
+      { ...channel("sine", 396), seconds: 1 },
+      { ...channel("sine", 417), seconds: 1 },
+    ], .5, 3, 1);
+    function peak(from: number, to: number) {
+      let amplitude = 0;
+      for (let sample = from * 44100; sample < to * 44100; sample++) {
+        amplitude = Math.max(amplitude, Math.abs(wav.getInt16(44 + sample * 2, true)));
+      }
+      return amplitude;
+    }
+    expect(peak(.25, .75)).toBeGreaterThan(0);
+    expect(peak(1.25, 1.75)).toBe(0);
+    expect(peak(2.25, 2.75)).toBeGreaterThan(0);
+  });
+
   it("writes playable PCM with the intended frequency, duration and safe mix", () => {
     const wav = render([{ ...channel(), volume: 1 }]);
     expect(wav.byteLength).toBe(44 + 44100 * 2);

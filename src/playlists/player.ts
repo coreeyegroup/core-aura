@@ -1,9 +1,12 @@
+import { trackBlob } from "../tracks/storage";
+import type { TrackLevel } from "../audio/tracks";
 import type { Plan } from "../manifestation/model";
 import type { Channel } from "../model";
 import { PlayItem, itemDuration } from "./model";
 type Audio = {
     stop?: (id: string) => void;
     stopAll: () => void;
+    toggleSoundtrack?: (id: string, load: () => Promise<Blob>, level: TrackLevel) => Promise<void>;
     play: (c: Channel) => Promise<void>;
     pause: (id: string) => void;
     resume: (id: string) => Promise<void>;
@@ -48,8 +51,12 @@ export class QueuePlayer {
     private seen = false;
     private loading = false;
     private needsLaunch = false;
+    private stage = 0;
+    private stageOffset = 0;
+    private gapRemaining = 0;
+    private gapStarted = 0;
     acting = false;
-    constructor(private audio: Audio, private manifest: Manifest) { }
+    constructor(private audio: Audio, private manifest: Manifest, private onStarted?: (item: PlayItem) => void) { }
     snapshot = () => this.state;
     subscribe = (f: () => void) => { this.listeners.add(f); return () => { this.listeners.delete(f); }; };
     private update(p: Partial<QueueState>) { this.state = { ...this.state, ...p }; this.listeners.forEach(f => f()); }
@@ -63,9 +70,31 @@ export class QueuePlayer {
         return; this.audio.setMaster(value); this.update({ output: value }); }
     private clear() { if (this.timer)
         clearInterval(this.timer); this.timer = undefined; }
-    private halt() { this.generation++; this.loading = false; this.needsLaunch = false; this.clear(); this.own(() => { this.ids.forEach(id => this.audio.pause(id)); this.manifest.stop(); this.audio.stopAll(); }); this.ids = []; }
+    private halt() {
+        this.generation++;
+        this.loading = false;
+        this.needsLaunch = false;
+        this.stage = this.stageOffset = this.gapRemaining = this.gapStarted = 0;
+        this.clear();
+        this.own(() => {
+            this.ids.forEach(id => this.audio.pause(id));
+            this.manifest.stop();
+            this.audio.stopAll();
+        });
+        this.ids = [];
+    }
     async start(items: PlayItem[], name: string) { if (!items.length)
         throw Error("Choose a saved item to play."); this.halt(); this.update({ items: structuredClone(items), name, index: 0, status: "playing", elapsed: 0, error: "" }); await this.launch(); }
+    private async launchStage(item: Extract<PlayItem, { kind: "session" }>, token: number) {
+        const channels = item.session.sequenceGap === undefined
+            ? item.session.channels : [item.session.channels[this.stage]];
+        this.ids = channels.map((_, index) => "queue:" + token + ":" + this.stage + ":" + index);
+        await Promise.all(channels.map((channel, index) =>
+            this.own(() => this.audio.play({ ...channel, id: this.ids[index] }))));
+        if (token !== this.generation) return;
+        this.seen = true;
+        if (this.state.status === "paused") this.ids.forEach(id => this.audio.pause(id));
+    }
     private async launch() {
         const item = this.state.items[this.state.index];
         if (!item)
@@ -78,19 +107,24 @@ export class QueuePlayer {
                 this.own(() => this.manifest.start(item.plan, { replace: true }));
                 this.seen = true;
             }
-            else {
-                this.ids = item.session.channels.map((_, i) => "queue:" + token + ":" + i);
-                this.setOutput(item.session.master);
-                await Promise.all(item.session.channels.map((c, i) => this.own(() => this.audio.play({ ...c, id: this.ids[i] }))));
-                if (token !== this.generation)
-                    return;
+            else if (item.kind === "track") {
+                if (!this.audio.toggleSoundtrack) throw Error("Imported track playback is unavailable.");
+                this.ids = ["track:queue:" + token];
+                await this.own(() => this.audio.toggleSoundtrack!(this.ids[0], () => trackBlob(item.id), {
+                    volume: item.track.volume, muted: item.track.muted, loop: false,
+                }));
+                if (token !== this.generation) return;
                 this.seen = true;
-                if (this.state.status === "paused")
-                    this.ids.forEach(id => this.audio.pause(id));
+                if (this.state.status === "paused") this.audio.pause(this.ids[0]);
+            }
+            else {
+                this.setOutput(item.session.master);
+                await this.launchStage(item, token);
             }
             if (token !== this.generation)
                 return;
             this.loading = false;
+            this.onStarted?.(item);
             this.timer = setInterval(() => this.tick(), 200);
         }
         catch (e) {
@@ -130,36 +164,86 @@ export class QueuePlayer {
                 this.update({ status: "paused" });
         }
         else {
+            if (this.gapRemaining > 0) {
+                const passed = (Date.now() - this.gapStarted) / 1000;
+                if (passed < this.gapRemaining) {
+                    this.update({ elapsed: this.stageOffset - this.gapRemaining + passed });
+                    return;
+                }
+                this.gapRemaining = 0;
+                if (item.kind === "session") void this.advanceStage(item);
+                return;
+            }
             const voices = this.audio.snapshot().filter(v => this.ids.includes(v.id) && v.status !== "stopping");
             if (voices.length) {
-                this.update({ elapsed: Math.max(...voices.map(v => v.time)) });
+                this.update({ elapsed: this.stageOffset + Math.max(...voices.map(v => v.time)) });
                 if (voices.every(v => v.status === "paused"))
                     this.update({ status: "paused" });
             }
-            else if (this.seen)
-                void this.next();
+            else if (this.seen) {
+                if (item.kind === "session" && item.session.sequenceGap !== undefined &&
+                    this.stage + 1 < item.session.channels.length) {
+                    this.stageOffset += item.session.channels[this.stage].seconds + item.session.sequenceGap;
+                    this.stage++;
+                    this.gapRemaining = item.session.sequenceGap;
+                    this.gapStarted = Date.now();
+                    if (!this.gapRemaining) void this.advanceStage(item);
+                } else void this.next();
+            }
         }
     }
-    pause() { if (this.state.status !== "playing")
-        return; this.update({ status: "paused" }); this.own(() => { if (this.state.items[this.state.index]?.kind === "practice")
-        this.manifest.pause();
-    else
-        this.ids.forEach(id => this.audio.pause(id)); }); }
-    async resume() { if (this.state.status !== "paused")
-        return; this.update({ status: "playing" }); if (this.needsLaunch) {
-        this.needsLaunch = false;
-        await this.launch();
-        return;
-    } try {
-        if (this.state.items[this.state.index]?.kind === "practice")
-            this.own(() => this.manifest.resume());
-        else
-            await Promise.all(this.ids.map(id => this.own(() => this.audio.resume(id))));
+    private async advanceStage(item: Extract<PlayItem, { kind: "session" }>) {
+        const token = this.generation;
+        this.loading = true;
+        this.seen = false;
+        try {
+            await this.launchStage(item, token);
+            if (token === this.generation) this.loading = false;
+        } catch (error) {
+            if (token !== this.generation) return;
+            this.halt();
+            this.update({ status: "error", error: (error as Error).message || "The chakra sequence could not continue." });
+        }
     }
-    catch (e) {
-        this.halt();
-        this.update({ status: "error", error: (e as Error).message });
-    } }
+    pause() {
+        if (this.state.status !== "playing") return;
+        if (this.gapRemaining > 0) {
+            this.gapRemaining = Math.max(.001, this.gapRemaining - (Date.now() - this.gapStarted) / 1000);
+        }
+        this.update({ status: "paused" });
+        if (this.loading) return;
+        this.own(() => {
+            if (this.state.items[this.state.index]?.kind === "practice") this.manifest.pause();
+            else this.ids.forEach(id => this.audio.pause(id));
+        });
+    }
+    async resume() {
+        if (this.state.status !== "paused") return;
+        this.update({ status: "playing" });
+        if (this.loading) return;
+        if (this.gapRemaining > 0) {
+            this.gapStarted = Date.now();
+            return;
+        }
+        if (this.needsLaunch) {
+            this.needsLaunch = false;
+            await this.launch();
+            return;
+        }
+
+        const token = this.generation;
+        try {
+            if (this.state.items[this.state.index]?.kind === "practice") {
+                this.own(() => this.manifest.resume());
+            } else {
+                await Promise.all(this.ids.map(id => this.own(() => this.audio.resume(id))));
+            }
+        } catch (error) {
+            if (token !== this.generation) return;
+            this.halt();
+            this.update({ status: "error", error: (error as Error).message });
+        }
+    }
     async next() { if (!["playing", "paused"].includes(this.state.status))
         return; const index = this.state.index + 1, paused = this.state.status === "paused"; this.halt(); if (index >= this.state.items.length) {
         this.update({ status: "completed", elapsed: itemDuration(this.state.items[this.state.index]) });

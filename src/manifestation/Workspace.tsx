@@ -1,3 +1,4 @@
+import { confirmSourceDeletion } from "../playlists/store";
 import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
 import {Presets} from "../workbench/Presets";
@@ -667,16 +668,29 @@ export function ManifestLibrary({
     [manage, setManage] = useState(false);
   const libraryInput = useRef<HTMLInputElement>(null);
   const savedSection = useRef<HTMLElement>(null);
+  const recordingsSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (section === "saved") {
       savedSection.current?.scrollIntoView({ block: "start" });
       savedSection.current?.focus({ preventScroll: true });
+    } else if (section === "recordings") {
+      recordingsSection.current?.scrollIntoView({ block: "start" });
+      recordingsSection.current?.focus({ preventScroll: true });
     }
   }, [section]);
   const [category, setCategory] = useState<string>(initialCategory),
     [query, setQuery] = useState(""),
     [selectedPlans,setSelectedPlans]=useState<string[]>([]),
     [message, setMessage] = useState("");
+  const visiblePlans = data.plans.filter(plan => matchesItem(plan.name, "practice", plan.id, search));
+  if (sort === "name") visiblePlans.sort((a, b) => a.name.localeCompare(b.name));
+  else visiblePlans.reverse();
+  const chosenPlans = visiblePlans.filter(plan => selectedPlans.includes(plan.id));
+  const matchingAffirmations = catalog.data.affirmations.filter(
+    affirmation => affirmation.category === category &&
+      [query, search].every(term => affirmation.text.toLowerCase().includes(term.trim().toLowerCase())),
+  );
+  useEffect(() => setSelectedPlans([]), [search]);
   useEffect(() => setCategory(initialCategory), [initialCategory]);
   useEffect(() => {
     if (!catalog.data.categories.includes(category)) {
@@ -875,12 +889,8 @@ export function ManifestLibrary({
         </p>
       )}
       <div className="affirmation-list">
-        {catalog.data.affirmations
-          .filter(
-            (a) =>
-              a.category === category &&
-              a.text.toLowerCase().includes((query+" "+search).trim().toLowerCase()),
-          )
+        {!matchingAffirmations.length && (query || search) && <p role="status">No affirmations match this search in the selected category.</p>}
+        {matchingAffirmations
           .map((a) => (
             <div className="affirmation-row" key={a.id}>
               <label className="affirmation-choice">
@@ -927,7 +937,9 @@ export function ManifestLibrary({
             </div>
           ))}
       </div>
-      <PersonalVoices initiallyOpen={recordingsOpen} />
+      <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
+        <PersonalVoices initiallyOpen={recordingsOpen} />
+      </div>
       <section
         className="saved-practices-section"
         ref={savedSection}
@@ -948,14 +960,33 @@ export function ManifestLibrary({
           aria-label="Import manifestation practice"
           onChange={(e) => void importPlan(e.target.files?.[0])}
         />
-        <div className="home-actions"><button disabled={!data.plans.length} onClick={()=>setSelectedPlans(data.plans.filter(p=>matchesItem(p.name,"practice",p.id,search)).map(p=>p.id))}>Select shown practices</button><button onClick={()=>setSelectedPlans([])}>Clear practice selection</button><button disabled={!selectedPlans.length} onClick={()=>{const text=JSON.stringify({kind:"core-aura-practice-collection",schemaVersion:1,practices:data.plans.filter(p=>selectedPlans.includes(p.id)).map(withoutRecordings)});if(text.length>100000){setMessage("Select fewer practices or use a backup ZIP.");return;}void download(text,"core-aura-practices.json","application/json").then(setMessage).catch(e=>setMessage(e.message));}}>Export selected practices</button><button disabled={!selectedPlans.length} onClick={()=>{if(!confirm("Delete selected practices and their reminders?"))return;try{store.removeMany(selectedPlans);setSelectedPlans([]);void syncPhoneReminders().then(setMessage).catch(e=>setMessage(e.message));}catch(e){setMessage((e as Error).message);}}}>Delete selected practices</button></div>
+        <div className="home-actions">
+          <button disabled={!visiblePlans.length} onClick={() => setSelectedPlans(visiblePlans.map(plan => plan.id))}>Select shown practices</button>
+          <button disabled={!chosenPlans.length} onClick={() => setSelectedPlans([])}>Clear practice selection</button>
+          <button disabled={!chosenPlans.length} onClick={() => {
+            const text = JSON.stringify({kind: "core-aura-practice-collection", schemaVersion: 1, practices: chosenPlans.map(withoutRecordings)});
+            if (text.length > 100000) { setMessage("Select fewer practices or use a full backup ZIP."); return; }
+            void download(text, "core-aura-practices.json", "application/json").then(setMessage).catch(error => setMessage(error.message));
+          }}>Export selected practices</button>
+          <button disabled={!chosenPlans.length} onClick={() => {
+            if (!confirmSourceDeletion("practice", chosenPlans, "Schedules for these practices will also be removed.")) return;
+            try {
+              if (chosenPlans.some(plan => state.plan?.id === plan.id)) manifestPlayer.stop();
+              store.removeMany(chosenPlans.map(plan => plan.id));
+              setSelectedPlans([]);
+              void syncPhoneReminders().then(setMessage).catch(error => setMessage(error.message));
+            } catch (error) { setMessage((error as Error).message); }
+          }}>Delete selected practices</button>
+        </div>
+        {chosenPlans.length > 0 && <p className="content-note">{chosenPlans.length} selected</p>}
+        {data.plans.length > 0 && !visiblePlans.length && <p role="status">No practices match this search.</p>}
         {!data.plans.length && (
           <p className="content-note">
             Save your selected sentences as a practice to schedule them.
             Practices stay on this device; export backups to keep a copy.
           </p>
         )}
-        {data.plans.filter(plan=>matchesItem(plan.name,"practice",plan.id,search)).slice().sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):0).map((plan) => (
+        {visiblePlans.map((plan) => (
           <article className="saved-card" key={plan.id}>
             <label className="check"><input aria-label={"Select practice "+plan.name} type="checkbox" checked={selectedPlans.includes(plan.id)} onChange={e=>setSelectedPlans(e.target.checked?[...selectedPlans,plan.id]:selectedPlans.filter(id=>id!==plan.id))}/> Select</label>
             <div>
@@ -1022,14 +1053,7 @@ export function ManifestLibrary({
               </button>
               <button
                 onClick={() => {
-                  if (
-                    !confirm(
-                      "Delete " +
-                        plan.name +
-                        " and its schedules from this device?",
-                    )
-                  )
-                    return;
+                  if (!confirmSourceDeletion("practice", [plan], "Schedules for this practice will also be removed.")) return;
                   try {
                     if (state.plan?.id === plan.id) manifestPlayer.stop();
                     store.remove(plan.id);
@@ -1168,9 +1192,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
       >
         Enable reminders
       </button>
-      {!data.plans.length ? (
-        <p className="notice">Save a practice before creating a schedule.</p>
-      ) : (
+      {data.plans.length > 0 && (
         <form onSubmit={add} className="manifest-fields">
           <div className="fields">
             <label>

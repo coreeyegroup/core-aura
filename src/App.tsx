@@ -1,4 +1,7 @@
-import {queuePlayer} from "./playlists/runtime";
+import { resolveItems } from "./playlists/model";
+import { Track, tracks, trackEvent } from "./tracks/storage";
+import { confirmSourceDeletion } from "./playlists/store";
+import {queuePlayer, startQueue} from "./playlists/runtime";
 import {QueueTransport} from "./playlists/QueueTransport";
 import {PlaylistLibrary} from "./playlists/PlaylistLibrary";
 import {chakraSequence} from "./workbench/sequence";
@@ -8,7 +11,7 @@ import {SettingsTools} from "./workbench/SettingsTools";
 import {LibraryLabels,matchesItem} from "./workbench/LibraryLabels";
 import {attachMix} from "./manifestation/background";
 import {HomeControls} from "./workbench/HomeControls";
-import {preferences,remember} from "./workbench/preferences";
+import {preferences, remember} from "./workbench/preferences";
 import {observeHistory} from "./workbench/history";
 import {PinButton} from "./workbench/PinButton";
 import {prepareSound} from "./workbench/actions";
@@ -43,6 +46,7 @@ import {
   channel,
   chakras,
   parseSession,
+  sessionDuration,
   sounds,
   validChannel,
 } from "./model";
@@ -130,6 +134,7 @@ export default function App() {
     exploreView,
   } = route;
   const recordingsOpen = librarySection === "recordings";
+  const playlistView = librarySection === "playlists";
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(() => {
     if (route.tab === "studio" || route.tab === "explore") return route.tab;
     try {
@@ -153,6 +158,9 @@ export default function App() {
   useEffect(() => {
     const restore = () => {
       const next = parseRoute(location.hash, routeRef.current);
+      if (next.tab === "home" && location.hash && !location.hash.startsWith("#home")) {
+        history.replaceState(history.state, "", "#home");
+      }
       routeRef.current = next;
       setRoute(next);
       if (next.tab === "studio" || next.tab === "explore")
@@ -160,6 +168,9 @@ export default function App() {
       setMessage("");
       window.scrollTo({ top: 0 });
     };
+    if (location.hash && !/^#(?:home|manifest|explore|studio|chakras|library|admin)(?:$|[/?])/.test(location.hash)) {
+      history.replaceState(history.state, "", "#home");
+    }
     addEventListener("popstate", restore);
     addEventListener("hashchange", restore);
     return () => {
@@ -302,6 +313,7 @@ export default function App() {
       );
   }, [layers, chakraChannels, selected, mixTarget, studioSeconds, chakraSeconds, master]);
   const [settings, setSettings] = useState(false);
+  const modalOpener = useRef<HTMLElement | null>(null);
   const [appearance, setAppearance] = useState(readAppearance);
   useEffect(() => {
     applyAppearance(appearance);
@@ -369,6 +381,7 @@ export default function App() {
         channels: row.channels,
         master: row.master,
         seconds: exportSeconds,
+        sequenceGap: row.sequenceGap,
       });
     } catch {
       setExportError("This session cannot be exported.");
@@ -376,17 +389,45 @@ export default function App() {
     }
   }
   const [saveName, setSaveName] = useState("");
+  const [saveAsSequence, setSaveAsSequence] = useState(false);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
+  const [localTracks, setLocalTracks] = useState<Track[]>([]);
+  const [trackReadError, setTrackReadError] = useState("");
+  useEffect(() => {
+    let generation = 0;
+    const refresh = () => {
+      const token = ++generation;
+      void tracks().then(rows => {
+        if (token === generation) { setLocalTracks(rows); setTrackReadError(""); }
+      }).catch(error => {
+        if (token === generation) setTrackReadError(error instanceof Error ? error.message : String(error));
+      });
+    };
+    refresh();
+    addEventListener(trackEvent, refresh);
+    return () => { generation++; removeEventListener(trackEvent, refresh); };
+  }, []);
   const [libraryQuery,setLibraryQuery]=useState("");
   const [librarySort,setLibrarySort]=useState("recent");
   const [selectedSessions,setSelectedSessions]=useState<string[]>([]);
+  const visibleSessions = sessions
+    .filter(row => matchesItem(row.name + " " + row.kind, "session", row.id, libraryQuery))
+    .sort((a, b) => librarySort === "name" ? a.name.localeCompare(b.name)
+      : (b.createdAt || "").localeCompare(a.createdAt || ""));
+  const chosenSessions = visibleSessions.filter(row => selectedSessions.includes(row.id));
   useSyncExternalStore(preferences.subscribe,preferences.snapshot);
   const [online, setOnline] = useState(navigator.onLine);
   const [offlineReady, setOfflineReady] = useState(false);
   const [updateStatus, setUpdateStatus] = useState("");
   const states = useSyncExternalStore(engine.subscribe, engine.snapshot);
   const sequence=useSyncExternalStore(chakraSequence.subscribe,chakraSequence.snapshot);
+  const recentPractice = !queueBusy && practice.status === "playing" && !isPreview(practice) ? practice.plan?.id : undefined;
+  useEffect(() => {
+    if (recentPractice && manifestationStore.snapshot().data.plans.some(plan => plan.id === recentPractice)) {
+      remember({ kind: "practice", id: recentPractice });
+    }
+  }, [recentPractice]);
   const importInput = useRef<HTMLInputElement>(null);
   const current =
     tab === "chakras"
@@ -463,7 +504,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!settings && !saving && !exporting) return;
+    if (!settings && !saving && !exporting) {
+      const opener = modalOpener.current;
+      modalOpener.current = null;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+      return;
+    }
     const keyboard = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSettings(false);
@@ -474,9 +520,9 @@ export default function App() {
       if (event.key !== "Tab") return;
       const items = [
         ...document.querySelectorAll<HTMLElement>(
-          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled), [role="dialog"] select:not(:disabled), [role="dialog"] summary',
+          '[role="dialog"] button:not(:disabled), [role="dialog"] input:not(:disabled):not([type="file"]), [role="dialog"] select:not(:disabled), [role="dialog"] summary, [role="dialog"] a[href], [role="dialog"] textarea:not(:disabled)',
         ),
-      ];
+      ].filter(element => element.getClientRects().length > 0);
       const first = items[0],
         last = items[items.length - 1];
       if (event.shiftKey && document.activeElement === first) {
@@ -497,18 +543,39 @@ export default function App() {
       title: "Core-aura",
       artist: "Personal listening session",
     });
-    navigator.mediaSession.setActionHandler("pause", () => {
-      manifestPlayer.pause();
-      engine.snapshot().forEach((s) => engine.pause(s.id));
-    });
-    navigator.mediaSession.setActionHandler("stop", () => {
-      manifestPlayer.stop();
-      engine.stopAll();
-    });
-    return () => {
-      navigator.mediaSession.setActionHandler("pause", null);
-      navigator.mediaSession.setActionHandler("stop", null);
+    const handlers: Partial<Record<MediaSessionAction, MediaSessionActionHandler>> = {
+      play: () => {
+        if (queuePlayer.snapshot().status === "paused") { void queuePlayer.resume(); return; }
+        if (chakraSequence.snapshot().status === "paused") { chakraSequence.resume(); return; }
+        if (manifestPlayer.snapshot().status === "paused") manifestPlayer.resume();
+        engine.snapshot().filter(sound => sound.status === "paused" && !sound.id.startsWith("manifest-background"))
+          .forEach(sound => void engine.resume(sound.id).catch(() => setMessage("Audio could not resume. Try Play in Core-aura.")));
+      },
+      pause: () => {
+        if (queuePlayer.snapshot().status === "playing") { queuePlayer.pause(); return; }
+        if (chakraSequence.snapshot().status === "playing") { chakraSequence.pause(); return; }
+        manifestPlayer.pause();
+        engine.snapshot().forEach(sound => engine.pause(sound.id));
+      },
+      stop: () => {
+        queuePlayer.stop();
+        chakraSequence.stop();
+        manifestPlayer.stop();
+        engine.stopAll();
+      },
+      nexttrack: () => { void queuePlayer.next(); },
+      previoustrack: () => {
+        if (queuePlayer.snapshot().index > 0) void queuePlayer.previous();
+      },
     };
+    const registered: MediaSessionAction[] = [];
+    for (const [action, handler] of Object.entries(handlers)) {
+      try {
+        navigator.mediaSession.setActionHandler(action as MediaSessionAction, handler);
+        registered.push(action as MediaSessionAction);
+      } catch { /* Some platforms expose only a subset of media actions. */ }
+    }
+    return () => registered.forEach(action => navigator.mediaSession.setActionHandler(action, null));
   }, []);
   useEffect(() => {
     if (!("mediaDevices" in navigator)) return;
@@ -580,22 +647,6 @@ export default function App() {
     const hz=frequency??(isNature(sound)?1000:["tanpura","yaman","mohanam","shruti"].includes(sound)?216:sound==="hum"?144:432);
     setOpenedSoundName(sounds[sound].name);setLayers([channel(sound,hz)]);
   }
-  function homeSession(row:Session){
-    if(row.kind!=="chakras"&&!replaceSoundDraft())return;
-    const target=row.kind==="chakras"?chakraChannels:layers;
-    if(engine.snapshot().some(v=>target.some(c=>c.id===v.id)&&v.status!=="stopping")){
-      if(!confirm("Replace current playback? This stops the active audio. Draft settings will be kept."))return;
-      if(row.kind==="chakras")chakraSequence.stop();
-      target.forEach(c=>engine.stop(c.id));
-    }
-    if(row.kind==="chakras"){
-      const ids=row.channels.map(c=>c.id);setSelected(ids);setMixTarget("selected");setChakraSeconds(row.channels[0].seconds);setChakraChannels(chakras.map(c=>row.channels.find(v=>v.id===c.id)??{...channel("sine",c.hz),id:c.id}));
-    }else{layers.forEach(c=>engine.stop(c.id));setLayers(row.channels.map(c=>({...c,id:crypto.randomUUID()})));setStudioSeconds(row.channels[0].seconds);}
-    setOpenedSoundName(row.name);setMaster(row.master);remember({kind:"session",id:row.id});
-  }
-  function selectHomePractice(id:string){
-    const {draft,plans}=manifestationStore.snapshot().data;if(!confirmDraftReplacement(draft,plans))return;manifestationStore.open(id);remember({kind:"practice",id});
-  }
   function openSound(sound: Sound, frequency?: number) {
     if(!replaceSoundDraft())return;
     layers.forEach((c) => engine.stop(c.id));
@@ -619,13 +670,20 @@ export default function App() {
   }
   function save() {
     try {
+      const ordered = [...currentWithTime];
+      const sequential = isChakras && saveAsSequence;
+      if (sequential) {
+        const order = sequence.order.concat(ordered.map(channel => channel.id));
+        ordered.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+      }
       const row = parseSession({
         schemaVersion: 2,
         engineVersion: ENGINE_VERSION,
         id: crypto.randomUUID(),
         name: saveName.trim(),
         kind: isChakras ? "chakras" : "studio",
-        channels: currentWithTime,
+        channels: sequential ? ordered.map(channel => ({ ...channel, seconds: sequence.seconds })) : currentWithTime,
+        sequenceGap: sequential ? sequence.gap : undefined,
         master,
         createdAt: new Date().toISOString(),
       });
@@ -641,7 +699,7 @@ export default function App() {
   function load(row: Session) {
     if(row.kind!=="chakras"&&!replaceSoundDraft())return;
     if(!prepareSound(row.channels.map(c=>c.id),false,true))return;
-    remember({kind:"session",id:row.id});setOpenedSoundName(row.name);
+    setOpenedSoundName(row.name);
     engine.stopAll();
     setMaster(row.master);
     if(row.kind==="chakras")setChakraSeconds(row.channels[0].seconds);else setStudioSeconds(row.channels[0].seconds);
@@ -655,13 +713,19 @@ export default function App() {
         ),
       );
       setSelected(row.channels.map((c) => c.id));
+      if (row.sequenceGap !== undefined) {
+        try {
+          chakraSequence.configure({ order: row.channels.map(channel => channel.id), seconds: row.channels[0].seconds, gap: row.sequenceGap });
+        } catch (error) { setMessage((error as Error).message); }
+      }
       setMixTarget("selected");
       navigate("chakras");
     } else {
       setLayers(row.channels.map((c) => ({ ...c })));
       navigate("studio");
     }
-    setMessage("Loaded " + row.name + ". Press Play to begin.");
+    setMessage("Loaded " + row.name + (row.sequenceGap === undefined
+      ? ". Press Play to begin." : ". Open Sequential chakra playback and press Start sequence."));
   }
   function favorite(sound: Sound) {
     const rows = starred.includes(sound)
@@ -683,6 +747,7 @@ export default function App() {
       .catch((e) => setMessage(e.message));
   }
   async function importSession(file?: File) {
+    if (importInput.current) importInput.current.value = "";
     if (!file) return;
     if (file.size > 100000) {
       setMessage("Choose a session file smaller than 100 KB.");
@@ -699,7 +764,6 @@ export default function App() {
         "This file has invalid settings or an unsupported session version.",
       );
     }
-    if (importInput.current) importInput.current.value = "";
   }
   async function update() {
     if (queueBusy || states.length || ["playing", "paused"].includes(practice.status)) {
@@ -869,7 +933,7 @@ export default function App() {
           )}
           <button
             className="icon-button"
-            onClick={() => setSettings(true)}
+            onClick={(event) => { modalOpener.current = event.currentTarget; setSettings(true); }}
             aria-label="Settings"
           >
             <Settings size={22} />
@@ -900,10 +964,13 @@ export default function App() {
           <Dashboard>
             <HomeControls
               sessions={sessions}
+              tracks={localTracks}
               onPractice={openManifest}
+              onSession={load}
               onOpen={(page) => {
                 if (page === "manifest") navigate("manifest", { manifestSection: "practice" });
                 else if (page === "schedule") openTool("schedule");
+                else if (page === "library") navigate("library", { librarySection: "playlists" });
                 else navigate(page);
               }}
               tools={
@@ -930,8 +997,8 @@ export default function App() {
         {(tab === "explore" || tab === "studio") && (
           <div className="segmented" aria-label="Sound workspace">
             <button
-              aria-pressed={tab === "explore"}
-              onClick={() => navigate("explore")}
+              aria-pressed={tab === "explore" && (exploreView === "sounds" || exploreView === "nature")}
+              onClick={() => navigate("explore", { exploreView: "sounds" })}
             >
               Explore
             </button>
@@ -948,16 +1015,16 @@ export default function App() {
         {tab === "admin" && <Admin />}
         {tab === "explore" && (
           <>
-            {exploreView !== "nature" && <>
+            {(exploreView === "sounds" || exploreView === "tracks") && <>
             <div className="page-heading">
-              <h1>Sound catalog</h1>
-              <p>
+              <h1>{exploreView === "tracks" ? "Sound tracks" : "Sound catalog"}</h1>
+              {exploreView === "sounds" && <p>
                 {Object.keys(sounds).length} generated sounds and studies ·
                 adjustable tuning · layered playback
-              </p>
+              </p>}
             </div>
             </>}
-            <div className="segmented" aria-label="Explore collection">
+            {(exploreView === "sounds" || exploreView === "nature") && <div className="segmented" aria-label="Explore collection">
               <button
                 aria-pressed={exploreView === "sounds"}
                 onClick={() => navigate("explore", { exploreView: "sounds" })}
@@ -966,8 +1033,8 @@ export default function App() {
               </button>
 
               <button aria-pressed={exploreView === "nature"} onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature library</button>
-            </div>
-            {exploreView === "tracks" ? <SoundTracks/> : exploreView === "packs" ? (
+            </div>}
+            {exploreView === "tracks" ? <SoundTracks defaultOpen/> : exploreView === "packs" ? (
               <PacksPanel />
             ) : exploreView === "nature" ? (
               <NatureLibrary master={master} onMaster={setMaster} sessions={sessions} onSave={row=>storeRows([...sessions,row])} initialSession={natureSessionToLoad} onLoaded={()=>setNatureSessionToLoad(undefined)} onLibrary={()=>navigate("library",{libraryView:"audio",librarySection:"all"})}/>
@@ -1051,7 +1118,8 @@ export default function App() {
               </div>
               <button
                 className="text-button"
-                onClick={() => {
+                onClick={(event) => {
+                  modalOpener.current = event.currentTarget;
                   setSaving(true);
                   setMessage("");
                 }}
@@ -1185,7 +1253,11 @@ export default function App() {
               <button
                 className="text-button"
                 disabled={!current.length}
-                onClick={() => setSaving(true)}
+                onClick={(event) => {
+                  modalOpener.current = event.currentTarget;
+                  setSaveAsSequence(false);
+                  setSaving(true);
+                }}
               >
                 Save
               </button>
@@ -1199,17 +1271,18 @@ export default function App() {
               <div>
                 <h1>Library</h1>
               </div>
-              {libraryView === "audio" && (
+              {!playlistView && libraryView === "audio" && (
                 <button onClick={() => importInput.current?.click()}>
-                  <Upload size={18} /> Import
+                  <Upload size={18} /> Import mix
                 </button>
               )}
             </div>
-            <PlaylistLibrary sessions={sessions}/>
-            <div className="fields"><label>Search library<input aria-label="Search library" type="search" value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} placeholder="Name, sentence, tag or collection"/></label><label>Sort<select aria-label="Sort library" value={librarySort} onChange={e=>setLibrarySort(e.target.value)}><option value="recent">Recently added</option><option value="name">Name A–Z</option></select></label></div>
             <div className="segmented" aria-label="Library collection">
+              <button aria-pressed={playlistView} onClick={() => navigate("library", { librarySection: "playlists" })}>
+                Playlists
+              </button>
               <button
-                aria-pressed={libraryView === "manifestation"}
+                aria-pressed={!playlistView && libraryView === "manifestation"}
                 onClick={() =>
                   navigate("library", {
                     libraryView: "manifestation",
@@ -1220,7 +1293,7 @@ export default function App() {
                 Affirmations
               </button>
               <button
-                aria-pressed={libraryView === "audio"}
+                aria-pressed={!playlistView && libraryView === "audio"}
                 onClick={() =>
                   navigate("library", {
                     libraryView: "audio",
@@ -1231,7 +1304,23 @@ export default function App() {
                 Audio library
               </button>
             </div>
-            {libraryView === "manifestation" ? (
+            {!playlistView && <div className="fields">
+              <label>{libraryView === "audio" ? "Search saved mixes" : "Search affirmations and practices"}
+                <input aria-label="Search library" type="search" value={libraryQuery}
+                  onChange={event => { setLibraryQuery(event.target.value); setSelectedSessions([]); }}
+                  placeholder="Name, sentence, tag or collection"/>
+              </label>
+              <label>Sort saved items <select aria-label="Sort library" value={librarySort} onChange={event => setLibrarySort(event.target.value)}>
+                <option value="recent">{libraryView === "audio" ? "Recently added" : "Recently saved"}</option><option value="name">Name A–Z</option>
+              </select></label>
+            </div>}
+            {!playlistView && libraryView === "manifestation" && (
+              <div className="home-actions" aria-label="Manifestation library shortcuts">
+                <button onClick={() => navigate("library", { librarySection: "saved" })}>Saved practices</button>
+                <button onClick={() => navigate("library", { librarySection: "recordings" })}>Recordings</button>
+              </div>
+            )}
+            {playlistView ? <PlaylistLibrary sessions={sessions} tracks={localTracks} trackError={trackReadError}/> : libraryView === "manifestation" ? (
               <ManifestLibrary
                 search={libraryQuery}
                 sort={librarySort}
@@ -1268,7 +1357,22 @@ export default function App() {
                 </section>
                 <PacksPanel library master={master} onMaster={setMaster} />
                 <h2>Saved sessions</h2>
-                <div className="home-actions"><button disabled={!sessions.length} onClick={()=>setSelectedSessions(sessions.filter(s=>matchesItem(s.name+" "+s.kind,"session",s.id,libraryQuery)).map(s=>s.id))}>Select shown mixes</button><button onClick={()=>setSelectedSessions([])}>Clear mix selection</button><button disabled={!selectedSessions.length} onClick={()=>{const text=JSON.stringify({kind:"core-aura-session-collection",schemaVersion:1,sessions:sessions.filter(s=>selectedSessions.includes(s.id))});if(text.length>100000){setMessage("Select fewer mixes or use a full backup ZIP.");return;}void deliverFile(new Blob([text],{type:"application/json"}),"core-aura-mixes.json").then(setMessage).catch(e=>setMessage(e.message));}}>Export selected mixes</button><button disabled={!selectedSessions.length} onClick={()=>{if(confirm("Delete selected saved mixes? Currently loaded settings remain.")){if(storeRows(sessions.filter(s=>!selectedSessions.includes(s.id))))setSelectedSessions([]);}}}>Delete selected mixes</button></div>
+                <div className="home-actions">
+                  <button disabled={!visibleSessions.length} onClick={() => setSelectedSessions(visibleSessions.map(row => row.id))}>Select shown mixes</button>
+                  <button disabled={!chosenSessions.length} onClick={() => setSelectedSessions([])}>Clear mix selection</button>
+                  <button disabled={!chosenSessions.length} onClick={() => {
+                    const text = JSON.stringify({kind: "core-aura-session-collection", schemaVersion: 1, sessions: chosenSessions});
+                    if (text.length > 100000) { setMessage("Select fewer mixes or use a full backup ZIP."); return; }
+                    void deliverFile(new Blob([text], {type: "application/json"}), "core-aura-mixes.json").then(setMessage).catch(error => setMessage(error.message));
+                  }}>Export selected mixes</button>
+                  <button disabled={!chosenSessions.length} onClick={() => {
+                    if (confirmSourceDeletion("session", chosenSessions, "Currently loaded settings remain.")) {
+                      if (storeRows(sessions.filter(row => !chosenSessions.some(chosen => chosen.id === row.id)))) setSelectedSessions([]);
+                    }
+                  }}>Delete selected mixes</button>
+                </div>
+                {chosenSessions.length > 0 && <p className="content-note">{chosenSessions.length} {chosenSessions.length === 1 ? "mix" : "mixes"} selected</p>}
+                {sessions.length > 0 && !visibleSessions.length && <p role="status">No mixes match this search.</p>}
                 {!sessions.length && (
                   <div className="empty">
                     <Library size={36} />
@@ -1279,20 +1383,24 @@ export default function App() {
                     </button>
                   </div>
                 )}
-                {sessions.filter(s=>matchesItem(s.name+" "+s.kind,"session",s.id,libraryQuery)).slice().sort((a,b)=>librarySort==="name"?a.name.localeCompare(b.name):0).map((row) => (
+                {visibleSessions.map((row) => (
                   <article className="saved-card" key={row.id}>
                     <label className="check"><input type="checkbox" aria-label={"Select mix "+row.name} checked={selectedSessions.includes(row.id)} onChange={e=>setSelectedSessions(e.target.checked?[...selectedSessions,row.id]:selectedSessions.filter(id=>id!==row.id))}/> Select</label>
                     <div>
                       <h3>{row.name}</h3>
                       <p>
                         {row.channels.length} layers ·{" "}
-                        {time(row.channels[0].seconds)} · {row.kind}
+                        {time(sessionDuration(row))} · {row.sequenceGap === undefined ? row.kind : "chakra sequence"}
                       </p>
                     </div>
                     <button className="primary" onClick={() => load(row)}>
                       Open
                     </button>
                     <div className="saved-actions">
+                      <button aria-label={"Play saved mix " + row.name} onClick={() => {
+                        void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions), row.name)
+                          .catch(error => setMessage(error.message));
+                      }}>Play</button>
                       <PinButton item={{kind:"session",id:row.id}}/>
                       <LibraryLabels item={{kind:"session",id:row.id}}/>
                       <button onClick={()=>{try{storeRows([...sessions,{...row,id:crypto.randomUUID(),name:(row.name+" copy").slice(0,80)}]);}catch(e){setMessage((e as Error).message);}}}>Duplicate</button>
@@ -1313,12 +1421,13 @@ export default function App() {
                         Rename
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={(event) => {
+                          modalOpener.current = event.currentTarget;
                           setExporting(row);
                           setExportSeconds(
                             Math.min(
                               60,
-                              Math.max(...row.channels.map((c) => c.seconds)),
+                              sessionDuration(row),
                             ),
                           );
                           setExportError("");
@@ -1331,7 +1440,7 @@ export default function App() {
                       </button>
                       <button
                         onClick={() => {
-                          if (confirm("Delete " + row.name + "?"))
+                          if (confirmSourceDeletion("session", [row]))
                             storeRows(sessions.filter((s) => s.id !== row.id));
                         }}
                       >
@@ -1360,7 +1469,7 @@ export default function App() {
           </>
         )}
         {(isStudio || isChakras) && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
-        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature") || (tab === "library" && libraryView === "audio")) && <SoundTracks />}
+        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature") || (tab === "library" && !playlistView && libraryView === "audio")) && <SoundTracks />}
         {isChakras && <details className="generated-track-panel">
           <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
           <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
@@ -1729,8 +1838,14 @@ export default function App() {
                 onChange={(e) => setSaveName(e.target.value)}
               />
             </label>
+            {isChakras && <label className="check">
+              <input type="checkbox" checked={saveAsSequence} onChange={event => setSaveAsSequence(event.target.checked)} />
+              Save as a sequence
+            </label>}
             <p>
-              {current.length} layers · {time(seconds)}
+              {current.length} layers · {time(isChakras && saveAsSequence
+                ? current.length * sequence.seconds + Math.max(0, current.length - 1) * sequence.gap
+                : seconds)}
             </p>
             <button
               className="primary wide"

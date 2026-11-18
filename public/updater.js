@@ -29,7 +29,7 @@ async function update() {
     while (Date.now() < deadline) {
       const active = registration.active;
       if (active?.state === 'activated' && await workerVersion(active) === version) {
-        message.textContent = 'Core-aura v' + version + ' is ready. Opening Sound Studio…';
+        message.textContent = 'Core-aura v' + version + ' is ready. Opening Core-aura…';
         location.replace('/?updated=' + encodeURIComponent(version));
         return;
       }

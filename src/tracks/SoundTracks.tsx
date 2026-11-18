@@ -1,3 +1,4 @@
+import { confirmSourceDeletion } from "../playlists/store";
 import {prepareSound} from "../workbench/actions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play, Pause, Square, Plus, Volume2, VolumeX } from "lucide-react";
@@ -5,7 +6,7 @@ import { engine } from "../audio/engine";
 import { deliverFile } from "../files/deliver";
 import { audioDuration, changeTrack, importTrack, tracks, Track, trackBlob, trackEvent, validateTrackFile } from "./storage";
 const clock = (n: number) => Math.floor(Math.max(0, n) / 60) + ":" + String(Math.floor(Math.max(0, n) % 60)).padStart(2, "0");
-export function SoundTracks() {
+export function SoundTracks({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
     const [rows, setRows] = useState<Track[]>([]), [message, setMessage] = useState(""), [busy, setBusy] = useState("");
     const [editing, setEditing] = useState(""), [title, setTitle] = useState("");
     const input = useRef<HTMLInputElement>(null), alive = useRef(true), states = useSyncExternalStore(engine.subscribe, engine.snapshot);
@@ -73,11 +74,11 @@ export function SoundTracks() {
             setMessage((e as Error).message);
         }
     }
-    return <details className="soundtrack-panel" id="soundtracks">
-    <summary>Sound tracks <span>{rows.length} on device · {states.filter(s => s.id.startsWith("track:") && s.status === "playing").length} playing</span></summary>
+    return <details className="soundtrack-panel" id="soundtracks" open={defaultOpen || undefined}>
+    <summary>{defaultOpen ? "Your tracks" : "Sound tracks"} <span>{rows.length} on device · {states.filter(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:") && s.status === "playing").length} playing</span></summary>
     <div className="track-toolbar">
       <button onClick={() => input.current?.click()} disabled={Boolean(busy)}><Plus size={17}/> Add audio</button>
-      <button disabled={!states.some(s => s.id.startsWith("track:"))} onClick={() => states.filter(s => s.id.startsWith("track:")).forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button>
+      <button disabled={!states.some(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:"))} onClick={() => states.filter(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:")).forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button>
     </div>
     <input ref={input} className="sr-only" aria-label="Import sound tracks" type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
         void add(files); }}/>
@@ -100,7 +101,7 @@ export function SoundTracks() {
           <button disabled={!state} aria-label={"Forward 10 seconds " + row.title} onClick={() => engine.seekSoundtrack(row.id, position + 10)}>+10 sec</button>
           <button onClick={() => { setEditing(row.id); setTitle(row.title); }}>Rename</button>
           <button disabled={Boolean(busy)} onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export original</button>
-          <button disabled={Boolean(busy)} onClick={() => { if (confirm("Remove " + row.title + " from this device? Export its original first if you need a backup."))
+          <button disabled={Boolean(busy)} onClick={() => { if (confirmSourceDeletion("track", [{id: row.id, name: row.title}], "Export its original first if you need a backup."))
                 void run(async () => { await changeTrack(row.id, null); engine.stop(row.id); setEditing(""); }, row.id); }}>Delete track</button>
         </div>
         <p className="content-note">Files and settings stay on this device. Supported formats depend on the device. Export original for a backup; generated-session exports do not include imported audio.</p>

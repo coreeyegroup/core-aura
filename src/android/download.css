@@ -1,7 +1,7 @@
 :root {
   font-family: system-ui, sans-serif;
-  color: #eaecef;
-  background: #14161c;
+  color: #edf3f7;
+  background: #10161d;
   color-scheme: dark;
 }
 * {
@@ -21,17 +21,17 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #353a45;
+  border-bottom: 1px solid #344451;
   padding: 4px 0 14px;
 }
 header a {
   font-weight: 800;
-  color: #eaecef;
+  color: #edf3f7;
   text-decoration: none;
 }
 header span {
   font-size: 11px;
-  color: #a2acbb;
+  color: #aebcc9;
 }
 h1 {
   font-size: 25px;
@@ -41,12 +41,12 @@ h2 {
   font-size: 18px;
 }
 p {
-  color: #b8c0cc;
+  color: #aebcc9;
   font-size: 14px;
 }
 section {
-  border: 1px solid #424956;
-  background: #1e2028;
+  border: 1px solid #6e8493;
+  background: #18212a;
   border-radius: 8px;
   padding: 12px;
   margin: 12px 0;
@@ -59,11 +59,11 @@ dl div {
   justify-content: space-between;
   gap: 12px;
   padding: 7px 0;
-  border-bottom: 1px solid #353a45;
+  border-bottom: 1px solid #344451;
   font-size: 14px;
 }
 dt {
-  color: #b8c0cc;
+  color: #aebcc9;
 }
 dd {
   margin: 0;
@@ -87,7 +87,7 @@ button,
 }
 button {
   background: #292d37;
-  color: #eaecef;
+  color: #edf3f7;
 }
 button:disabled {
   opacity: 0.6;

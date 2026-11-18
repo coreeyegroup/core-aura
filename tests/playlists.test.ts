@@ -122,3 +122,31 @@ finally {
     vi.unstubAllGlobals();
     vi.resetModules();
 } });
+
+it("plays saved chakra channels in order and keeps the transition gap paused", async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const root = { ...channel("sine", 396), id: "root", seconds: 1 };
+    const sacral = { ...channel("sine", 417), id: "sacral", seconds: 1 };
+    const sequence = {
+        ...session, id: "chakra-sequence", kind: "chakras" as const,
+        channels: [root, sacral], sequenceGap: 1,
+    };
+    try {
+        await h.player.start(resolveItems([{ kind: "session", id: sequence.id }], [], [sequence]), "Chakras");
+        expect(h.audio.play.mock.calls.map(([value]) => value.hz)).toEqual([396]);
+        h.end();
+        await vi.advanceTimersByTimeAsync(600);
+        h.player.pause();
+        await vi.advanceTimersByTimeAsync(1500);
+        expect(h.audio.play).toHaveBeenCalledTimes(1);
+        await h.player.resume();
+        await vi.advanceTimersByTimeAsync(800);
+        expect(h.audio.play.mock.calls.map(([value]) => value.hz)).toEqual([396, 417]);
+        h.end();
+        await vi.advanceTimersByTimeAsync(250);
+        expect(h.player.snapshot()).toMatchObject({ status: "completed", elapsed: 3 });
+    } finally {
+        h.player.dispose();
+    }
+});

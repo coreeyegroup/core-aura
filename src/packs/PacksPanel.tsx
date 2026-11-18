@@ -170,7 +170,7 @@ export function PacksPanel({
       aria-label={library ? "Downloaded packs" : "Sound pack catalog"}
     >
       <div className="section-heading">
-        <h2>{library ? "Downloaded packs" : "Sound packs"}</h2>
+        {library ? <h2>Downloaded packs</h2> : <h1>Sound packs</h1>}
         {!library && (
           <button onClick={refresh} disabled={Boolean(download)}>
             Refresh catalog

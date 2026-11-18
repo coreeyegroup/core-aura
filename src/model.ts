@@ -1,5 +1,5 @@
 import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
-export const VERSION = "0.29.0";
+export const VERSION = "0.30.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -43,6 +43,7 @@ export type Session = {
   channels: Channel[];
   master: number;
   createdAt: string;
+  sequenceGap?: number;
 };
 const instrumentSounds: Record<
   Exclude<Sound, AmbienceSound>,
@@ -248,7 +249,19 @@ export function parseSession(value: unknown): Session {
     )
   )
     throw Error("This chakra session uses unsupported settings.");
+  if (s.sequenceGap !== undefined && (s.kind !== "chakras" ||
+      !Number.isFinite(s.sequenceGap) || s.sequenceGap < 0 || s.sequenceGap > 30 ||
+      s.channels.some(channel => channel.seconds !== s.channels[0].seconds))) {
+    throw Error("This chakra sequence has invalid timing.");
+  }
   if (s.kind === "nature" && (s.channels.length>8 || s.channels.some(c=>!/^nature:[a-zA-Z0-9-]{1,80}$/.test(c.id))))
     throw Error("This nature mix uses unsupported channel identifiers.");
   return { ...s, channels: s.channels.map((c) => ({ ...c })) };
+}
+
+export function sessionDuration(session: Session) {
+  return session.sequenceGap === undefined
+    ? Math.max(...session.channels.map(channel => channel.seconds))
+    : session.channels.reduce((total, channel) => total + channel.seconds, 0)
+      + (session.channels.length - 1) * session.sequenceGap;
 }

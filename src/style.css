@@ -1879,7 +1879,7 @@ progress {
   font-size: calc(11px * var(--text-scale));
   padding-inline: 6px;
 }
-.saved-practices-section {
+.saved-practices-section, .recordings-section {
   display: grid;
   gap: var(--gap);
   scroll-margin-top: 75px;

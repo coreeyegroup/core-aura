@@ -26,3 +26,26 @@ if (typeof window !== "undefined")
         restore();
         listeners.forEach(f => f());
     } });
+
+export function confirmSourceDeletion(
+    kind: Playlist["items"][number]["kind"],
+    sources: { id: string; name: string }[],
+    detail = "",
+) {
+    if (!sources.length) return false;
+    const ids = new Set(sources.map(source => source.id));
+    const affected = state.data.playlists.filter(playlist =>
+        playlist.items.some(item => item.kind === kind && ids.has(item.id)));
+    const lines = [
+        `Delete ${sources.length} ${sources.length === 1 ? "item" : "items"} from this device?`,
+        ...sources.map(source => "• " + source.name),
+    ];
+    if (detail) lines.push("", detail);
+    if (affected.length) {
+        lines.push("", "These playlists will need repair before they can play:",
+            ...affected.map(playlist => "• " + playlist.name));
+    } else if (state.error) {
+        lines.push("", "Playlist dependencies could not be checked.");
+    }
+    return confirm(lines.join("\n"));
+}
