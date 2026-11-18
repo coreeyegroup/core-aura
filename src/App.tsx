@@ -1,3 +1,6 @@
+import {queuePlayer} from "./playlists/runtime";
+import {QueueTransport} from "./playlists/QueueTransport";
+import {PlaylistLibrary} from "./playlists/PlaylistLibrary";
 import {chakraSequence} from "./workbench/sequence";
 import {SequenceTransport} from "./workbench/SequenceControls";
 import {BackgroundControls} from "./manifestation/BackgroundControls";
@@ -172,6 +175,8 @@ export default function App() {
       heading.focus({ preventScroll: true });
     }
   }, [tab]);
+  const queue=useSyncExternalStore(queuePlayer.subscribe,queuePlayer.snapshot);
+  const queueBusy=["playing","paused","error"].includes(queue.status);
   const [due, setDue] = useState<Due | null>(null);
   const practice = useSyncExternalStore(
     manifestPlayer.subscribe,
@@ -727,6 +732,7 @@ export default function App() {
       setUpdateStatus("Could not reach the update service. Please try again.");
     }
   }
+  useEffect(()=>{if(!queueBusy)queuePlayer.setOutput(master);},[queueBusy,master]);
   const focus = layers[0];
   const activeCount = states.filter((s) => s.status === "playing").length;
   const errorInvalid = currentWithTime.some((c) => !validChannel(c));
@@ -844,7 +850,7 @@ export default function App() {
             <AudioLines size={21} />
           </span>
           <span className="brand-name">
-            CORE AURA<small>PERSONAL WORKSPACE</small>
+            CORE AURA<small>MEDITATION & MANIFESTATION</small>
           </span>
         </a>
         <div className="header-actions">
@@ -873,7 +879,7 @@ export default function App() {
         </div>
       </header>
       <main id="main" tabIndex={-1} inert={settings||saving||!!exporting ? true : undefined}>
-        {showPlaybackBar &&
+        {!queueBusy && showPlaybackBar &&
           (isStudio || isChakras || isNatureView || (tab === "manifest" && !practiceBusy)) &&
           playbackBar}
         {due && (
@@ -895,7 +901,7 @@ export default function App() {
         {tab === "home" && (
           <Dashboard
             sessions={sessions.length}
-            controls={<HomeControls sessions={sessions} layers={layers} states={states} soundSeconds={studioSeconds} chakraSeconds={chakraSeconds} master={master} chakraChannels={chakraChannels} selected={selected} target={mixTarget} onLayer={patch} onSound={configureSound} onSession={homeSession} onSoundSeconds={setStudioSeconds} onChakraSeconds={setChakraSeconds} onMaster={setMaster} onSelected={setSelected} onTarget={setMixTarget} onChakra={patch} onSelectPractice={selectHomePractice} onPractice={openManifest} onOpen={page=>page==="manifest"?navigate("manifest",{manifestSection:"practice"}):page==="schedule"?navigate("manifest",{manifestSection:"schedule"}):page==="nature"?navigate("explore",{exploreView:"nature"}):navigate(page)} tools={<div className="home-actions"><button onClick={()=>openTool("affirmations")}>Affirmations</button><button onClick={()=>openTool("recordings")}>Recordings</button><button onClick={()=>openTool("packs")}>Sound packs</button><button onClick={()=>openTool("sessions")}>Saved sessions</button><button onClick={()=>setSettings(true)}>Display</button></div>}/>}
+            controls={<HomeControls sessions={sessions} onPractice={openManifest} onOpen={page=>page==="manifest"?navigate("manifest",{manifestSection:"practice"}):page==="schedule"?navigate("manifest",{manifestSection:"schedule"}):page==="nature"?navigate("explore",{exploreView:"nature"}):navigate(page)} tools={<div className="home-actions"><button onClick={()=>openTool("affirmations")}>Affirmations</button><button onClick={()=>openTool("recordings")}>Recordings</button><button onClick={()=>openTool("packs")}>Sound packs</button><button onClick={()=>openTool("sessions")}>Saved sessions</button><button onClick={()=>navigate("manifest",{manifestSection:"schedule"})}>Schedule</button></div>}/>}
             onTool={openTool}
             onContinue={() =>
               navigate("manifest", { manifestSection: "practice" })
@@ -914,6 +920,7 @@ export default function App() {
         {tab === "manifest" && (
           <Manifestation
             sessions={sessions}
+            queueActive={queueBusy}
             initialView={manifestSection}
             onView={(view) => navigate("manifest", { manifestSection: view })}
             onLibrary={() => openTool("affirmations")}
@@ -1197,6 +1204,7 @@ export default function App() {
                 </button>
               )}
             </div>
+            <PlaylistLibrary sessions={sessions}/>
             <div className="fields"><label>Search library<input aria-label="Search library" type="search" value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} placeholder="Name, sentence, tag or collection"/></label><label>Sort<select aria-label="Sort library" value={librarySort} onChange={e=>setLibrarySort(e.target.value)}><option value="recent">Recently added</option><option value="name">Name A–Z</option></select></label></div>
             <div className="segmented" aria-label="Library collection">
               <button
@@ -1371,7 +1379,7 @@ export default function App() {
           </div>
         )}
       </main>
-      {(isStudio || isChakras) && (
+      {!queueBusy && (isStudio || isChakras) && (
         <section
           ref={dockRef}
           className="player-dock"
@@ -1432,12 +1440,13 @@ export default function App() {
           )}
         </section>
       )}
-      {showPlaybackBar &&
+      {!queueBusy && showPlaybackBar &&
         !isStudio &&
         !isChakras &&
         !isNatureView &&
         tab !== "manifest" &&
         playbackBar}
+      <QueueTransport/>
       <nav className="bottom-nav" aria-label="Main navigation">
         {tabs.map(([id, label, Icon]) => (
           <button

@@ -34,7 +34,7 @@ export function applyAppearance(value: Appearance) {
         : "light"
       : value.theme;
   root.dataset.resolvedTheme = resolved;
-  const colors = { light: "#f5f6f8", dark: "#14161c", contrast: "#000000" };
+  const colors = { light: "#f3f7f4", dark: "#111b19", contrast: "#000000" };
   const meta = document.querySelector<HTMLMetaElement>(
     'meta[name="theme-color"]',
   );

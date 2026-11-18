@@ -81,6 +81,7 @@ function NumberField({
   );
 }
 export function Manifestation({
+  queueActive = false,
   onLibrary,
   sessions = [],
   initialView = "practice",
@@ -88,6 +89,7 @@ export function Manifestation({
 }: {
   onLibrary: () => void;
   sessions?: Session[];
+  queueActive?: boolean;
   initialView?: string;
   onView?: (view: "practice" | "schedule") => void;
 }) {
@@ -596,7 +598,7 @@ export function Manifestation({
           }}
         />
       )}
-      <section
+      {!queueActive&&<section
         ref={dock}
         className="player-dock manifest-player-dock"
         aria-label="Manifestation player"
@@ -626,7 +628,7 @@ export function Manifestation({
             Resume repeats the current sentence from its beginning.
           </p>
         )}
-      </section>
+      </section>}
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}

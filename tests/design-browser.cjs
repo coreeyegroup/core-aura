@@ -138,7 +138,7 @@ const { chromium } = require("playwright"),
       await p.evaluate(
         () => document.querySelector('meta[name="theme-color"]').content,
       ),
-      "#f5f6f8",
+      "#f3f7f4",
     );
     await p.setViewportSize({ width: 1366, height: 900 });
     await navigate(p, "Studio");

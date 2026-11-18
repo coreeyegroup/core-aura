@@ -78,7 +78,7 @@ const { chromium } = require("playwright"),
       const nav=async(name)=>{await p.locator('.bottom-nav').getByRole('button',{name,exact:true}).click();if(name==='Home')await tools();};
       await p.goto("http://localhost:8089");await tools();
       await p
-        .locator(".tool-grid")
+        .locator('[data-module="tools"]')
         .getByRole("button", { name: "Schedule", exact: true })
         .click();
       assert.ok(p.url().endsWith("#manifest/schedule"));
@@ -86,10 +86,8 @@ const { chromium } = require("playwright"),
       await p.getByLabel("Reminder time", { exact: true }).waitFor();
       await p.goBack();
       await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();await tools();
-      await p
-        .locator(".intention-grid")
-        .getByRole("button", { name: /Wealth/ })
-        .click();
+      await nav("Library");
+      await p.getByLabel("Category",{exact:true}).selectOption("Wealth");
       assert.equal(
         await p.getByLabel("Category", { exact: true }).inputValue(),
         "Wealth",
@@ -120,10 +118,8 @@ const { chromium } = require("playwright"),
         .fill("Unsaved draft");
       await nav("Home");
       p.once("dialog", (d) => d.dismiss());
-      await p
-        .locator(".ticker-open")
-        .filter({ hasText: "Second practice" })
-        .click();
+      await p.getByLabel("Home manifestation",{exact:true}).selectOption("second");
+      await p.locator('[data-module="manifest"]').getByRole("button",{name:"Open section",exact:true}).click();
       assert.ok(p.url().endsWith("#home"));
       assert.equal(
         await p.evaluate(
@@ -134,10 +130,8 @@ const { chromium } = require("playwright"),
         "Unsaved draft",
       );
       p.once("dialog", (d) => d.accept());
-      await p
-        .locator(".ticker-open")
-        .filter({ hasText: "Second practice" })
-        .click();
+      await p.getByLabel("Home manifestation",{exact:true}).selectOption("second");
+      await p.locator('[data-module="manifest"]').getByRole("button",{name:"Open section",exact:true}).click();
       assert.equal(
         await p.getByLabel("Practice name", { exact: true }).inputValue(),
         "Second practice",
@@ -156,7 +150,8 @@ const { chromium } = require("playwright"),
         "second",
       );
       await nav("Home");
-      await p.getByRole("button", { name: "View all", exact: true }).click();
+      await nav("Library");
+      await p.evaluate(()=>{location.hash="#library/practices";});
       await p.locator(".saved-practices-section").waitFor();
       assert.ok(p.url().includes("#library/practices"));
       assert.equal(
@@ -170,10 +165,7 @@ const { chromium } = require("playwright"),
         .getByRole("heading", { name: "Second updated", exact: true })
         .waitFor();
       await nav("Home");
-      await p
-        .locator(".tone-grid")
-        .getByRole("button", { name: /528/ })
-        .click();
+      await p.locator('[data-module="sound"]').getByRole("button",{name:"Create",exact:true}).click();
       await p.getByLabel("Frequency (Hz)", { exact: true }).fill("321");
       await p.getByRole("button", { name: "Play", exact: true }).last().click();
       await p
@@ -220,7 +212,7 @@ const { chromium } = require("playwright"),
         .selectOption("speech");
       await p.locator(".sentence-queue-head .preview-button").click();
       await nav("Home");
-      assert.ok((await p.getByLabel('Home practice',{exact:true}).textContent()).includes('Second updated'));
+      assert.ok((await p.getByLabel('Home manifestation',{exact:true}).textContent()).includes('Second updated'));
       await nav("Manifest");
       await p
         .getByRole("button", { name: "Play practice", exact: true })
@@ -269,7 +261,7 @@ const { chromium } = require("playwright"),
       assert.ok((await p.evaluate(() => window.__voiceStops)) > stops);
       await nav("Home");
       await p
-        .locator(".tool-grid")
+        .locator('[data-module="tools"]')
         .getByRole("button", { name: "Sound packs", exact: true })
         .click();
       await p.reload();

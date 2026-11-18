@@ -1,3 +1,4 @@
+import {parsePlaylists} from "../playlists/model";
 import {parseSequenceConfig} from "./sequence";
 import {parseSession,sounds} from "../model";
 import {parsePlan,parseReminders} from "../manifestation/model";
@@ -9,14 +10,15 @@ import {parseHistory} from "./history";
 import {parsePack,validateWav} from "../packs/catalog";
 import {trackSettings,validateTrackFile} from "../tracks/storage";
 import {zipStored,unzipStored} from "./archive";
-export const backupKeys=["core-aura.chakra-sequence.v1","core-aura.audio-defaults.v1","core-aura.voice-defaults.v1","core-aura.sessions.v2","core-aura.manifestation.v1","core-aura.affirmation-library.v1","core-aura.workspace.v1","core-aura.nature.draft.v1","core-aura.appearance","core-aura.favorites","core-aura.workbench.v1","core-aura.history.v1","core-aura.chakra-timer","core-aura.composer.v1","core-aura.last-sound-view","core-aura.library-view"];
+export const backupKeys=["core-aura.playlists.v1","core-aura.chakra-sequence.v1","core-aura.audio-defaults.v1","core-aura.voice-defaults.v1","core-aura.sessions.v2","core-aura.manifestation.v1","core-aura.affirmation-library.v1","core-aura.workspace.v1","core-aura.nature.draft.v1","core-aura.appearance","core-aura.favorites","core-aura.workbench.v1","core-aura.history.v1","core-aura.chakra-timer","core-aura.composer.v1","core-aura.last-sound-view","core-aura.library-view"];
 const sources={tracks:{db:"core-aura-soundtracks",store:"tracks"},recordings:{db:"core-aura-personal-voice",store:"recordings"},packs:{db:"core-aura-packs",store:"packs"}};
 export type MediaKind=keyof typeof sources;
 export async function mediaRows(kind:MediaKind):Promise<any[]>{const {db:name,store}=sources[kind];const db=await new Promise<IDBDatabase>((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore(store,{keyPath:"id"});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(Error("Media storage unavailable."));r.onblocked=()=>reject(Error("Close other Core-aura windows."));});return new Promise((resolve,reject)=>{const tx=db.transaction(store,"readonly"),request=tx.objectStore(store).getAll();tx.oncomplete=()=>{db.close();resolve(request.result);};tx.onabort=tx.onerror=()=>{db.close();reject(Error("Media could not be read."));};});}
 async function writeRows(kind:MediaKind,rows:any[]){const {db:name,store}=sources[kind];await new Promise<void>((resolve,reject)=>{const r=indexedDB.open(name,1);r.onsuccess=()=>{const db=r.result,tx=db.transaction(store,"readwrite"),s=tx.objectStore(store);s.clear();rows.forEach(row=>s.put(row));tx.oncomplete=()=>{db.close();resolve();};tx.onerror=tx.onabort=()=>{db.close();reject(Error("Media restore failed; recovery will be attempted."));};};r.onerror=()=>reject(Error("Media storage unavailable."));});}
 export function validateSettings(value:unknown):Record<string,string>{
  const input=value as Record<string,string>;if(!input||typeof input!=="object"||Array.isArray(input)||Object.keys(input).length>backupKeys.length)throw Error("Invalid settings backup.");const clean:Record<string,string>={};for(const [key,raw]of Object.entries(input)){if(!backupKeys.includes(key)||typeof raw!=="string"||raw.length>5*1024*1024)throw Error("Unsupported backup setting.");
- if(key.endsWith("chakra-sequence.v1"))parseSequenceConfig(JSON.parse(raw));
+ if(key.endsWith("playlists.v1"))parsePlaylists(JSON.parse(raw));
+ else if(key.endsWith("chakra-sequence.v1"))parseSequenceConfig(JSON.parse(raw));
  else if(key.endsWith("audio-defaults.v1")){const d=JSON.parse(raw);if(!Number.isFinite(d.fadeSeconds)||d.fadeSeconds<.01||d.fadeSeconds>5)throw Error("Invalid fade default.");}
  else if(key.endsWith("voice-defaults.v1")){const d=JSON.parse(raw);if(typeof d.voice!=="string"||d.voice.length>300||!Number.isFinite(d.rate)||d.rate<.5||d.rate>1.5||!Number.isFinite(d.volume)||d.volume<0||d.volume>1)throw Error("Invalid voice defaults.");}
  else if(key.endsWith("sessions.v2")){const rows=JSON.parse(raw);if(!Array.isArray(rows)||rows.length>1000)throw Error("Invalid sessions.");rows.forEach(parseSession);}
