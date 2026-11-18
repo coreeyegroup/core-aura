@@ -1,10 +1,11 @@
-import {Channel} from "../model";
+import {Channel,chakras} from "../model";
 import {engine} from "../audio/engine";
 import {onOtherAudio} from "../audio/activity";
-export type SequenceState={status:"idle"|"playing"|"paused"|"completed";channels:Channel[];index:number;seconds:number;gap:number;elapsed:number;error:string};
+export type SequenceState={status:"idle"|"playing"|"paused"|"completed";channels:Channel[];index:number;seconds:number;gap:number;elapsed:number;error:string;order:string[]};
 export class ChakraSequence {
- private state:SequenceState={status:"idle",channels:[],index:0,seconds:60,gap:0,elapsed:0,error:""};private listeners=new Set<()=>void>();private timer?:ReturnType<typeof setInterval>;private own=false;private seen=false;private nextAt=0;private generation=0;
- constructor(){onOtherAudio(()=>{if(!this.own)this.stop();});}
+ private state:SequenceState={status:"idle",channels:[],index:0,seconds:60,gap:0,elapsed:0,error:"",order:[]};private listeners=new Set<()=>void>();private timer?:ReturnType<typeof setInterval>;private own=false;private seen=false;private nextAt=0;private generation=0;
+ constructor(){try{const raw=JSON.parse(localStorage.getItem("core-aura.chakra-sequence.v1")||"null");if(raw){const config=parseSequenceConfig(raw);this.state={...this.state,...config};}}catch{}onOtherAudio(()=>{if(!this.own)this.stop();});}
+ configure(patch:Partial<{seconds:number;gap:number;order:string[]}>) {if(["playing","paused"].includes(this.state.status))return;const config=parseSequenceConfig({seconds:this.state.seconds,gap:this.state.gap,order:this.state.order,...patch});localStorage.setItem("core-aura.chakra-sequence.v1",JSON.stringify(config));this.update(config);}
  snapshot=()=>this.state;subscribe=(f:()=>void)=>{this.listeners.add(f);return()=>{this.listeners.delete(f);};};
  private update(p:Partial<SequenceState>){this.state={...this.state,...p};this.listeners.forEach(f=>f());}
  start(channels:Channel[],seconds:number,gap:number){if(!channels.length||channels.length>7||!Number.isInteger(seconds)||seconds<1||seconds>3600||!Number.isFinite(gap)||gap<0||gap>30)throw Error("Choose one to seven chakras and valid sequence timing.");this.stop();this.own=true;engine.stopAll();this.own=false;this.update({status:"playing",channels:channels.map(c=>({...c})),index:0,seconds,gap,elapsed:0,error:""});this.play();this.timer=setInterval(()=>this.tick(),100);}
@@ -15,3 +16,5 @@ export class ChakraSequence {
  stop(){this.generation++;if(this.timer)clearInterval(this.timer);this.timer=undefined;if(["playing","paused"].includes(this.state.status))this.state.channels.forEach(c=>engine.stop(c.id));if(this.state.status!=="idle")this.update({status:"idle",elapsed:0});}
 }
 export const chakraSequence=new ChakraSequence();
+
+export function parseSequenceConfig(v:unknown):{seconds:number;gap:number;order:string[]}{const p=v as {seconds:number;gap:number;order:string[]};if(!p||!Number.isInteger(p.seconds)||p.seconds<1||p.seconds>3600||!Number.isFinite(p.gap)||p.gap<0||p.gap>30||!Array.isArray(p.order)||p.order.length>7||new Set(p.order).size!==p.order.length||p.order.some(id=>!chakras.some(c=>c.id===id)))throw Error("Invalid chakra sequence settings.");return structuredClone(p);}

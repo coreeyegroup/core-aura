@@ -267,7 +267,7 @@ export default function App() {
     workspace.data?.mixTarget || "selected",
   );
   const [studioSeconds,setStudioSeconds]=useState(workspace.data?.seconds||300);
-  const [chakraSeconds,setChakraSeconds]=useState(()=>{try{return Number(localStorage.getItem("core-aura.chakra-timer"))||workspace.data?.seconds||300;}catch{return workspace.data?.seconds||300;}});
+  const [chakraSeconds,setChakraSeconds]=useState(()=>{try{const n=Number(localStorage.getItem("core-aura.chakra-timer"));return Number.isInteger(n)&&n>=1&&n<=7200?n:workspace.data?.seconds||300;}catch{return workspace.data?.seconds||300;}});
   const seconds=tab==="chakras"?chakraSeconds:studioSeconds;
   const setSeconds=tab==="chakras"?setChakraSeconds:setStudioSeconds;
   useEffect(()=>{try{localStorage.setItem("core-aura.chakra-timer",String(chakraSeconds));}catch{}},[chakraSeconds]);

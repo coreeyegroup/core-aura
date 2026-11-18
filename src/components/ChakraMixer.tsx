@@ -67,7 +67,7 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
         </article>;
       })}
     </div>
-    <SequenceSetup channels={channels.filter(c=>target==="all"||selected.includes(c.id))}/>
+    <SequenceSetup showTransport={false} channels={channels.filter(c=>target==="all"||selected.includes(c.id))}/>
     <details className="info-panel"><summary>About these frequencies</summary><p>396, 417, 528, 639, 741, 852 and 963 Hz use a modern Solfeggio meditation mapping. These are spiritual listening associations, not established medical treatment frequencies. A pure tone contains one frequency; instruments include harmonics or resonant partials. Start at a comfortable low volume.</p></details>
   </section>;
 }
