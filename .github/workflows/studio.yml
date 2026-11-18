@@ -36,7 +36,7 @@ jobs:
           trap 'kill "$server" "$backend"' EXIT
           curl --retry 15 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8090/api/health
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
-          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.24.0
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.25.0
           npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()

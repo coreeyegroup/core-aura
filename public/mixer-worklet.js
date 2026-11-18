@@ -29,7 +29,8 @@ class CoreAuraMixer extends AudioWorkletProcessor {
       let sum = 0;
       for (const c of this.channels.values()) {
         const value = sample(c, sampleRate);
-        if (!c.muted) sum += value * c.volume;
+        c.mixGain = (c.mixGain ?? c.volume) + (c.volume - (c.mixGain ?? c.volume)) * Math.min(1, 1 / (sampleRate * .04));
+        if (!c.muted) sum += value * c.mixGain;
       }
       out[i] = Math.max(-0.95, Math.min(0.95, sum * scale));
     }

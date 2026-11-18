@@ -676,7 +676,7 @@ export default function App() {
   const errorInvalid = currentWithTime.some((c) => !validChannel(c));
   const practiceBusy = ["playing", "paused"].includes(practice.status);
   const soundStates = states.filter(
-    (state) => state.id !== "manifest-background",
+    (state) => state.id !== "manifest-background" && !state.id.startsWith("manifest-background:"),
   );
   const showPlaybackBar = practiceBusy
     ? tab !== "manifest"
@@ -853,6 +853,7 @@ export default function App() {
         )}
         {tab === "manifest" && (
           <Manifestation
+            sessions={sessions}
             initialView={manifestSection}
             onView={(view) => navigate("manifest", { manifestSection: view })}
             onLibrary={() => openTool("affirmations")}

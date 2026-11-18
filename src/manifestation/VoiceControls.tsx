@@ -60,6 +60,7 @@ export function PreviewButton({
                 gap: 0,
                 mode: "speech",
                 background: null,
+                backgroundMix: null,
                 useRecordings: recorded,
               });
           } catch (e) {

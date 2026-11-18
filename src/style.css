@@ -2180,3 +2180,11 @@ progress {
 :root[data-density="compact"][data-text-size="large"] .nature-save { grid-template-columns:1fr; }
 :root[data-density="compact"][data-text-size="large"] .nature-save button { max-width:none; }
 :root[data-density="compact"][data-text-size="large"] .chakra-mixer { grid-template-columns:1fr; }
+
+.manifest-background-controls { border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:0 var(--pad); }
+.manifest-background-controls > summary { flex-wrap:wrap;gap:4px; }
+.manifest-background-controls > summary .content-note { flex:1;font-weight:400;overflow-wrap:anywhere; }
+.manifest-background-controls[open] { padding-bottom:var(--pad); }
+.background-voice-controls { display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;align-items:center; }
+.manifest-background-controls .check { font-size:calc(12px * var(--text-scale)); }
+[data-text-size="large"] .background-voice-controls { grid-template-columns:1fr; }

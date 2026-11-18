@@ -1,3 +1,5 @@
+import { BackgroundControls } from "./BackgroundControls";
+import { Session } from "../model";
 import { BookOpen, Pencil } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -76,10 +78,12 @@ function NumberField({
 }
 export function Manifestation({
   onLibrary,
+  sessions = [],
   initialView = "practice",
   onView,
 }: {
   onLibrary: () => void;
+  sessions?: Session[];
   initialView?: string;
   onView?: (view: "practice" | "schedule") => void;
 }) {
@@ -404,6 +408,7 @@ export function Manifestation({
                         volume: p.volume || 0.7,
                         repeats: 1,
                         background: null,
+                        backgroundMix: null,
                       };
                       change(sample);
                       manifestPlayer.start(sample);
@@ -547,79 +552,12 @@ export function Manifestation({
                     </label>
                   )}
                 </div>
-                <details>
-                  <summary>Background sound</summary>
-                  <label>
-                    Background sound
-                    <select
-                      aria-label="Background sound"
-                      value={p.background?.sound || "none"}
-                      onChange={(e) =>
-                        change({
-                          background:
-                            e.target.value === "none"
-                              ? null
-                              : {
-                                  sound: e.target.value as
-                                    | "sine"
-                                    | "bowl"
-                                    | "tanpura",
-                                  hz: e.target.value === "tanpura" ? 216 : 432,
-                                  volume: 0.12,
-                                },
-                        })
-                      }
-                    >
-                      <option value="none">None</option>
-                      <option value="sine">Pure tone</option>
-                      <option value="bowl">Singing bowl</option>
-                      <option value="tanpura">Tanpura drone</option>
-                    </select>
-                  </label>
-                  {p.background && (
-                    <>
-                      <label>
-                        Background frequency (Hz)
-                        <NumberField
-                          min={p.background.sound === "sine" ? 20 : 100}
-                          max={
-                            p.background.sound === "sine"
-                              ? 12000
-                              : p.background.sound === "bowl"
-                                ? 1000
-                                : 600
-                          }
-                          value={p.background.hz}
-                          onValue={(hz) =>
-                            change({ background: { ...p.background!, hz } })
-                          }
-                        />
-                      </label>
-                      <label className="range-label">
-                        Background level{" "}
-                        <output>
-                          {Math.round(p.background.volume * 100)}%
-                        </output>
-                        <input
-                          type="range"
-                          aria-label="Background level"
-                          min="0"
-                          max="30"
-                          value={p.background.volume * 100}
-                          onChange={(e) =>
-                            change({
-                              background: {
-                                ...p.background!,
-                                volume: Number(e.target.value) / 100,
-                              },
-                            })
-                          }
-                        />
-                      </label>
-                    </>
-                  )}
-                </details>
+
               </fieldset>
+              <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
+                try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
+                catch(error){setMessage((error as Error).message);}
+              }}/>
             </div>
           </div>
         </>

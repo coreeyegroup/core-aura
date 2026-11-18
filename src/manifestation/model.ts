@@ -1,3 +1,4 @@
+import { Channel, validChannel } from "../model";
 export type Category =
   | "Health"
   | "Wealth"
@@ -95,6 +96,14 @@ export type Plan = {
   rate: number;
   volume: number;
   seconds: number;
+  backgroundMix?: {
+    name: string;
+    channels: Channel[];
+    master: number;
+    volume: number;
+  } | null;
+  backgroundDucking?: boolean;
+  backgroundDuckLevel?: number;
   background: null | {
     sound: "sine" | "bowl" | "tanpura";
     hz: number;
@@ -187,6 +196,17 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
       ))
   )
     throw Error("The background sound settings are unsupported.");
+  if (p.backgroundMix != null) {
+    const m = p.backgroundMix;
+    if (p.background !== null || typeof m.name !== "string" || !m.name.trim() || m.name.length > 80 ||
+        !Array.isArray(m.channels) || !m.channels.length || m.channels.length > 8 ||
+        !m.channels.every(validChannel) || new Set(m.channels.map(c=>c.id)).size !== m.channels.length ||
+        !finite(m.master,0,1) || !finite(m.volume,0,1))
+      throw Error("The attached background mix has invalid settings.");
+  }
+  if ((p.backgroundDucking !== undefined && typeof p.backgroundDucking !== "boolean") ||
+      (p.backgroundDuckLevel !== undefined && !finite(p.backgroundDuckLevel,0,1)))
+    throw Error("Invalid background voice-reduction settings.");
   if (p.useRecordings !== undefined && typeof p.useRecordings !== "boolean")
     throw Error("Invalid personal voice setting.");
   if (
