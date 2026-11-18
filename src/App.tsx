@@ -897,23 +897,26 @@ export default function App() {
           </div>
         )}
         {tab === "home" && (
-          <Dashboard
-            sessions={sessions.length}
-            controls={<HomeControls sessions={sessions} onPractice={openManifest} onOpen={page=>page==="manifest"?navigate("manifest",{manifestSection:"practice"}):page==="schedule"?navigate("manifest",{manifestSection:"schedule"}):page==="nature"?navigate("explore",{exploreView:"nature"}):navigate(page)} tools={<div className="home-actions"><button onClick={()=>openTool("affirmations")}>Affirmations</button><button onClick={()=>openTool("recordings")}>Recordings</button><button onClick={()=>openTool("packs")}>Sound packs</button><button onClick={()=>openTool("sessions")}>Saved sessions</button><button onClick={()=>navigate("manifest",{manifestSection:"schedule"})}>Schedule</button></div>}/>}
-            onTool={openTool}
-            onContinue={() =>
-              navigate("manifest", { manifestSection: "practice" })
-            }
-            onPractice={openManifest}
-            onTone={(hz) => openSound("sine", hz)}
-            onCategory={(value) => {
-              navigate("library", {
-                category: value,
-                libraryView: "manifestation",
-                librarySection: "all",
-              });
-            }}
-          />
+          <Dashboard>
+            <HomeControls
+              sessions={sessions}
+              onPractice={openManifest}
+              onOpen={(page) => {
+                if (page === "manifest") navigate("manifest", { manifestSection: "practice" });
+                else if (page === "schedule") openTool("schedule");
+                else navigate(page);
+              }}
+              tools={
+                <div className="home-actions">
+                  <button onClick={() => openTool("affirmations")}>Affirmations</button>
+                  <button onClick={() => openTool("recordings")}>Recordings</button>
+                  <button onClick={() => openTool("packs")}>Sound packs</button>
+                  <button onClick={() => openTool("sessions")}>Saved sessions</button>
+                  <button onClick={() => openTool("schedule")}>Schedule</button>
+                </div>
+              }
+            />
+          </Dashboard>
         )}
         {tab === "manifest" && (
           <Manifestation

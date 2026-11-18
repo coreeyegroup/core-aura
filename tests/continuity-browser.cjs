@@ -85,7 +85,7 @@ const { chromium } = require("playwright"),
       await p.reload();
       await p.getByLabel("Reminder time", { exact: true }).waitFor();
       await p.goBack();
-      await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();await tools();
+      await p.getByRole("heading", { name: "Your practice", exact: true }).waitFor();await tools();
       await nav("Library");
       await p.getByLabel("Category",{exact:true}).selectOption("Wealth");
       assert.equal(
