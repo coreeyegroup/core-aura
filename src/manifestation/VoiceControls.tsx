@@ -335,8 +335,10 @@ export function RecordSentence({
 }
 export function PersonalVoices({
   initiallyOpen = false,
+  allowAttach = true,
 }: {
   initiallyOpen?: boolean;
+  allowAttach?: boolean;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   const [newText, setNewText] = useState("");
@@ -436,7 +438,7 @@ export function PersonalVoices({
             >
               {Capacitor.isNativePlatform() ? "Share WAV" : "Download WAV"}
             </button>
-            <button
+            {allowAttach && <button
               disabled={["playing", "paused"].includes(playback.status)}
               onClick={() => {
                 try {
@@ -466,7 +468,7 @@ export function PersonalVoices({
               }}
             >
               Use in practice
-            </button>
+            </button>}
             <button
               onClick={() => {
                 if (
@@ -491,7 +493,7 @@ export function PersonalVoices({
       ))}
       {!clips.length && (
         <p>
-          No recordings yet. Use Record voice beside a sentence in your
+          No recordings yet. Use Record or import WAV to add a clip, or record beside a sentence in your
           practice.
         </p>
       )}

@@ -29,7 +29,6 @@ import {
   Download,
   Upload,
   Heart,
-  Check,
   ArrowRight,
   WifiOff,
   Sparkles,
@@ -70,6 +69,7 @@ import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
 import { Manifestation, ManifestLibrary } from "./manifestation/Workspace";
+import { VoicePanel } from "./manifestation/VoicePanel";
 import { manifestationStore } from "./manifestation/store";
 import { manifestPlayer } from "./manifestation/player";
 import { observePushReminders } from "./manifestation/push";
@@ -78,7 +78,7 @@ import {
   readAppearance,
   saveAppearance,
   applyAppearance,
-  chakraThemes,
+  defaultCustomColor,
   Appearance,
 } from "./appearance";
 
@@ -112,21 +112,24 @@ const tabs = [
 ] as const;
 
 // Add each rebuilt screen here as it is ready. Explore shares the Sounds tab.
-const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set();
+const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["library"]);
+
+const collections = [
+  { label: "Sounds", libraryView: "sounds", librarySection: "all" },
+  { label: "Backgrounds", libraryView: "backgrounds", librarySection: "all" },
+  { label: "Voices", libraryView: "manifestation", librarySection: "recordings" },
+  { label: "Affirmations", libraryView: "manifestation", librarySection: "all" },
+  { label: "Manifestation practices", libraryView: "manifestation", librarySection: "saved" },
+  { label: "Audio files", libraryView: "audio", librarySection: "all" },
+  { label: "Sound packs", libraryView: "packs", librarySection: "all" },
+  { label: "Saved mixes", libraryView: "mixes", librarySection: "all" },
+  { label: "Playlists", libraryView: "overview", librarySection: "playlists" },
+] as const satisfies readonly (Pick<Route, "libraryView" | "librarySection"> & { label: string })[];
 
 export default function App() {
-  const [route, setRoute] = useState<Route>(() => {
-    let previous = defaultRoute;
-    try {
-      previous = {
-        ...defaultRoute,
-        libraryView:
-          localStorage.getItem("core-aura.library-view") === "audio" ? "audio"
-            : localStorage.getItem("core-aura.library-view") === "backgrounds" ? "backgrounds" : "manifestation",
-      };
-    } catch {}
-    return parseRoute(location.hash || "#"+preferences.snapshot().value.start, previous);
-  });
+  const [route, setRoute] = useState<Route>(() =>
+    parseRoute(location.hash || "#" + preferences.snapshot().value.start),
+  );
   const routeRef = useRef(route);
   routeRef.current = route;
   const {
@@ -141,7 +144,10 @@ export default function App() {
   const showWorkspace = primaryTab === "admin" || rebuiltScreens.has(primaryTab);
   const screenName = tabs.find(([id]) => id === primaryTab)?.[1];
   const playlistView = librarySection === "playlists";
-  const backgroundsView = !playlistView && libraryView === "backgrounds";
+  const backgroundsView = libraryView === "backgrounds";
+  const mixesView = backgroundsView || libraryView === "mixes";
+  const collection = collections.find(item => item.libraryView === libraryView && item.librarySection === librarySection);
+  const manifestReady = rebuiltScreens.has("manifest");
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(() => {
     if (route.tab === "studio" || route.tab === "explore") return route.tab;
     try {
@@ -157,11 +163,6 @@ export default function App() {
       localStorage.setItem("core-aura.last-sound-view", lastSoundTab);
     } catch {}
   }, [lastSoundTab]);
-  useEffect(() => {
-    try {
-      localStorage.setItem("core-aura.library-view", libraryView);
-    } catch {}
-  }, [libraryView]);
   useEffect(() => {
     const restore = () => {
       const next = parseRoute(location.hash, routeRef.current);
@@ -186,13 +187,12 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (showWorkspace && tab === "library" && librarySection !== "all") return;
     const heading = document.querySelector<HTMLElement>("#main h1");
     if (heading) {
       heading.tabIndex = -1;
       heading.focus({ preventScroll: true });
     }
-  }, [tab]);
+  }, [tab, libraryView, librarySection]);
   const queue=useSyncExternalStore(queuePlayer.subscribe,queuePlayer.snapshot);
   const queueBusy=["playing","paused","error"].includes(queue.status);
   const [due, setDue] = useState<Due | null>(null);
@@ -454,7 +454,8 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
-  const isNatureView = tab === "explore" && exploreView === "nature";
+  const isLibrarySounds = tab === "library" && libraryView === "sounds";
+  const isNatureView = (tab === "explore" && exploreView === "nature") || isLibrarySounds;
   const miniRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = miniRef.current;
@@ -606,6 +607,10 @@ export default function App() {
   }, []);
   function navigate(value: Tab, patch: Partial<Route> = {}) {
     if (value === "explore" || value === "studio") setLastSoundTab(value);
+    if ("libraryView" in patch || "librarySection" in patch) {
+      setLibraryQuery("");
+      setSelectedSessions([]);
+    }
     const next = { ...routeRef.current, tab: value, ...patch };
     const hash = routeHash(next);
     if (location.hash !== hash) history.pushState(null, "", hash);
@@ -631,7 +636,7 @@ export default function App() {
       ["affirmations", "recordings", "sessions", "practices"].includes(tool)
     ) {
       navigate("library", {
-        libraryView: tool === "sessions" ? "audio" : "manifestation",
+        libraryView: tool === "sessions" ? "mixes" : "manifestation",
         librarySection:
           tool === "recordings"
             ? "recordings"
@@ -827,11 +832,18 @@ export default function App() {
   );
   const showPlaybackBar = practiceBusy
     ? tab !== "manifest"
-    : (soundStates.length > 0 || ["playing","paused"].includes(sequence.status)) && !(isStudio || isChakras || isNatureView);
+    : (soundStates.length > 0 || ["playing", "paused"].includes(sequence.status))
+      && !isStudio && !isChakras
+      && (!isNatureView || soundStates.some(state => !state.id.startsWith("nature:")));
   const playingSounds = sequence.status==="playing" || soundStates.some((state) => state.status === "playing");
   function openPlayingSound() {
-    if(soundStates.some(s=>s.id.startsWith("nature:"))) {navigate("explore",{exploreView:"nature"});return;}
-    if (soundStates.some((state) => state.id.startsWith("pack:") || state.id.startsWith("track:")))
+    if (soundStates.some(state => state.id.startsWith("nature:"))) {
+      navigate("library", { libraryView: "sounds", librarySection: "all" });
+      return;
+    }
+    if (soundStates.some(state => state.id.startsWith("pack:")))
+      navigate("library", { libraryView: "packs", librarySection: "all" });
+    else if (soundStates.some(state => state.id.startsWith("track:")))
       navigate("library", { libraryView: "audio", librarySection: "all" });
     else
       navigate(
@@ -867,7 +879,9 @@ export default function App() {
         className="playback-location"
         onClick={() =>
           practiceBusy
-            ? navigate("manifest", { manifestSection: "practice" })
+            ? manifestReady
+              ? navigate("manifest", { manifestSection: "practice" })
+              : navigate("library", { libraryView: "manifestation", librarySection: "saved" })
             : openPlayingSound()
         }
       >
@@ -919,6 +933,31 @@ export default function App() {
       </button>
       <details className="global-levels"><summary>Levels</summary><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Player sound output" type="range" min="0" max="100" value={master*100} onChange={e=>setMaster(Number(e.target.value)/100)}/></label>{practiceBusy&&practice.plan&&<><label className="range-label">Voice · next sentence <output>{Math.round(practice.plan.volume*100)}%</output><input aria-label="Player voice level" type="range" min="0" max="100" value={practice.plan.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><BackgroundControls plan={practice.plan} sessions={sessions} active onChange={patch=>manifestPlayer.updateBackground(patch)}/></>}<p className="content-note">{soundStates.length} sound sources · Open player for individual controls.</p><button onClick={()=>{manifestPlayer.stop();engine.stopAll();}}>Stop all audio</button></details>
     </div>
+  );
+  const natureLibrary = (
+    <NatureLibrary
+      embedded={isLibrarySounds}
+      favorites={isLibrarySounds ? starred : undefined}
+      onFavorite={favorite}
+      master={master}
+      onMaster={setMaster}
+      sessions={sessions}
+      editingName={editingMix?.kind === "nature" ? editingMix.name : undefined}
+      onEndEdit={() => setEditingMix(undefined)}
+      onSave={(row, asCopy) => {
+        const original = editingMix?.kind === "nature" && !asCopy ? editingMix : undefined;
+        if (original && !sessions.some(item => item.id === original.id)) {
+          throw Error("This mix was removed. Use Save as copy to keep your edits.");
+        }
+        const saved = storeRows(original ? sessions.map(item => item.id === original.id
+          ? { ...row, id: original.id, createdAt: original.createdAt } : item) : [...sessions, row]);
+        if (saved) setEditingMix(undefined);
+        return saved;
+      }}
+      initialSession={natureSessionToLoad}
+      onLoaded={() => setNatureSessionToLoad(undefined)}
+      onLibrary={() => navigate("library", { libraryView: "mixes", librarySection: "all" })}
+    />
   );
   return (
     <div className="app" data-screen={tab}>
@@ -1066,13 +1105,7 @@ export default function App() {
             {exploreView === "tracks" ? <SoundTracks defaultOpen/> : exploreView === "packs" ? (
               <PacksPanel />
             ) : exploreView === "nature" ? (
-              <NatureLibrary master={master} onMaster={setMaster} sessions={sessions} editingName={editingMix?.kind === "nature" ? editingMix.name : undefined} onEndEdit={() => setEditingMix(undefined)} onSave={(row, asCopy)=>{
-                const original = editingMix?.kind === "nature" && !asCopy ? sessions.find(item => item.id === editingMix.id) : undefined;
-                const saved = storeRows(original ? sessions.map(item => item.id === original.id
-                  ? { ...row, id: original.id, createdAt: original.createdAt } : item) : [...sessions,row]);
-                if (saved) setEditingMix(undefined);
-                return saved;
-              }} initialSession={natureSessionToLoad} onLoaded={()=>setNatureSessionToLoad(undefined)} onLibrary={()=>navigate("library",{libraryView:"audio",librarySection:"all"})}/>
+              natureLibrary
             ) : (
               <>
                 <label className="search">
@@ -1303,61 +1336,41 @@ export default function App() {
         {tab === "library" && (
           <>
             <div className="section-heading">
-              <div>
-                <h1>Library</h1>
-              </div>
-              {!playlistView && libraryView !== "manifestation" && (
-                <div className="home-actions">
-                  <button onClick={() => openSound("sine", 432)}>
-                    <Plus size={18} /> {backgroundsView ? "Create background" : "Create mix"}
-                  </button>
-                  <button onClick={() => importInput.current?.click()}>
-                    <Upload size={18} /> Import mix
-                  </button>
-                </div>
-              )}
+              <h1>{collection?.label ?? "Library"}</h1>
+              {collection && <button onClick={() => navigate("library", { libraryView: "overview", librarySection: "all" })}>
+                All collections
+              </button>}
             </div>
-            <div className="segmented library-collections" aria-label="Library collection">
-              <button aria-pressed={playlistView} onClick={() => navigate("library", { librarySection: "playlists" })}>
-                Playlists
+            {!collection && <div className="library-destinations" role="group" aria-label="Library collections">
+              {collections.map(({ label, libraryView, librarySection }) => (
+                <button key={label} onClick={() => navigate("library", { libraryView, librarySection })}>
+                  {label} <ArrowRight size={16} aria-hidden="true" />
+                </button>
+              ))}
+            </div>}
+            {mixesView && <div className="home-actions">
+              <button onClick={() => navigate("library", { libraryView: "sounds", librarySection: "all" })}>
+                <Plus size={18} /> Create mix
               </button>
-              <button
-                aria-pressed={!playlistView && libraryView === "manifestation" && librarySection === "all"}
-                onClick={() =>
-                  navigate("library", {
-                    libraryView: "manifestation",
-                    librarySection: "all",
-                  })
-                }
-              >
-                Affirmations
-              </button>
-              <button
-                aria-pressed={!playlistView && libraryView === "audio"}
-                onClick={() =>
-                  navigate("library", {
-                    libraryView: "audio",
-                    librarySection: "all",
-                  })
-                }
-              >
-                Audio library
-              </button>
-              <button aria-pressed={!playlistView && libraryView === "manifestation" && librarySection === "recordings"}
-                onClick={() => navigate("library", { libraryView: "manifestation", librarySection: "recordings" })}>Recordings</button>
-              <button aria-pressed={backgroundsView}
-                onClick={() => navigate("library", { libraryView: "backgrounds", librarySection: "all" })}>Backgrounds</button>
-            </div>
-            {!playlistView && (libraryView !== "manifestation" || librarySection === "saved") && <div className="fields">
-              <label>{backgroundsView ? "Search backgrounds" : libraryView === "audio" ? "Search saved mixes" : "Search saved practices"}
+              <button onClick={() => importInput.current?.click()}><Upload size={18} /> Import mix</button>
+            </div>}
+            {(mixesView || librarySection === "saved") && <div className="fields">
+              <label>{backgroundsView ? "Search backgrounds" : mixesView ? "Search saved mixes" : "Search saved practices"}
                 <input aria-label="Search library" type="search" value={libraryQuery}
                   onChange={event => { setLibraryQuery(event.target.value); setSelectedSessions([]); }}
                   placeholder="Name, tag or collection"/>
               </label>
               <label>Sort saved items <select aria-label="Sort library" value={librarySort} onChange={event => setLibrarySort(event.target.value)}>
-                <option value="recent">{libraryView !== "manifestation" ? "Recently added" : "Recently saved"}</option><option value="name">Name A–Z</option>
+                <option value="recent">Recently saved</option><option value="name">Name A–Z</option>
               </select></label>
             </div>}
+            {isLibrarySounds && natureLibrary}
+            {libraryView === "audio" && <SoundTracks defaultOpen />}
+            {libraryView === "packs" && <>
+              <PacksPanel embedded />
+              <PacksPanel library master={master} onMaster={setMaster} />
+            </>}
+            {!playlistView && librarySection === "recordings" && <VoicePanel />}
             {playlistView ? <PlaylistLibrary sessions={sessions} tracks={localTracks} trackError={trackReadError}/> : libraryView === "manifestation" ? (
               <ManifestLibrary
                 search={libraryQuery}
@@ -1365,13 +1378,12 @@ export default function App() {
                 initialCategory={category}
                 section={librarySection}
                 onCategory={(value) => navigate("library", { category: value })}
-                onPractice={(id) =>
-                  id
-                    ? openManifest(id)
-                    : navigate("manifest", { manifestSection: "practice" })
-                }
+                onPractice={manifestReady ? (id) =>
+                  id ? openManifest(id) : navigate("manifest", { manifestSection: "practice" })
+                : undefined}
+                focusOnEntry={false}
               />
-            ) : (
+            ) : mixesView ? (
               <>
                 <input
                   ref={importInput}
@@ -1381,21 +1393,7 @@ export default function App() {
                   onChange={(e) => importSession(e.target.files?.[0])}
                   aria-label="Import session file"
                 />
-                {backgroundsView ? <p className="content-note">Choose a saved mix of up to eight layers. Adding it to a practice saves a separate copy in that practice.</p> : <>
-                <section className="offline-card">
-                  <Check size={22} />
-                  <div>
-                    <strong>
-                      {offlineReady
-                        ? "Player ready offline"
-                        : "Preparing offline player"}
-                    </strong>
-                    <p>All built-in sounds are generated on this device.</p>
-                  </div>
-                </section>
-                <PacksPanel library master={master} onMaster={setMaster} />
-                </>}
-                <h2>{backgroundsView ? "Saved backgrounds" : "Saved sessions"}</h2>
+                {backgroundsView && <p className="content-note">Saved mixes with up to eight layers can be used as practice backgrounds.</p>}
                 <div className="home-actions">
                   <button disabled={!visibleSessions.length} onClick={() => setSelectedSessions(visibleSessions.map(row => row.id))}>Select shown mixes</button>
                   <button disabled={!chosenSessions.length} onClick={() => setSelectedSessions([])}>Clear mix selection</button>
@@ -1405,7 +1403,7 @@ export default function App() {
                     void deliverFile(new Blob([text], {type: "application/json"}), "core-aura-mixes.json").then(setMessage).catch(error => setMessage(error.message));
                   }}>Export selected mixes</button>
                   <button disabled={!chosenSessions.length} onClick={() => {
-                    if (confirmSourceDeletion("session", chosenSessions, "Mixes are removed from Audio Library and Backgrounds. Practices keep their attached copies.")) {
+                    if (confirmSourceDeletion("session", chosenSessions, "Mixes are removed from Saved mixes and Backgrounds. Practices keep their attached copies.")) {
                       if (storeRows(sessions.filter(row => !chosenSessions.some(chosen => chosen.id === row.id)))) setSelectedSessions([]);
                     }
                   }}>Delete selected mixes</button>
@@ -1416,10 +1414,7 @@ export default function App() {
                   <div className="empty">
                     <Library size={36} />
                     <h3>{backgroundsView ? "No saved backgrounds" : "No saved mixes"}</h3>
-                    <p>Build a session in Studio, Chakras or Nature library, then save it.</p>
-                    <button onClick={() => navigate("studio")}>
-                      Open Studio <ArrowRight size={18} />
-                    </button>
+                    <p>Create a mix from Sounds or import its settings file.</p>
                   </div>
                 )}
                 {visibleSessions.map((row) => (
@@ -1432,25 +1427,29 @@ export default function App() {
                         {time(sessionDuration(row))} · {row.sequenceGap === undefined ? row.kind : "chakra sequence"}
                       </p>
                     </div>
-                    <button className="primary" onClick={() => load(row)}>
-                      Open
-                    </button>
+
                     <div className="saved-actions">
                       <button aria-label={"Play saved mix " + row.name} onClick={() => {
                         void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions), row.name)
                           .catch(error => setMessage(error.message));
                       }}>Play</button>
-                      <button onClick={() => load(row, true)}>Edit mix</button>
+                      {row.kind === "nature" ? <button onClick={() => {
+                        if (!prepareSound(row.channels.map(channel => channel.id), false, true)) return;
+                        setEditingMix(row);
+                        setNatureSessionToLoad(row);
+                        navigate("library", { libraryView: "sounds", librarySection: "all" });
+                      }}>Edit mix</button> : rebuiltScreens.has(row.kind === "chakras" ? "chakras" : "studio") &&
+                        <button onClick={() => load(row, true)}>Edit mix</button>}
                       <PinButton item={{kind:"session",id:row.id}}/>
                       <LibraryLabels item={{kind:"session",id:row.id}}/>
                       <button onClick={()=>{try{storeRows([...sessions,{...row,id:crypto.randomUUID(),name:(row.name+" copy").slice(0,80)}]);}catch(e){setMessage((e as Error).message);}}}>Duplicate</button>
-                      <button disabled={practiceBusy || row.channels.length > 8} onClick={() => {
+                      {manifestReady && <button disabled={practiceBusy || row.channels.length > 8} onClick={() => {
                         try {
                           const { draft } = manifestationStore.snapshot().data;
                           manifestationStore.draft({ ...draft, background: null, backgroundMix: attachMix(row) });
                           navigate("manifest", { manifestSection: "practice" });
                         } catch (error) { setMessage((error as Error).message); }
-                      }}>Use in Manifest</button>
+                      }}>Use in Manifest</button>}
                       <button
                         onClick={() => {
                           const name = prompt("Session name", row.name);
@@ -1495,27 +1494,12 @@ export default function App() {
                     </div>
                   </article>
                 ))}
-                {!backgroundsView && <><h2>Favorites</h2>
-                <div className="favorite-list">
-                  {starred.length ? (
-                    starred.map((id) => (
-                      <button key={id} onClick={() => openSound(id)}>
-                        {sounds[id].name}
-                        <ArrowRight size={18} />
-                      </button>
-                    ))
-                  ) : (
-                    <p className="content-note">
-                      Tap a heart in Explore to keep a sound here.
-                    </p>
-                  )}
-                </div></>}
               </>
-            )}
+            ) : null}
           </>
         )}
         {(isStudio || isChakras) && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
-        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature") || (tab === "library" && !playlistView && libraryView === "audio")) && <SoundTracks />}
+        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature")) && <SoundTracks />}
         {isChakras && <details className="generated-track-panel">
           <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
           <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
@@ -1615,7 +1599,11 @@ export default function App() {
                 ? "page"
                 : undefined
             }
-            onClick={() => id === "manifest" ? navigate("manifest", { manifestSection: "practices" }) : navigate(id === "studio" ? lastSoundTab : id)}
+            onClick={() => {
+              if (id === "manifest") navigate(id, { manifestSection: "practices" });
+              else if (id === "library") navigate(id, { libraryView: "overview", librarySection: "all" });
+              else navigate(id === "studio" ? lastSoundTab : id);
+            }}
           >
             <span className="nav-icon" aria-hidden="true"><Icon size={21} /></span>
             <span>{label}</span>
@@ -1662,15 +1650,20 @@ export default function App() {
                   <option value="system">System</option>
                   <option value="light">Light</option>
                   <option value="dark">Dark</option>
-                  <option value="contrast">High contrast</option>
-                  <optgroup label="Chakra colours">
-                    {Object.entries(chakraThemes).map(([value, palette]) => (
-                      <option key={value} value={value}>{palette.label}</option>
-                    ))}
-                  </optgroup>
+                  <option value="green">Green</option>
+                  <option value="yellow">Yellow</option>
+                  <option value="custom">Custom</option>
                 </select>
               </label>
 
+              {appearance.theme === "custom" && <label className="custom-colour">
+                Custom colour
+                <input
+                  type="color"
+                  value={appearance.customColor ?? defaultCustomColor}
+                  onChange={event => changeAppearance({ ...appearance, customColor: event.target.value })}
+                />
+              </label>}
               <label>
                 Spacing
                 <select

@@ -32,10 +32,12 @@ async function catalog(url: string) {
 }
 export function PacksPanel({
   library = false,
+  embedded = false,
   master = 0.5,
   onMaster,
 }: {
   library?: boolean;
+  embedded?: boolean;
   master?: number;
   onMaster?: (n: number) => void;
 }) {
@@ -170,7 +172,7 @@ export function PacksPanel({
       aria-label={library ? "Downloaded packs" : "Sound pack catalog"}
     >
       <div className="section-heading">
-        {library ? <h2>Downloaded packs</h2> : <h1>Sound packs</h1>}
+        {library ? <h2>Downloaded packs</h2> : embedded ? <h2>Available packs</h2> : <h1>Sound packs</h1>}
         {!library && (
           <button onClick={refresh} disabled={Boolean(download)}>
             Refresh catalog
@@ -216,7 +218,7 @@ export function PacksPanel({
       )}
       {library && !installed.length && (
         <p className="content-note">
-          No packs downloaded. Find them in Explore → Sound packs.
+          No packs downloaded.
         </p>
       )}
       {shown

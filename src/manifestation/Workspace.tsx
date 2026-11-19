@@ -679,7 +679,7 @@ export function ManifestLibrary({
   onCategory,
   focusOnEntry = true,
 }: {
-  onPractice: (id?: string) => void;
+  onPractice?: (id?: string) => void;
   initialCategory?: string;
   section?: "all" | "saved" | "recordings";
   onCategory?: (category: string) => void;
@@ -780,9 +780,9 @@ export function ManifestLibrary({
       <div className="affirmation-toolbar">
         <div className="section-heading affirmation-heading">
           <h2>Affirmation library</h2>
-          <button className="primary" disabled={!selectedCount} onClick={() => onPractice()}>
+          {onPractice && <button className="primary" disabled={!selectedCount} onClick={() => onPractice()}>
             Use selection ({selectedCount})
-          </button>
+          </button>}
         </div>
         <div className="fields affirmation-filters">
           <label>
@@ -919,7 +919,7 @@ export function ManifestLibrary({
           Add a category to start your affirmation library.
         </p>
       )}
-      <VoicePanel />
+      {onPractice && <VoicePanel />}
       <div className="affirmation-list">
         {!matchingAffirmations.length && category && (
           <p className="affirmation-empty" role="status">
@@ -930,12 +930,12 @@ export function ManifestLibrary({
           .map((a) => (
             <div className="affirmation-row" key={a.id}>
               <label className="affirmation-choice">
-                <input
+                {onPractice && <input
                   type="checkbox"
                   disabled={active}
                   checked={data.draft.lines.some((l) => l.text === a.text)}
                   onChange={() => select(a.id, a.text)}
-                />
+                />}
                 <span>{a.text}</span>
               </label>
               <PreviewButton line={a} id={a.id} />
@@ -975,7 +975,7 @@ export function ManifestLibrary({
       </div>
       </>}
       {section === "recordings" && <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
-        <PersonalVoices initiallyOpen />
+        <PersonalVoices initiallyOpen allowAttach={Boolean(onPractice)} />
       </div>}
       {section === "saved" && <section
         className="saved-practices-section"
@@ -1019,8 +1019,7 @@ export function ManifestLibrary({
         {data.plans.length > 0 && !visiblePlans.length && <p role="status">No practices match this search.</p>}
         {!data.plans.length && (
           <p className="content-note">
-            Save your selected sentences as a practice to schedule them.
-            Practices stay on this device; export backups to keep a copy.
+            {onPractice ? "Save your selected sentences as a practice to schedule them." : "Import a practice backup to get started."}
           </p>
         )}
         {visiblePlans.map((plan) => (
@@ -1033,7 +1032,7 @@ export function ManifestLibrary({
                 {plan.mode === "speech" ? "spoken" : "reading"}
               </p>
             </div>
-            <button
+            {onPractice && <button
               className="primary"
               onClick={() => {
                 try {
@@ -1044,7 +1043,7 @@ export function ManifestLibrary({
               }}
             >
               Edit practice
-            </button>
+            </button>}
             <div className="saved-actions">
               <button
                 aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}

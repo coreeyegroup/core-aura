@@ -1,23 +1,30 @@
-export const chakraThemes = {
-  red: { label: "Red · Root", paper: "#fff3f2", accent: "#a12835", soft: "#fbe1e2" },
-  orange: { label: "Orange · Sacral", paper: "#fff3e8", accent: "#984015", soft: "#ffe3ce" },
-  yellow: { label: "Yellow · Solar plexus", paper: "#fff8dc", accent: "#745500", soft: "#f6e8aa" },
-  green: { label: "Green · Heart", paper: "#ecf7ed", accent: "#246039", soft: "#d8eedd" },
-  blue: { label: "Blue · Throat", paper: "#edf6ff", accent: "#235b91", soft: "#dbeafe" },
-  indigo: { label: "Indigo · Third eye", paper: "#eeefff", accent: "#41499b", soft: "#e0e3fb" },
-  purple: { label: "Purple · Crown", paper: "#f6effc", accent: "#65388a", soft: "#ebddf5" },
+const palettes = {
+  yellow: { paper: "#fff8dc", accent: "#745500", soft: "#f6e8aa" },
+  green: { paper: "#ecf7ed", accent: "#246039", soft: "#d8eedd" },
 } as const;
-type ChakraTheme = keyof typeof chakraThemes;
-export const themes = [
-  "system", "light", "dark", "contrast",
-  ...Object.keys(chakraThemes) as ChakraTheme[],
-] as const;
+export const themes = ["system", "light", "dark", "green", "yellow", "custom"] as const;
+export const defaultCustomColor = "#16645d";
 export type Theme = (typeof themes)[number];
 export type Appearance = {
   textSize: number;
   density: "compact" | "comfortable";
   theme: Theme;
+  customColor?: string;
 };
+
+function validColor(value: unknown): value is string {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function customPalette(color: string) {
+  const components = [1, 3, 5].map(index => parseInt(color.slice(index, index + 2), 16));
+  const tint = (base: number, amount: number) =>
+    "#" + components.map(channel =>
+      Math.round(base + amount * (channel - base)).toString(16).padStart(2, "0"),
+    ).join("");
+  return { paper: tint(255, 0.08), accent: tint(0, 0.43), soft: tint(255, 0.18) };
+}
+
 export function readAppearance(): Appearance {
   try {
     const value = JSON.parse(
@@ -29,6 +36,7 @@ export function readAppearance(): Appearance {
         : 100,
       density: value?.density === "comfortable" ? "comfortable" : "compact",
       theme: themes.includes(value?.theme) ? value.theme : "system",
+      ...(validColor(value?.customColor) ? { customColor: value.customColor } : {}),
     };
   } catch {
     return { textSize: 100, density: "compact", theme: "system" };
@@ -47,15 +55,14 @@ export function applyAppearance(value: Appearance) {
         : "light"
       : value.theme;
   root.dataset.resolvedTheme = resolved;
-  const colors = { light: "#f4f6f8", dark: "#10161d", contrast: "#000000" };
-  const meta = document.querySelector<HTMLMetaElement>(
-    'meta[name="theme-color"]',
-  );
-  const palette = chakraThemes[resolved as ChakraTheme];
+  const palette = resolved === "custom"
+    ? customPalette(validColor(value.customColor) ? value.customColor : defaultCustomColor)
+    : resolved === "green" || resolved === "yellow" ? palettes[resolved] : undefined;
   root.style.setProperty("--theme-paper", palette?.paper ?? "");
   root.style.setProperty("--theme-accent", palette?.accent ?? "");
   root.style.setProperty("--theme-accent-soft", palette?.soft ?? "");
-  if (meta) meta.content = palette?.paper ?? colors[resolved as keyof typeof colors];
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta) meta.content = palette?.paper ?? (resolved === "dark" ? "#10161d" : "#f4f6f8");
 }
 export function saveAppearance(value: Appearance) {
   applyAppearance(value);

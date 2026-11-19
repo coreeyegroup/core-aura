@@ -1,8 +1,11 @@
 import type { Tab } from "./model";
+export const libraryViews = ["overview", "manifestation", "sounds", "backgrounds", "audio", "mixes", "packs"] as const;
+type LibraryView = (typeof libraryViews)[number];
+
 export type Route = {
   tab: Tab;
   manifestSection: "practices" | "practice" | "schedule";
-  libraryView: "manifestation" | "audio" | "backgrounds";
+  libraryView: LibraryView;
   librarySection: "all" | "saved" | "recordings" | "playlists";
   category: string;
   exploreView: "sounds" | "packs" | "nature" | "tracks";
@@ -10,7 +13,7 @@ export type Route = {
 export const defaultRoute: Route = {
   tab: "home",
   manifestSection: "practice",
-  libraryView: "manifestation",
+  libraryView: "overview",
   librarySection: "all",
   category: "Health",
   exploreView: "sounds",
@@ -36,8 +39,9 @@ export function parseRoute(hash: string, previous = defaultRoute): Route {
   if (page === "explore")
     route.exploreView = section === "packs" ? "packs" : section === "nature" ? "nature" : section === "tracks" ? "tracks" : "sounds";
   if (page === "library") {
-    if (section && section !== "playlists")
-      route.libraryView = section === "audio" || section === "backgrounds" ? section : "manifestation";
+    if (section === "playlists") route.libraryView = "overview";
+    else if (section) route.libraryView = libraryViews.find(view => view === section) ?? "manifestation";
+    else route.libraryView = "overview";
     route.librarySection =
       section === "playlists" ? "playlists" :
       section === "practices"
@@ -59,6 +63,7 @@ export function routeHash(route: Route) {
     return "#explore" + (route.exploreView === "packs" ? "/packs" : route.exploreView === "nature" ? "/nature" : route.exploreView === "tracks" ? "/tracks" : "");
   if (route.tab === "library") {
     if (route.librarySection === "playlists") return "#library/playlists";
+    if (route.libraryView === "overview") return "#library";
     if (route.libraryView !== "manifestation") return "#library/" + route.libraryView;
     const section =
       route.librarySection === "saved"

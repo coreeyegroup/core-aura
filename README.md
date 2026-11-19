@@ -2,9 +2,9 @@
 
 Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
-## v0.33.0 staged rebuild
+## v0.34.0 Library rebuild
 
-Home, Manifest, Sounds, Chakras and Library show the navigation shell while their next designs are built. Existing local data and the previous implementations are kept for later stages. Settings includes System, Light, Dark, High contrast and seven chakra palettes. Previously registered OS or server reminders may still arrive, while the closed Manifest screen does not start practices in-app.
+Library includes generated sounds and favorites, saved backgrounds, voice recordings and speech voices, affirmations, manifestation practices, imported audio files, sound packs, saved mixes, and playlists. Home, Manifest, Sounds, and Chakras remain staged. Settings offers System, Light, Dark, Green, Yellow, and a custom colour.
 
 ## v0.32.0 Manifestation and Library
 
