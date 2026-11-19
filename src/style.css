@@ -2549,15 +2549,96 @@ progress {
 
 .settings-sheet .appearance-controls .custom-colour { grid-column: 1 / -1; }
 .custom-colour input { width: 100%; min-height: 44px; }
+/* Library overview and collection details */
+.library-overview { display: grid; gap: 18px; }
+.library-overview h2 { margin-bottom: 8px; }
+.library-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: clamp(18px, 4vw, 36px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  color: var(--ink);
+  background: linear-gradient(115deg, var(--surface), var(--accent-soft));
+}
+:root .app main .library-hero h1 {
+  width: fit-content;
+  font-size: calc(clamp(32px, 5vw, 50px) * var(--text-scale));
+}
+.library-overview :is(h1, h2):focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
+.library-hero p { color: var(--muted); margin: 4px 0 14px; }
+.library-hero .library-hero-action { min-height: 44px; background: var(--surface); padding-inline: 12px; }
+.library-hero-art {
+  display: grid;
+  place-items: center;
+  width: clamp(50px, 12vw, 108px);
+  aspect-ratio: 1;
+  border: 1px solid var(--control-line);
+  border-radius: 50%;
+  color: var(--accent);
+  background: var(--surface);
+}
+.library-hero-art svg { width: 54%; height: 54%; }
+.library-search {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 10px 4px;
+  background: var(--surface);
+  border: 1px solid var(--control-line);
+  border-radius: 12px;
+  color: var(--accent);
+}
+.library-search input { border: 0; background: transparent; min-height: 46px; color: var(--ink); }
+.library-search input::-webkit-search-cancel-button { appearance: none; }
 .library-destinations {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--gap);
 }
-.library-destinations button { justify-content: space-between; min-height: 52px; }
+:root .app .library-destinations button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: start;
+  align-items: center;
+  min-height: 94px;
+  gap: 7px;
+  padding: 10px;
+  text-align: left;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.library-destinations button:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); }
+.library-tile-icon { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.library-tile-label { grid-column: 1 / -1; grid-row: 2; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.library-tile-label small { font-size: calc(12px * var(--text-scale)); font-weight: 400; color: var(--muted); }
+.library-tile-arrow { color: var(--accent); grid-column: 2; grid-row: 1; }
+.library-collection-header {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 12px;
+  border-bottom: 1px solid var(--line);
+}
+.library-collection-header button { justify-self: start; min-height: 44px; }
+.library-collection-header p { margin-top: 4px; }
+.library-more > summary { min-height: 44px; align-content: center; cursor: pointer; }
+.library-more[open] > summary { margin-bottom: 6px; }
+.library-card-more { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+@media (min-width: 650px) {
+  .library-destinations { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  :root .app .library-destinations button { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 84px; align-content: center; }
+  .library-tile-label { grid-column: 2; grid-row: 1; }
+  .library-tile-arrow { grid-column: 3; }
+  .library-overview .library-starters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .library-overview .library-starters > h2,
+  .library-overview .library-starters > p { grid-column: 1 / -1; }
+}
 .app:has(.queue-player) .nature-player { display: none; }
 
-.library-starters { display: grid; gap: var(--gap); }
+.library-starters, .library-starter-group { display: grid; gap: var(--gap); align-content: start; }
 .library-starter {
   display: flex;
   flex-wrap: wrap;
@@ -2571,6 +2652,7 @@ progress {
 }
 .library-starter small { color: var(--muted); }
 .library-starter-actions { display: flex; flex-wrap: wrap; gap: var(--gap); }
-.library-starter-actions button { min-height: 44px; }
-.library-starter-order { flex-basis: 100%; }
+:root .app .library-starter-actions button { min-height: 44px; }
+.library-starter-order { display: block; margin-top: 4px; overflow-wrap: anywhere; }
+.library-starter h4 { margin: 0; font-size: calc(14px * var(--text-scale)); }
 .queue-reading { margin: 6px 0; overflow-wrap: anywhere; }

@@ -53,6 +53,7 @@ import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
 import { LibraryStarters } from "./components/LibraryStarters";
+import { collections, LibraryOverview } from "./components/LibraryOverview";
 import { ChakraMixer } from "./components/ChakraMixer";
 import { SoundTracks } from "./tracks/SoundTracks";
 import { AndroidUpdates } from "./android/AndroidUpdates";
@@ -115,18 +116,6 @@ const tabs = [
 // Add each rebuilt screen here as it is ready. Explore shares the Sounds tab.
 const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["library"]);
 
-const collections = [
-  { label: "Sounds", libraryView: "sounds", librarySection: "all" },
-  { label: "Backgrounds", libraryView: "backgrounds", librarySection: "all" },
-  { label: "Voices", libraryView: "manifestation", librarySection: "recordings" },
-  { label: "Affirmations", libraryView: "manifestation", librarySection: "all" },
-  { label: "Manifestation practices", libraryView: "manifestation", librarySection: "saved" },
-  { label: "Audio files", libraryView: "audio", librarySection: "all" },
-  { label: "Sound packs", libraryView: "packs", librarySection: "all" },
-  { label: "Saved mixes", libraryView: "mixes", librarySection: "all" },
-  { label: "Playlists", libraryView: "overview", librarySection: "playlists" },
-] as const satisfies readonly (Pick<Route, "libraryView" | "librarySection"> & { label: string })[];
-
 export default function App() {
   const [route, setRoute] = useState<Route>(() =>
     parseRoute(location.hash || "#" + preferences.snapshot().value.start),
@@ -187,7 +176,11 @@ export default function App() {
       removeEventListener("hashchange", restore);
     };
   }, []);
+  const headingMounted = useRef(false);
   useEffect(() => {
+    const firstRender = !headingMounted.current;
+    headingMounted.current = true;
+    if (firstRender && tab === "library" && libraryView === "overview" && librarySection === "all") return;
     const heading = document.querySelector<HTMLElement>("#main h1");
     if (heading) {
       heading.tabIndex = -1;
@@ -1336,19 +1329,17 @@ export default function App() {
         )}
         {tab === "library" && (
           <>
-            <div className="section-heading">
-              <h1>{collection?.label ?? "Library"}</h1>
-              {collection && <button onClick={() => navigate("library", { libraryView: "overview", librarySection: "all" })}>
-                All collections
-              </button>}
-            </div>
-            {!collection && <div className="library-destinations" role="group" aria-label="Library collections">
-              {collections.map(({ label, libraryView, librarySection }) => (
-                <button key={label} onClick={() => navigate("library", { libraryView, librarySection })}>
-                  {label} <ArrowRight size={16} aria-hidden="true" />
+            {collection ? (
+              <header className="library-collection-header">
+                <button onClick={() => navigate("library", { libraryView: "overview", librarySection: "all" })}>
+                  All collections
                 </button>
-              ))}
-            </div>}
+                <div>
+                  <h1>{collection.label}</h1>
+                  <p className="content-note">{collection.description}</p>
+                </div>
+              </header>
+            ) : <LibraryOverview onOpen={route => navigate("library", route)} />}
             {mixesView && <div className="home-actions">
               <button onClick={() => navigate("library", { libraryView: "sounds", librarySection: "all" })}>
                 <Plus size={18} /> Create mix
@@ -1409,20 +1400,23 @@ export default function App() {
                   aria-label="Import session file"
                 />
                 {backgroundsView && <p className="content-note">Saved mixes with up to eight layers can be used as practice backgrounds.</p>}
-                <div className="home-actions">
-                  <button disabled={!visibleSessions.length} onClick={() => setSelectedSessions(visibleSessions.map(row => row.id))}>Select shown mixes</button>
-                  <button disabled={!chosenSessions.length} onClick={() => setSelectedSessions([])}>Clear mix selection</button>
-                  <button disabled={!chosenSessions.length} onClick={() => {
-                    const text = JSON.stringify({kind: "core-aura-session-collection", schemaVersion: 1, sessions: chosenSessions});
-                    if (text.length > 100000) { setMessage("Select fewer mixes or use a full backup ZIP."); return; }
-                    void deliverFile(new Blob([text], {type: "application/json"}), "core-aura-mixes.json").then(setMessage).catch(error => setMessage(error.message));
-                  }}>Export selected mixes</button>
-                  <button disabled={!chosenSessions.length} onClick={() => {
-                    if (confirmSourceDeletion("session", chosenSessions, "Mixes are removed from Saved mixes and Backgrounds. Practices keep their attached copies.")) {
-                      if (storeRows(sessions.filter(row => !chosenSessions.some(chosen => chosen.id === row.id)))) setSelectedSessions([]);
-                    }
-                  }}>Delete selected mixes</button>
-                </div>
+                {visibleSessions.length > 0 && <details className="library-more">
+                  <summary>Manage multiple mixes</summary>
+                  <div className="saved-actions">
+                    <button disabled={!visibleSessions.length} onClick={() => setSelectedSessions(visibleSessions.map(row => row.id))}>Select shown mixes</button>
+                    <button disabled={!chosenSessions.length} onClick={() => setSelectedSessions([])}>Clear mix selection</button>
+                    <button disabled={!chosenSessions.length} onClick={() => {
+                      const text = JSON.stringify({kind: "core-aura-session-collection", schemaVersion: 1, sessions: chosenSessions});
+                      if (text.length > 100000) { setMessage("Select fewer mixes or use a full backup ZIP."); return; }
+                      void deliverFile(new Blob([text], {type: "application/json"}), "core-aura-mixes.json").then(setMessage).catch(error => setMessage(error.message));
+                    }}>Export selected mixes</button>
+                    <button disabled={!chosenSessions.length} onClick={() => {
+                      if (confirmSourceDeletion("session", chosenSessions, "Mixes are removed from Saved mixes and Backgrounds. Practices keep their attached copies.")) {
+                        if (storeRows(sessions.filter(row => !chosenSessions.some(chosen => chosen.id === row.id)))) setSelectedSessions([]);
+                      }
+                    }}>Delete selected mixes</button>
+                  </div>
+                </details>}
                 {chosenSessions.length > 0 && <p className="content-note">{chosenSessions.length} {chosenSessions.length === 1 ? "mix" : "mixes"} selected</p>}
                 {librarySessions.length > 0 && !visibleSessions.length && <p role="status">No mixes match this search.</p>}
                 {!librarySessions.length && (
@@ -1455,58 +1449,63 @@ export default function App() {
                         navigate("library", { libraryView: "sounds", librarySection: "all" });
                       }}>Edit mix</button> : rebuiltScreens.has(row.kind === "chakras" ? "chakras" : "studio") &&
                         <button onClick={() => load(row, true)}>Edit mix</button>}
-                      <PinButton item={{kind:"session",id:row.id}}/>
-                      <LibraryLabels item={{kind:"session",id:row.id}}/>
-                      <button onClick={()=>{try{storeRows([...sessions,{...row,id:crypto.randomUUID(),name:(row.name+" copy").slice(0,80)}]);}catch(e){setMessage((e as Error).message);}}}>Duplicate</button>
-                      {manifestReady && <button disabled={practiceBusy || row.channels.length > 8} onClick={() => {
-                        try {
-                          const { draft } = manifestationStore.snapshot().data;
-                          manifestationStore.draft({ ...draft, background: null, backgroundMix: attachMix(row) });
-                          navigate("manifest", { manifestSection: "practice" });
-                        } catch (error) { setMessage((error as Error).message); }
-                      }}>Use in Manifest</button>}
-                      <button
-                        onClick={() => {
-                          const name = prompt("Session name", row.name);
-                          if (name?.trim() && name.length <= 80)
-                            storeRows(
-                              sessions.map((s) =>
-                                s.id === row.id
-                                  ? { ...s, name: name.trim() }
-                                  : s,
+                    </div>
+                    <details className="library-more library-card-more">
+                      <summary aria-label={"More options for " + row.name}>More options</summary>
+                      <div className="saved-actions">
+                        <PinButton item={{kind:"session",id:row.id}}/>
+                        <LibraryLabels item={{kind:"session",id:row.id}}/>
+                        <button onClick={()=>{try{storeRows([...sessions,{...row,id:crypto.randomUUID(),name:(row.name+" copy").slice(0,80)}]);}catch(e){setMessage((e as Error).message);}}}>Duplicate</button>
+                        {manifestReady && <button disabled={practiceBusy || row.channels.length > 8} onClick={() => {
+                          try {
+                            const { draft } = manifestationStore.snapshot().data;
+                            manifestationStore.draft({ ...draft, background: null, backgroundMix: attachMix(row) });
+                            navigate("manifest", { manifestSection: "practice" });
+                          } catch (error) { setMessage((error as Error).message); }
+                        }}>Use in Manifest</button>}
+                        <button
+                          onClick={() => {
+                            const name = prompt("Session name", row.name);
+                            if (name?.trim() && name.length <= 80)
+                              storeRows(
+                                sessions.map((s) =>
+                                  s.id === row.id
+                                    ? { ...s, name: name.trim() }
+                                    : s,
+                                ),
+                              );
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          onClick={(event) => {
+                            modalOpener.current = event.currentTarget;
+                            setExporting(row);
+                            setExportSeconds(
+                              Math.min(
+                                60,
+                                sessionDuration(row),
                               ),
                             );
-                        }}
-                      >
-                        Rename
-                      </button>
-                      <button
-                        onClick={(event) => {
-                          modalOpener.current = event.currentTarget;
-                          setExporting(row);
-                          setExportSeconds(
-                            Math.min(
-                              60,
-                              sessionDuration(row),
-                            ),
-                          );
-                          setExportError("");
-                        }}
-                      >
-                        WAV audio
-                      </button>
-                      <button onClick={() => exportSession(row)}>
-                        <Download size={16} /> Settings JSON
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirmSourceDeletion("session", [row], "This mix is also removed from Backgrounds. Practices keep their attached copies."))
-                            storeRows(sessions.filter((s) => s.id !== row.id));
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </div>
+                            setExportError("");
+                          }}
+                        >
+                          WAV audio
+                        </button>
+                        <button onClick={() => exportSession(row)}>
+                          <Download size={16} /> Settings JSON
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirmSourceDeletion("session", [row], "This mix is also removed from Backgrounds. Practices keep their attached copies."))
+                              storeRows(sessions.filter((s) => s.id !== row.id));
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </details>
                   </article>
                 ))}
               </>

@@ -95,6 +95,34 @@ function testAudio(name) {
     await nav.getByRole("button", { name: "Library", exact: true }).click();
     const libraryGrid = page.getByRole("group", { name: "Library collections" });
     await libraryGrid.waitFor();
+    assert.equal(await libraryGrid.getByRole("button").count(), 9);
+    const libraryStarters = page.getByRole("region", { name: "Starter collection" });
+    assert.equal(await libraryStarters.getByRole("button", { name: /^Play / }).count(), 9);
+    const librarySearch = page.getByRole("searchbox", { name: "Find a collection or starter" });
+    await librarySearch.fill("Morning");
+    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).waitFor();
+    assert.equal(await libraryGrid.getByRole("button").count(), 0);
+    assert.equal(await libraryStarters.getByRole("button").count(), 1);
+    await page.getByRole("button", { name: "Clear library search" }).click();
+    assert.equal(await librarySearch.evaluate(input => input === document.activeElement), true);
+    await page.getByRole("button", { name: "Ready to play", exact: true }).click();
+    const ready = libraryStarters.getByRole("heading", { name: "Ready to play" });
+    assert.equal(await ready.evaluate(heading => heading === document.activeElement), true);
+    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).click();
+    await libraryStarters.getByRole("button", { name: "Pause Morning pause" }).click();
+    await libraryStarters.getByRole("button", { name: "Resume Morning pause" }).waitFor();
+    await page.getByRole("button", { name: "Stop playlist" }).click();
+    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).waitFor();
+    for (const width of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      assert.equal(await libraryGrid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length),
+        width >= 650 ? 3 : 2);
+    }
+    await page.setViewportSize({ width: 320, height: 740 });
+    const overviewAudit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    assert.deepEqual(overviewAudit.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) })), []);
+
     for (const [name, route, evidence] of collections) {
       await libraryGrid.getByRole("button", { name, exact: true }).click();
       await page.getByRole("heading", { level: 1, name, exact: true }).waitFor();
@@ -168,6 +196,12 @@ function testAudio(name) {
     await page.getByRole("heading", { name: "Evening practice mix", exact: true }).waitFor();
     assert.equal(await card.count(), 0);
     assert.equal(await page.locator(".saved-card").count(), 2);
+    const editedCard = page.locator(".saved-card").filter({ hasText: "Evening practice mix" });
+    const rename = editedCard.getByRole("button", { name: "Rename", exact: true });
+    assert.equal(await rename.isVisible(), false);
+    await editedCard.locator('summary[aria-label="More options for Evening practice mix"]').click();
+    assert.equal(await rename.isVisible(), true);
+
     await page.goto(origin + "/#library/practices");
     const starters = page.getByRole("region", { name: "Starter collection" });
     await starters.getByRole("button", { name: "Save a copy of A quiet moment" }).click();

@@ -1,10 +1,10 @@
-import { useState } from "react";
-import { Play, Plus } from "lucide-react";
+import { type Ref, useState, useSyncExternalStore } from "react";
+import { Pause, Play, Plus } from "lucide-react";
 import { affirmations, type Category, type Plan } from "../manifestation/model";
 import { manifestationStore } from "../manifestation/store";
 import { chakras, ENGINE_VERSION, type Channel, type Session } from "../model";
 import { durationLabel, itemDuration, resolveItems, type PlaylistRef } from "../playlists/model";
-import { startQueue } from "../playlists/runtime";
+import { queuePlayer, startQueue } from "../playlists/runtime";
 
 function practice(id: string, name: string, category: Category): Plan {
   const lines = affirmations.filter(item => item.category === category).slice(0, 3)
@@ -49,7 +49,9 @@ const mixes = [
 
 const sessionRef = ({ id }: Session): PlaylistRef => ({ kind: "session", id });
 const practiceRef = ({ id }: Plan): PlaylistRef => ({ kind: "practice", id });
-const entries = {
+type StarterEntry = { name: string; refs: PlaylistRef[]; plan?: Plan; session?: Session };
+type StarterGroup = "practices" | "backgrounds" | "mixes" | "playlists";
+const entries: Record<StarterGroup, StarterEntry[]> = {
   practices: practices.map(plan => ({ name: plan.name, refs: [practiceRef(plan)], plan })),
   backgrounds: backgrounds.map(session => ({ name: session.name, refs: [sessionRef(session)], session })),
   mixes: mixes.map(session => ({ name: session.name, refs: [sessionRef(session)], session })),
@@ -57,48 +59,85 @@ const entries = {
     { name: "Morning pause", refs: [practiceRef(practices[0]), sessionRef(backgrounds[1])] },
     { name: "Evening wind-down", refs: [sessionRef(backgrounds[0]), practiceRef(practices[1])] },
   ],
-} satisfies Record<string, { name: string; refs: PlaylistRef[]; plan?: Plan; session?: Session }[]>;
+};
 
-export function LibraryStarters({ section, onSaveMix }: {
-  section: keyof typeof entries;
+const groups = ["playlists", "practices", "backgrounds", "mixes"] as const;
+const groupNames = {
+  playlists: "Playlists", practices: "Manifestation practices",
+  backgrounds: "Backgrounds", mixes: "Mixes and chakra tones",
+};
+
+export function LibraryStarters({ section, onSaveMix, query = "", headingRef }: {
+  section: keyof typeof entries | "all";
   onSaveMix?: (session: Session) => boolean;
+  query?: string;
+  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const [message, setMessage] = useState("");
+  const playback = useSyncExternalStore(queuePlayer.subscribe, queuePlayer.snapshot);
+  const showingAll = section === "all";
+  const visibleGroups = (showingAll ? groups : [section]).map(group => ({
+    group,
+    visible: entries[group].filter(entry =>
+      (entry.name + " " + groupNames[group]).toLowerCase().includes(query),
+    ),
+  })).filter(({ visible }) => visible.length > 0);
   return (
     <section className="library-starters" aria-label="Starter collection">
-      <h2>Included with Core-aura</h2>
-      {entries[section].map(entry => {
-        const items = resolveItems(entry.refs, practices, [...backgrounds, ...mixes]);
-        const length = durationLabel(items.reduce((total, item) => total + itemDuration(item), 0));
-        const plan = "plan" in entry ? entry.plan : undefined;
-        const session = "session" in entry ? entry.session : undefined;
-        return (
-          <article className="library-starter" key={entry.name}>
-            <div>
-              <h3>{entry.name}</h3>
-              <small>{plan ? "Silent practice · " : items.length > 1 ? "2 items · " : ""}{length}</small>
-            </div>
-            <div className="library-starter-actions">
-              <button className="primary" aria-label={"Play " + entry.name} onClick={() => {
-                setMessage("");
-                void startQueue(items, entry.name).catch(error => setMessage(error.message));
-              }}><Play size={16} aria-hidden="true" /> Play</button>
-              {(plan || (session && onSaveMix)) && (
-                <button aria-label={"Save a copy of " + entry.name} onClick={() => {
-                  try {
-                    if (plan) manifestationStore.addCopy(plan);
-                    if (session && !onSaveMix?.(session)) return;
-                    setMessage("Saved a copy of " + entry.name + ".");
-                  } catch (error) {
-                    setMessage((error as Error).message);
-                  }
-                }}><Plus size={16} aria-hidden="true" /> Save copy</button>
-              )}
-            </div>
-            {items.length > 1 && <small className="library-starter-order">{items.map(item => item.name).join(" → ")}</small>}
-          </article>
-        );
-      })}
+      <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined}>
+        {showingAll ? "Ready to play" : "Included with Core-aura"}
+      </h2>
+      {!visibleGroups.length && <p role="status" className="content-note">No starter items match your search.</p>}
+      {visibleGroups.map(({ group, visible }) => (
+        <div className="library-starter-group" key={group}>
+          {showingAll && <h3>{groupNames[group]}</h3>}
+          {visible.map(entry => {
+            const items = resolveItems(entry.refs, practices, [...backgrounds, ...mixes]);
+            const length = durationLabel(items.reduce((total, item) => total + itemDuration(item), 0));
+            const current = playback.name === entry.name && playback.items.length === items.length &&
+              items.every((item, i) => item.id === playback.items[i].id);
+            const playing = current && playback.status === "playing";
+            const paused = current && playback.status === "paused";
+            const verb = playing ? "Pause" : paused ? "Resume" : "Play";
+            const Title = showingAll ? "h4" : "h3";
+            const { plan, session } = entry;
+            return (
+              <article className="library-starter" key={entry.name}>
+                <div>
+                  <Title>{entry.name}</Title>
+                  <small>{plan ? "Silent practice · " : items.length > 1 ? items.length + " items · " : ""}{length}</small>
+                  {showingAll && items.length > 1 && (
+                    <small className="library-starter-order">{items.map(item => item.name).join(" → ")}</small>
+                  )}
+                </div>
+                <div className="library-starter-actions">
+                  <button className="primary" aria-label={verb + " " + entry.name} onClick={() => {
+                    setMessage("");
+                    if (playing) queuePlayer.pause();
+                    else {
+                      const action = paused ? queuePlayer.resume() : startQueue(items, entry.name);
+                      void action.catch(error => setMessage(error.message));
+                    }
+                  }}>
+                    {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />} {verb}
+                  </button>
+                  {(!showingAll && (plan || (session && onSaveMix))) && (
+                    <button aria-label={"Save a copy of " + entry.name} onClick={() => {
+                      try {
+                        if (plan) manifestationStore.addCopy(plan);
+                        if (session && !onSaveMix?.(session)) return;
+                        setMessage("Saved a copy of " + entry.name + ".");
+                      } catch (error) {
+                        setMessage((error as Error).message);
+                      }
+                    }}><Plus size={16} aria-hidden="true" /> Save copy</button>
+                  )}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ))}
       {message && <p role="status">{message}</p>}
     </section>
   );
