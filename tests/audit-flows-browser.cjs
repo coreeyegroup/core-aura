@@ -83,6 +83,27 @@ function testAudio() {
     assert.equal(await label("Import session file").inputValue(), "");
 
     await button("Affirmations").click();
+    const workspace = page.getByRole("group", { name: "Affirmation workspace" });
+    const workspaceButton = name => workspace.getByRole("button", { name, exact: true });
+    assert.equal(await workspaceButton("Browse").getAttribute("aria-pressed"), "true");
+    assert.equal(await label("Search library").count(), 0);
+    assert.equal(await page.getByRole("region", { name: "Saved practices" }).count(), 0);
+    const affirmationSearch = page.getByRole("searchbox", { name: "Find a sentence" });
+    await affirmationSearch.fill("zzz nonexistent");
+    await page.getByText("No affirmations match this search in the selected category.").waitFor();
+    await button("Clear search").click();
+    assert.equal(await affirmationSearch.inputValue(), "");
+    const firstAffirmation = page.locator(".affirmation-choice input").first();
+    await firstAffirmation.check();
+    await workspaceButton("Recordings").click();
+    await page.getByText("My voice recordings (0)", { exact: true }).waitFor();
+    assert.equal(await affirmationSearch.count(), 0);
+    await page.reload();
+    assert.equal(await workspaceButton("Recordings").getAttribute("aria-pressed"), "true");
+    await workspaceButton("Browse").click();
+    assert.equal(await firstAffirmation.isChecked(), true);
+    await workspaceButton("Saved practices").click();
+    assert.equal(await affirmationSearch.count(), 0);
     await label("Select practice Older practice").check();
     await label("Search library").fill("Newer");
     assert.equal(await button("Delete selected practices").isDisabled(), true);

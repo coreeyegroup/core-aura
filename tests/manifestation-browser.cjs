@@ -270,6 +270,7 @@ function speechMock() {
       .getByRole("button", { name: "Library", exact: true })
       .last()
       .click();
+    await p.getByRole("button", { name: "Saved practices", exact: true }).click();
     await p
       .getByRole("heading", { name: "Morning manifestation", exact: true })
       .waitFor();

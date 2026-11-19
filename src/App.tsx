@@ -133,7 +133,6 @@ export default function App() {
     librarySection,
     exploreView,
   } = route;
-  const recordingsOpen = librarySection === "recordings";
   const playlistView = librarySection === "playlists";
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(() => {
     if (route.tab === "studio" || route.tab === "explore") return route.tab;
@@ -1304,28 +1303,28 @@ export default function App() {
                 Audio library
               </button>
             </div>
-            {!playlistView && <div className="fields">
-              <label>{libraryView === "audio" ? "Search saved mixes" : "Search affirmations and practices"}
+            {!playlistView && libraryView === "manifestation" && (
+              <div className="manifest-library-nav" role="group" aria-label="Affirmation workspace">
+                <button aria-pressed={librarySection === "all"} onClick={() => navigate("library", { librarySection: "all" })}>Browse</button>
+                <button aria-pressed={librarySection === "saved"} onClick={() => navigate("library", { librarySection: "saved" })}>Saved practices</button>
+                <button aria-pressed={librarySection === "recordings"} onClick={() => navigate("library", { librarySection: "recordings" })}>Recordings</button>
+              </div>
+            )}
+            {!playlistView && (libraryView === "audio" || librarySection === "saved") && <div className="fields">
+              <label>{libraryView === "audio" ? "Search saved mixes" : "Search saved practices"}
                 <input aria-label="Search library" type="search" value={libraryQuery}
                   onChange={event => { setLibraryQuery(event.target.value); setSelectedSessions([]); }}
-                  placeholder="Name, sentence, tag or collection"/>
+                  placeholder="Name, tag or collection"/>
               </label>
               <label>Sort saved items <select aria-label="Sort library" value={librarySort} onChange={event => setLibrarySort(event.target.value)}>
                 <option value="recent">{libraryView === "audio" ? "Recently added" : "Recently saved"}</option><option value="name">Name A–Z</option>
               </select></label>
             </div>}
-            {!playlistView && libraryView === "manifestation" && (
-              <div className="home-actions" aria-label="Manifestation library shortcuts">
-                <button onClick={() => navigate("library", { librarySection: "saved" })}>Saved practices</button>
-                <button onClick={() => navigate("library", { librarySection: "recordings" })}>Recordings</button>
-              </div>
-            )}
             {playlistView ? <PlaylistLibrary sessions={sessions} tracks={localTracks} trackError={trackReadError}/> : libraryView === "manifestation" ? (
               <ManifestLibrary
                 search={libraryQuery}
                 sort={librarySort}
                 initialCategory={category}
-                recordingsOpen={recordingsOpen}
                 section={librarySection}
                 onCategory={(value) => navigate("library", { category: value })}
                 onPractice={(id) =>

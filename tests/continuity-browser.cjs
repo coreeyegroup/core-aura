@@ -218,6 +218,7 @@ const { chromium } = require("playwright"),
         .getByRole("button", { name: "Play practice", exact: true })
         .click();
       await nav("Library");
+      await p.getByRole("button", { name: "Saved practices", exact: true }).click();
       const stopsBeforeInvalid = await p.evaluate(() => window.__voiceStops);
       await p
         .getByLabel("Import manifestation practice", { exact: true })
@@ -316,6 +317,7 @@ const { chromium } = require("playwright"),
         path: "mobile-verification/continuity-manifest-393.png",
       });
       await nav("Library");
+      await p.getByRole("button", { name: "Saved practices", exact: true }).click();
       const importFile = {
         name: "practice.json",
         mimeType: "application/json",

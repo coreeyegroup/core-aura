@@ -335,11 +335,9 @@ export function PersonalVoices({
 }: {
   initiallyOpen?: boolean;
 }) {
-  const panel = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(initiallyOpen);
   useEffect(() => {
     setOpen(initiallyOpen);
-    if (initiallyOpen) panel.current?.scrollIntoView({ block: "start" });
   }, [initiallyOpen]);
   const playback = useSyncExternalStore(
     manifestPlayer.subscribe,
@@ -369,7 +367,6 @@ export function PersonalVoices({
   return (
     <details
       className="personal-voices"
-      ref={panel}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >

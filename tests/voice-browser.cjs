@@ -137,6 +137,7 @@ const assert = require("node:assert/strict");
     await p
       .getByRole("button", { name: "Choose affirmations", exact: true })
       .click();
+    await p.getByRole("button", { name: "Saved practices", exact: true }).click();
     const downloading = p.waitForEvent("download");
     await p
       .getByRole("button", { name: "Export practice", exact: true })
@@ -146,7 +147,7 @@ const assert = require("node:assert/strict");
     const backup = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
     assert.equal(backup.lines[0].recordingId, undefined);
     assert.equal(backup.useRecordings, false);
-    await p.getByText("My voice recordings (1)", { exact: true }).click();
+    await p.getByRole("button", { name: "Recordings", exact: true }).click();
     await p
       .getByRole("button", { name: "Play preview: " + text, exact: true })
       .last()
@@ -163,6 +164,7 @@ const assert = require("node:assert/strict");
       JSON.parse(localStorage.getItem("core-aura.manifestation.v1")),
     );
     assert.equal(stored.plans[0].lines[0].recordingId, undefined);
+    await p.getByRole("button", { name: "Browse", exact: true }).click();
     // A denied microphone leaves the sentence usable and surfaces the failure.
     await p
       .getByRole("button", { name: "Use selection (1)", exact: true })

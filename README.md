@@ -1,6 +1,10 @@
 # Core-aura
 
-Core-aura 0.30.0 is a manifestation, sound-generation and personal meditation application. Home selects saved practices and mixes for direct playback; Library builds mixed sequential playlists. A slate and teal palette pairs with compact mobile navigation, grouped Home controls and a consistent player. Detailed configuration lives in Manifest, Sounds, and Chakras. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura 0.31.0 is a manifestation, sound-generation and personal meditation application. Home selects saved practices and mixes for direct playback; Library builds mixed sequential playlists. A slate and teal palette pairs with compact mobile navigation, grouped Home controls and a consistent player. Detailed configuration lives in Manifest, Sounds, and Chakras. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+
+## Affirmations
+
+Open Library → Affirmations to browse one category, search its sentences, preview them, and send your selection to Manifest. Saved practices and Recordings have separate views. Category and sentence editing, library backup, and voice settings are available from Browse.
 
 ## v0.30.0 audit fixes
 

@@ -641,7 +641,6 @@ export function Manifestation({
 export function ManifestLibrary({
   onPractice,
   initialCategory = "Health",
-  recordingsOpen = false,
   search = "",
   sort = "recent",
   section = "all",
@@ -651,7 +650,6 @@ export function ManifestLibrary({
   initialCategory?: string;
   section?: "all" | "saved" | "recordings";
   onCategory?: (category: string) => void;
-  recordingsOpen?: boolean;
   search?:string;
   sort?:string;
 }) {
@@ -671,10 +669,8 @@ export function ManifestLibrary({
   const recordingsSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (section === "saved") {
-      savedSection.current?.scrollIntoView({ block: "start" });
       savedSection.current?.focus({ preventScroll: true });
     } else if (section === "recordings") {
-      recordingsSection.current?.scrollIntoView({ block: "start" });
       recordingsSection.current?.focus({ preventScroll: true });
     }
   }, [section]);
@@ -686,10 +682,11 @@ export function ManifestLibrary({
   if (sort === "name") visiblePlans.sort((a, b) => a.name.localeCompare(b.name));
   else visiblePlans.reverse();
   const chosenPlans = visiblePlans.filter(plan => selectedPlans.includes(plan.id));
+  const needle = query.trim().toLowerCase();
   const matchingAffirmations = catalog.data.affirmations.filter(
-    affirmation => affirmation.category === category &&
-      [query, search].every(term => affirmation.text.toLowerCase().includes(term.trim().toLowerCase())),
+    affirmation => affirmation.category === category && affirmation.text.toLowerCase().includes(needle),
   );
+  const selectedCount = data.draft.lines.length;
   useEffect(() => setSelectedPlans([]), [search]);
   useEffect(() => setCategory(initialCategory), [initialCategory]);
   useEffect(() => {
@@ -744,41 +741,33 @@ export function ManifestLibrary({
   }
   return (
     <section className="manifest-workspace" aria-label="Manifestation library">
-      <div className="section-heading">
-        <h2>Affirmation library</h2>
-        <button
-          className="primary"
-          disabled={!data.draft.lines.length}
-          onClick={() => onPractice()}
-        >
-          Use selection ({data.draft.lines.length})
-        </button>
-      </div>
-      <VoicePanel />
-      <div className="fields">
-        <label>
-          Category
-          <select
-            aria-label="Category"
-            value={category}
-            onChange={(e) => {
+      {section === "all" && <>
+      <div className="affirmation-toolbar">
+        <div className="section-heading affirmation-heading">
+          <h2>Affirmation library</h2>
+          <button className="primary" disabled={!selectedCount} onClick={() => onPractice()}>
+            Use selection ({selectedCount})
+          </button>
+        </div>
+        <div className="fields affirmation-filters">
+          <label>
+            Category
+            <select aria-label="Category" value={category} onChange={(e) => {
               setCategory(e.target.value);
               onCategory?.(e.target.value);
-            }}
-          >
-            {catalog.data.categories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Find a sentence
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
+            }}>
+              {catalog.data.categories.map(categoryName => <option key={categoryName}>{categoryName}</option>)}
+            </select>
+          </label>
+          <label>
+            Find a sentence
+            <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search this category" />
+          </label>
+        </div>
+        <div className="affirmation-results">
+          <small aria-live="polite">{matchingAffirmations.length} {matchingAffirmations.length === 1 ? "affirmation" : "affirmations"}</small>
+          {needle && <button className="text-button" onClick={() => setQuery("")}>Clear search</button>}
+        </div>
       </div>
       {active && (
         <p className="content-note">
@@ -787,6 +776,7 @@ export function ManifestLibrary({
       )}
       <details
         className="library-management"
+        open={manage}
         onToggle={(e) => setManage(e.currentTarget.open)}
       >
         <summary>Manage categories &amp; affirmations</summary>
@@ -794,9 +784,10 @@ export function ManifestLibrary({
           Changes are saved on this device. Export your library to back it up or
           move it to another device.
         </p>
-        <div className="admin-actions">
-          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,-1);}catch(e){setMessage((e as Error).message);}}}>Move category up</button>
-          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,1);}catch(e){setMessage((e as Error).message);}}}>Move category down</button>
+        <div className="affirmation-management-groups">
+        <fieldset><legend>Categories</legend><div className="admin-actions">
+          <button disabled={active || catalog.data.categories.indexOf(category) <= 0} onClick={()=>{try{affirmationLibrary.reorderCategory(category,-1);}catch(e){setMessage((e as Error).message);}}}>Move category up</button>
+          <button disabled={active || !category || catalog.data.categories.indexOf(category) >= catalog.data.categories.length - 1} onClick={()=>{try{affirmationLibrary.reorderCategory(category,1);}catch(e){setMessage((e as Error).message);}}}>Move category down</button>
           <button
             disabled={active}
             onClick={() => setEditing({ kind: "category-add", category })}
@@ -815,12 +806,16 @@ export function ManifestLibrary({
           >
             Delete category
           </button>
+        </div></fieldset>
+        <fieldset><legend>Affirmations</legend><div className="admin-actions">
           <button
             disabled={active || !category}
             onClick={() => setEditing({ kind: "affirmation-add", category })}
           >
             Add affirmation
           </button>
+        </div></fieldset>
+        <fieldset><legend>Library backup</legend><div className="admin-actions">
           <button
             disabled={!!catalog.error}
             onClick={() =>
@@ -841,6 +836,7 @@ export function ManifestLibrary({
           >
             Import library
           </button>
+        </div></fieldset>
         </div>
       </details>
       <input
@@ -888,8 +884,13 @@ export function ManifestLibrary({
           Add a category to start your affirmation library.
         </p>
       )}
+      <VoicePanel />
       <div className="affirmation-list">
-        {!matchingAffirmations.length && (query || search) && <p role="status">No affirmations match this search in the selected category.</p>}
+        {!matchingAffirmations.length && category && (
+          <p className="affirmation-empty" role="status">
+            {needle ? "No affirmations match this search in the selected category." : "No affirmations in this category yet."}
+          </p>
+        )}
         {matchingAffirmations
           .map((a) => (
             <div className="affirmation-row" key={a.id}>
@@ -937,10 +938,11 @@ export function ManifestLibrary({
             </div>
           ))}
       </div>
-      <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
-        <PersonalVoices initiallyOpen={recordingsOpen} />
-      </div>
-      <section
+      </>}
+      {section === "recordings" && <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
+        <PersonalVoices initiallyOpen />
+      </div>}
+      {section === "saved" && <section
         className="saved-practices-section"
         ref={savedSection}
         tabIndex={-1}
@@ -1072,7 +1074,7 @@ export function ManifestLibrary({
             </div>
           </article>
         ))}
-      </section>
+      </section>}
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}

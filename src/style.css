@@ -2527,3 +2527,37 @@ progress {
 @media (min-width: 760px) {
   .app .settings-sheet { border-radius: 18px; }
 }
+
+/* Affirmation browsing, saved practices and recordings each have their own pane. */
+.manifest-library-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-block: 2px;
+}
+.manifest-library-nav button {
+  flex: 1 1 auto;
+  background: var(--surface);
+}
+.manifest-library-nav button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.affirmation-toolbar {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.affirmation-heading { flex-wrap: wrap; }
+.affirmation-heading h2 { font-size: calc(16px * var(--text-scale)); }
+.affirmation-filters { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
+.affirmation-filters label { min-width: 0; }
+[data-text-size="large"] .affirmation-filters { grid-template-columns: minmax(0, 1fr); }
+.affirmation-results { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.affirmation-management-groups { display: grid; gap: 6px; }
+.affirmation-management-groups fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 6px; }
+.affirmation-empty { padding: 9px; color: var(--muted); font-size: calc(13px * var(--text-scale)); }
