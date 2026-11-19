@@ -985,6 +985,7 @@ export function ManifestLibrary({
       >
         <div className="section-heading">
           <h2>Saved practices</h2>
+          {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>Add practice</button>}
           <button onClick={() => input.current?.click()}>
             Import practice
           </button>

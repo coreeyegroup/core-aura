@@ -3,15 +3,15 @@ const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 
 const origin = "http://localhost:8089";
-const screens = ["Home", "Manifest", "Sounds", "Chakras"];
+const screens = ["Home", "Chakras"];
 const palettes = ["system", "light", "dark", "green", "yellow", "custom"];
 const collections = [
-  ["Sounds", "#library/sounds", "Nature & instruments"],
+  ["Sounds", "#library/sounds", "Import your own sound"],
   ["Backgrounds", "#library/backgrounds", "Saved mix"],
   ["Voices", "#library/recordings", "My voice recordings (0)"],
   ["Affirmations", "#library/affirmations", "Affirmation library"],
   ["Manifestation practices", "#library/practices", "Saved practice"],
-  ["Audio files", "#library/audio", "Add audio"],
+  ["Audio files", "#library/audio", "Import audio"],
   ["Sound packs", "#library/packs", "Available packs"],
   ["Saved mixes", "#library/mixes", "Saved mix"],
   ["Playlists", "#library/playlists", "Saved routine"],
@@ -83,41 +83,21 @@ function testAudio(name) {
       await nav.getByRole("button", { name, exact: true }).click();
       await assertEmpty(name);
     }
-    for (const [route, name] of [
-      ["#manifest/schedule", "Manifest"],
-      ["#explore/nature", "Sounds"],
-      ["#studio", "Sounds"],
-    ]) {
-      await page.goto(origin + "/" + route);
-      await assertEmpty(name);
-    }
-
     await nav.getByRole("button", { name: "Library", exact: true }).click();
     const libraryGrid = page.getByRole("group", { name: "Library collections" });
     await libraryGrid.waitFor();
     assert.equal(await libraryGrid.getByRole("button").count(), 9);
-    const libraryStarters = page.getByRole("region", { name: "Starter collection" });
-    assert.equal(await libraryStarters.getByRole("button", { name: /^Play / }).count(), 9);
-    const librarySearch = page.getByRole("searchbox", { name: "Find a collection or starter" });
-    await librarySearch.fill("Morning");
-    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).waitFor();
-    assert.equal(await libraryGrid.getByRole("button").count(), 0);
-    assert.equal(await libraryStarters.getByRole("button").count(), 1);
+    assert.equal(await page.getByRole("region", { name: "Starter collection" }).count(), 0);
+    const librarySearch = page.getByRole("searchbox", { name: "Find a collection" });
+    await librarySearch.fill("voices");
+    assert.equal(await libraryGrid.getByRole("button").count(), 1);
     await page.getByRole("button", { name: "Clear library search" }).click();
     assert.equal(await librarySearch.evaluate(input => input === document.activeElement), true);
-    await page.getByRole("button", { name: "Ready to play", exact: true }).click();
-    const ready = libraryStarters.getByRole("heading", { name: "Ready to play" });
-    assert.equal(await ready.evaluate(heading => heading === document.activeElement), true);
-    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).click();
-    await libraryStarters.getByRole("button", { name: "Pause Morning pause" }).click();
-    await libraryStarters.getByRole("button", { name: "Resume Morning pause" }).waitFor();
-    await page.getByRole("button", { name: "Stop playlist" }).click();
-    await libraryStarters.getByRole("button", { name: "Play Morning pause" }).waitFor();
     for (const width of [320, 390, 768, 1024]) {
       await page.setViewportSize({ width, height: 800 });
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       assert.equal(await libraryGrid.evaluate(el => getComputedStyle(el).gridTemplateColumns.split(" ").length),
-        width >= 650 ? 3 : 2);
+        1);
     }
     await page.setViewportSize({ width: 320, height: 740 });
     const overviewAudit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
@@ -131,6 +111,20 @@ function testAudio(name) {
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await page.getByRole("button", { name: "All collections", exact: true }).click();
     }
+    await page.goto(origin + "/#library/sounds");
+    const catalog = page.getByRole("region", { name: "Sound catalog" });
+    await catalog.getByRole("searchbox", { name: "Search sounds" }).fill("rain");
+    const testSound = catalog.getByRole("button", { name: /^Test play .*rain/i }).first();
+    await testSound.click();
+    await catalog.getByRole("button", { name: /^Stop test / }).click();
+    await catalog.getByRole("button", { name: /^Export WAV .*rain/i }).first().click();
+    const sampleDownload = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download WAV" }).click();
+    assert.match((await sampleDownload).suggestedFilename(), /\.wav$/);
+    await page.getByRole("button", { name: "Close audio export" }).click();
+
+    assert.equal(await page.getByRole("button", { name: "Add frequency tone" }).count(), 0);
+    assert.equal(await page.getByLabel("Nature mix duration").count(), 0);
     await page.goto(origin + "/#library/audio");
     await page.getByLabel("Import sound tracks").setInputFiles(testAudio("Quiet audio.wav"));
     await page.getByText("Quiet audio", { exact: true }).waitFor();
@@ -181,7 +175,7 @@ function testAudio(name) {
     await page.getByRole("dialog").waitFor({ state: "detached" });
     assert.equal(await settings.evaluate(element => element === document.activeElement), true);
     assert.deepEqual(await page.evaluate(keys => Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)])), Object.keys(saved)), saved);
-    await page.goto(origin + "/#library/sounds");
+    await page.goto(origin + "/#explore/nature");
     await page.getByRole("button", { name: "Add frequency tone" }).click();
     const mixName = page.getByLabel("Mix name", { exact: true });
     await mixName.fill("Rain practice mix");
@@ -189,7 +183,7 @@ function testAudio(name) {
     await page.getByText("Generated mix saved in Saved mixes.", { exact: true }).waitFor();
     await page.goto(origin + "/#library/backgrounds");
     const card = page.locator(".saved-card").filter({ hasText: "Rain practice mix" });
-    await card.getByRole("button", { name: "Edit mix", exact: true }).click();
+    await card.getByRole("button", { name: "Edit in Sounds", exact: true }).click();
     await mixName.fill("Evening practice mix");
     await page.getByRole("button", { name: "Save changes", exact: true }).click();
     await page.goto(origin + "/#library/mixes");
@@ -217,11 +211,24 @@ function testAudio(name) {
     await starters.getByRole("button", { name: "Save a copy of Gentle rain" }).click();
     await page.locator(".saved-card").getByRole("heading", { name: "Gentle rain", exact: true }).waitFor();
 
+    await page.goto(origin + "/#library/playlists");
+    const incoming = { schemaVersion: 1, playlists: [
+      { id: "queue", name: "Imported playlist", items: [{ kind: "session", id: "mix" }] },
+    ] };
+    await page.getByLabel("Import playlist JSON").setInputFiles({
+      name: "playlists.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(incoming)),
+    });
+    await page.getByText("Imported playlist", { exact: true }).waitFor();
+    await page.getByText("Saved routine", { exact: true }).waitFor();
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export playlists" }).click();
+    assert.equal((await downloaded).suggestedFilename(), "core-aura-playlists.json");
+
     await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
     await context.setOffline(true);
     await page.goto(origin + "/#library/playlists");
     await page.reload();
-    await starters.getByRole("button", { name: "Play Morning pause" }).click();
+    await starters.getByRole("button", { name: "Test play Morning pause" }).click();
     const player = page.getByRole("region", { name: "Playlist player" });
     await player.getByText("I can return my attention to this moment.", { exact: true }).waitFor();
     await player.getByRole("button", { name: "Next item" }).click();
@@ -231,7 +238,7 @@ function testAudio(name) {
     await player.waitFor({ state: "detached" });
     await context.setOffline(false);
     assert.deepEqual(errors, []);
-    console.log("Verified four staged screens, nine Library collections, mix editing, six themes, custom colour persistence, keyboard focus, accessibility and saved data.");
+    console.log("Verified nine Library collections, isolated sound testing, separate mix editing, six themes, custom colour persistence, keyboard focus, accessibility and saved data.");
   } finally {
     await browser.close();
   }

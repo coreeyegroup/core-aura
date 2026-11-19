@@ -2552,35 +2552,6 @@ progress {
 /* Library overview and collection details */
 .library-overview { display: grid; gap: 18px; }
 .library-overview h2 { margin-bottom: 8px; }
-.library-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 16px;
-  padding: clamp(18px, 4vw, 36px);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  color: var(--ink);
-  background: linear-gradient(115deg, var(--surface), var(--accent-soft));
-}
-:root .app main .library-hero h1 {
-  width: fit-content;
-  font-size: calc(clamp(32px, 5vw, 50px) * var(--text-scale));
-}
-.library-overview :is(h1, h2):focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-.library-hero p { color: var(--muted); margin: 4px 0 14px; }
-.library-hero .library-hero-action { min-height: 44px; background: var(--surface); padding-inline: 12px; }
-.library-hero-art {
-  display: grid;
-  place-items: center;
-  width: clamp(50px, 12vw, 108px);
-  aspect-ratio: 1;
-  border: 1px solid var(--control-line);
-  border-radius: 50%;
-  color: var(--accent);
-  background: var(--surface);
-}
-.library-hero-art svg { width: 54%; height: 54%; }
 .library-search {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -2594,28 +2565,22 @@ progress {
 }
 .library-search input { border: 0; background: transparent; min-height: 46px; color: var(--ink); }
 .library-search input::-webkit-search-cancel-button { appearance: none; }
-.library-destinations {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--gap);
-}
+.library-destinations { display: grid; gap: 5px; }
 :root .app .library-destinations button {
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-content: start;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  min-height: 94px;
-  gap: 7px;
-  padding: 10px;
+  min-height: 52px;
+  gap: 10px;
+  padding: 7px 10px;
   text-align: left;
   background: var(--surface);
-  border-radius: 12px;
 }
 .library-destinations button:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); }
-.library-tile-icon { display: grid; place-items: center; width: 35px; height: 35px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
-.library-tile-label { grid-column: 1 / -1; grid-row: 2; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.library-tile-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 7px; background: var(--accent-soft); color: var(--accent); }
+.library-tile-label { display: grid; gap: 2px; overflow-wrap: anywhere; }
 .library-tile-label small { font-size: calc(12px * var(--text-scale)); font-weight: 400; color: var(--muted); }
-.library-tile-arrow { color: var(--accent); grid-column: 2; grid-row: 1; }
+.library-tile-arrow { color: var(--accent); }
 .library-collection-header {
   display: grid;
   gap: 8px;
@@ -2627,15 +2592,6 @@ progress {
 .library-more > summary { min-height: 44px; align-content: center; cursor: pointer; }
 .library-more[open] > summary { margin-bottom: 6px; }
 .library-card-more { grid-column: 1 / -1; border-top: 1px solid var(--line); }
-@media (min-width: 650px) {
-  .library-destinations { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  :root .app .library-destinations button { grid-template-columns: auto minmax(0, 1fr) auto; min-height: 84px; align-content: center; }
-  .library-tile-label { grid-column: 2; grid-row: 1; }
-  .library-tile-arrow { grid-column: 3; }
-  .library-overview .library-starters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .library-overview .library-starters > h2,
-  .library-overview .library-starters > p { grid-column: 1 / -1; }
-}
 .app:has(.queue-player) .nature-player { display: none; }
 
 .library-starters, .library-starter-group { display: grid; gap: var(--gap); align-content: start; }

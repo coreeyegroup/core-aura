@@ -203,7 +203,7 @@ export function PacksPanel({
           browser storage cleanup.{" "}
         </p>
       )}
-      {library && installed.length > 0 && (
+      {library && onMaster && installed.length > 0 && (
         <label className="range-label">
           Playback volume <output>{Math.round(master * 100)}%</output>
           <input

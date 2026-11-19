@@ -1,4 +1,4 @@
-import { type Ref, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Pause, Play, Plus } from "lucide-react";
 import { affirmations, type Category, type Plan } from "../manifestation/model";
 import { manifestationStore } from "../manifestation/store";
@@ -61,83 +61,59 @@ const entries: Record<StarterGroup, StarterEntry[]> = {
   ],
 };
 
-const groups = ["playlists", "practices", "backgrounds", "mixes"] as const;
-const groupNames = {
-  playlists: "Playlists", practices: "Manifestation practices",
-  backgrounds: "Backgrounds", mixes: "Mixes and chakra tones",
-};
-
-export function LibraryStarters({ section, onSaveMix, query = "", headingRef }: {
-  section: keyof typeof entries | "all";
+export function LibraryStarters({ section, onSaveMix, query = "" }: {
+  section: StarterGroup;
   onSaveMix?: (session: Session) => boolean;
   query?: string;
-  headingRef?: Ref<HTMLHeadingElement>;
 }) {
   const [message, setMessage] = useState("");
   const playback = useSyncExternalStore(queuePlayer.subscribe, queuePlayer.snapshot);
-  const showingAll = section === "all";
-  const visibleGroups = (showingAll ? groups : [section]).map(group => ({
-    group,
-    visible: entries[group].filter(entry =>
-      (entry.name + " " + groupNames[group]).toLowerCase().includes(query),
-    ),
-  })).filter(({ visible }) => visible.length > 0);
+  const rows = entries[section].filter(entry => entry.name.toLowerCase().includes(query.trim().toLowerCase()));
+  if (!rows.length) return null;
   return (
     <section className="library-starters" aria-label="Starter collection">
-      <h2 ref={headingRef} tabIndex={headingRef ? -1 : undefined}>
-        {showingAll ? "Ready to play" : "Included with Core-aura"}
-      </h2>
-      {!visibleGroups.length && <p role="status" className="content-note">No starter items match your search.</p>}
-      {visibleGroups.map(({ group, visible }) => (
-        <div className="library-starter-group" key={group}>
-          {showingAll && <h3>{groupNames[group]}</h3>}
-          {visible.map(entry => {
-            const items = resolveItems(entry.refs, practices, [...backgrounds, ...mixes]);
-            const length = durationLabel(items.reduce((total, item) => total + itemDuration(item), 0));
-            const current = playback.name === entry.name && playback.items.length === items.length &&
-              items.every((item, i) => item.id === playback.items[i].id);
-            const playing = current && playback.status === "playing";
-            const paused = current && playback.status === "paused";
-            const verb = playing ? "Pause" : paused ? "Resume" : "Play";
-            const Title = showingAll ? "h4" : "h3";
-            const { plan, session } = entry;
-            return (
-              <article className="library-starter" key={entry.name}>
-                <div>
-                  <Title>{entry.name}</Title>
-                  <small>{plan ? "Silent practice · " : items.length > 1 ? items.length + " items · " : ""}{length}</small>
-                  {showingAll && items.length > 1 && (
-                    <small className="library-starter-order">{items.map(item => item.name).join(" → ")}</small>
-                  )}
-                </div>
-                <div className="library-starter-actions">
-                  <button className="primary" aria-label={verb + " " + entry.name} onClick={() => {
-                    setMessage("");
-                    if (playing) queuePlayer.pause();
-                    else {
-                      const action = paused ? queuePlayer.resume() : startQueue(items, entry.name);
-                      void action.catch(error => setMessage(error.message));
-                    }
-                  }}>
-                    {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />} {verb}
-                  </button>
-                  {(!showingAll && (plan || (session && onSaveMix))) && (
-                    <button aria-label={"Save a copy of " + entry.name} onClick={() => {
-                      try {
-                        if (plan) manifestationStore.addCopy(plan);
-                        if (session && !onSaveMix?.(session)) return;
-                        setMessage("Saved a copy of " + entry.name + ".");
-                      } catch (error) {
-                        setMessage((error as Error).message);
-                      }
-                    }}><Plus size={16} aria-hidden="true" /> Save copy</button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ))}
+      <h2>Built-in items</h2>
+      {rows.map(entry => {
+        const items = resolveItems(entry.refs, practices, [...backgrounds, ...mixes]);
+        const length = durationLabel(items.reduce((total, item) => total + itemDuration(item), 0));
+        const current = playback.name === entry.name && playback.items.length === items.length &&
+          items.every((item, i) => item.id === playback.items[i].id);
+        const playing = current && playback.status === "playing";
+        const paused = current && playback.status === "paused";
+        const verb = playing ? "Pause" : paused ? "Resume" : "Play";
+        const { plan, session } = entry;
+        return (
+          <article className="library-starter" key={entry.name}>
+            <div>
+              <h3>{entry.name}</h3>
+              <small>{plan ? "Silent practice · " : items.length > 1 ? items.length + " items · " : ""}{length}</small>
+            </div>
+            <div className="library-starter-actions">
+              <button className="primary" aria-label={(verb === "Play" ? "Test play" : verb) + " " + entry.name} onClick={() => {
+                setMessage("");
+                if (playing) queuePlayer.pause();
+                else {
+                  const action = paused ? queuePlayer.resume() : startQueue(items, entry.name);
+                  void action.catch(error => setMessage(error.message));
+                }
+              }}>
+                {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />} {verb === "Play" ? "Test play" : verb}
+              </button>
+              {(plan || (session && onSaveMix)) && (
+                <button aria-label={"Save a copy of " + entry.name} onClick={() => {
+                  try {
+                    if (plan) manifestationStore.addCopy(plan);
+                    if (session && !onSaveMix?.(session)) return;
+                    setMessage("Saved a copy of " + entry.name + ".");
+                  } catch (error) {
+                    setMessage((error as Error).message);
+                  }
+                }}><Plus size={16} aria-hidden="true" /> Save copy</button>
+              )}
+            </div>
+          </article>
+        );
+      })}
       {message && <p role="status">{message}</p>}
     </section>
   );

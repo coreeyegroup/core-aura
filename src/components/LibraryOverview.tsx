@@ -1,17 +1,16 @@
 import { useRef, useState } from "react";
 import {
   ArrowRight, AudioLines, BookOpen, Layers, ListMusic, Mic, Music2,
-  Package, Play, Search, Sparkles, Waves, X,
+  Package, Search, Sparkles, Waves, X,
 } from "lucide-react";
 import type { Route } from "../navigation";
-import { LibraryStarters } from "./LibraryStarters";
 
 type LibraryRoute = Pick<Route, "libraryView" | "librarySection">;
 
 export const collections = [
   { label: "Sounds", description: "Nature, instruments and tones", icon: AudioLines, libraryView: "sounds", librarySection: "all" },
   { label: "Backgrounds", description: "Atmospheres for your practice", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
-  { label: "Voices", description: "Speech and personal recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
+  { label: "Voices", description: "Personal voice recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
   { label: "Affirmations", description: "Sentences and categories", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
   { label: "Manifestation practices", description: "Saved and silent practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
   { label: "Audio files", description: "Manage your imported tracks", icon: Music2, libraryView: "audio", librarySection: "all" },
@@ -23,31 +22,19 @@ export const collections = [
 export function LibraryOverview({ onOpen }: { onOpen: (route: LibraryRoute) => void }) {
   const [query, setQuery] = useState("");
   const search = useRef<HTMLInputElement>(null);
-  const ready = useRef<HTMLHeadingElement>(null);
   const term = query.trim().toLowerCase();
   const shown = collections.filter(item => (item.label + " " + item.description).toLowerCase().includes(term));
 
   return (
     <div className="library-overview">
-      <header className="library-hero">
-        <div>
-          <h1>Library</h1>
-          <p>Find a sound, choose a practice, or start a playlist.</p>
-          <button className="library-hero-action" onClick={() => {
-            ready.current?.focus();
-          }}>
-            <Play size={16} aria-hidden="true" /> Ready to play
-          </button>
-        </div>
-        <div className="library-hero-art" aria-hidden="true"><AudioLines /></div>
-      </header>
+      <h1>Library</h1>
       <div className="library-search">
         <Search size={19} aria-hidden="true" />
         <input
           ref={search}
           type="search"
-          aria-label="Find a collection or starter"
-          placeholder="Find a collection or starter"
+          aria-label="Find a collection"
+          placeholder="Find a collection"
           value={query}
           onChange={event => setQuery(event.target.value)}
         />
@@ -77,7 +64,6 @@ export function LibraryOverview({ onOpen }: { onOpen: (route: LibraryRoute) => v
         </div>
         {!shown.length && <p className="content-note" role="status">No collections match your search.</p>}
       </section>
-      <LibraryStarters section="all" query={term} headingRef={ready} />
     </div>
   );
 }

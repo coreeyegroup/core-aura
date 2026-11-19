@@ -9,7 +9,6 @@ import {SequenceTransport} from "./workbench/SequenceControls";
 import {BackgroundControls} from "./manifestation/BackgroundControls";
 import {SettingsTools} from "./workbench/SettingsTools";
 import {LibraryLabels,matchesItem} from "./workbench/LibraryLabels";
-import {attachMix} from "./manifestation/background";
 import {HomeControls} from "./workbench/HomeControls";
 import {preferences, remember} from "./workbench/preferences";
 import {observeHistory} from "./workbench/history";
@@ -71,7 +70,7 @@ import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
 import { Manifestation, ManifestLibrary } from "./manifestation/Workspace";
-import { VoicePanel } from "./manifestation/VoicePanel";
+import { LibrarySounds } from "./components/LibrarySounds";
 import { manifestationStore } from "./manifestation/store";
 import { manifestPlayer } from "./manifestation/player";
 import { observePushReminders } from "./manifestation/push";
@@ -114,7 +113,7 @@ const tabs = [
 ] as const;
 
 // Add each rebuilt screen here as it is ready. Explore shares the Sounds tab.
-const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["library"]);
+const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["library", "studio", "manifest"]);
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() =>
@@ -448,8 +447,7 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
-  const isLibrarySounds = tab === "library" && libraryView === "sounds";
-  const isNatureView = (tab === "explore" && exploreView === "nature") || isLibrarySounds;
+  const isNatureView = tab === "explore" && exploreView === "nature";
   const miniRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = miniRef.current;
@@ -606,6 +604,7 @@ export default function App() {
       setSelectedSessions([]);
     }
     const next = { ...routeRef.current, tab: value, ...patch };
+    if (value === "library" && next.librarySection === "playlists") next.libraryView = "overview";
     const hash = routeHash(next);
     if (location.hash !== hash) history.pushState(null, "", hash);
     routeRef.current = next;
@@ -832,7 +831,7 @@ export default function App() {
   const playingSounds = sequence.status==="playing" || soundStates.some((state) => state.status === "playing");
   function openPlayingSound() {
     if (soundStates.some(state => state.id.startsWith("nature:"))) {
-      navigate("library", { libraryView: "sounds", librarySection: "all" });
+      navigate("explore", { exploreView: "nature" });
       return;
     }
     if (soundStates.some(state => state.id.startsWith("pack:")))
@@ -925,13 +924,12 @@ export default function App() {
       >
         {practiceBusy ? "Stop practice" : "Stop all"}
       </button>
-      <details className="global-levels"><summary>Levels</summary><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Player sound output" type="range" min="0" max="100" value={master*100} onChange={e=>setMaster(Number(e.target.value)/100)}/></label>{practiceBusy&&practice.plan&&<><label className="range-label">Voice · next sentence <output>{Math.round(practice.plan.volume*100)}%</output><input aria-label="Player voice level" type="range" min="0" max="100" value={practice.plan.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><BackgroundControls plan={practice.plan} sessions={sessions} active onChange={patch=>manifestPlayer.updateBackground(patch)}/></>}<p className="content-note">{soundStates.length} sound sources · Open player for individual controls.</p><button onClick={()=>{manifestPlayer.stop();engine.stopAll();}}>Stop all audio</button></details>
+      {tab !== "library" && <details className="global-levels"><summary>Levels</summary><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Player sound output" type="range" min="0" max="100" value={master*100} onChange={e=>setMaster(Number(e.target.value)/100)}/></label>{practiceBusy&&practice.plan&&<><label className="range-label">Voice · next sentence <output>{Math.round(practice.plan.volume*100)}%</output><input aria-label="Player voice level" type="range" min="0" max="100" value={practice.plan.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><BackgroundControls plan={practice.plan} sessions={sessions} active onChange={patch=>manifestPlayer.updateBackground(patch)}/></>}<p className="content-note">{soundStates.length} sound sources · Open player for individual controls.</p><button onClick={()=>{manifestPlayer.stop();engine.stopAll();}}>Stop all audio</button></details>}
     </div>
   );
   const natureLibrary = (
     <NatureLibrary
-      embedded={isLibrarySounds}
-      favorites={isLibrarySounds ? starred : undefined}
+      favorites={starred}
       onFavorite={favorite}
       master={master}
       onMaster={setMaster}
@@ -1341,8 +1339,8 @@ export default function App() {
               </header>
             ) : <LibraryOverview onOpen={route => navigate("library", route)} />}
             {mixesView && <div className="home-actions">
-              <button onClick={() => navigate("library", { libraryView: "sounds", librarySection: "all" })}>
-                <Plus size={18} /> Create mix
+              <button onClick={() => navigate("explore", { exploreView: "nature" })}>
+                Open Sounds
               </button>
               <button onClick={() => importInput.current?.click()}><Upload size={18} /> Import mix</button>
             </div>}
@@ -1357,26 +1355,39 @@ export default function App() {
               </select></label>
             </div>}
             {playlistView && <LibraryStarters section="playlists" />}
-            {librarySection === "saved" && <LibraryStarters section="practices" />}
+            {librarySection === "saved" && <LibraryStarters section="practices" query={libraryQuery} />}
             {mixesView && <LibraryStarters
               key={libraryView}
               section={backgroundsView ? "backgrounds" : "mixes"}
+              query={libraryQuery}
               onSaveMix={session => storeRows([...sessions, {
                 ...session, id: crypto.randomUUID(), createdAt: new Date().toISOString(),
               }])}
             />}
-            {isLibrarySounds && natureLibrary}
+            {libraryView === "sounds" && <LibrarySounds
+              favorites={starred}
+              onFavorite={favorite}
+              onImport={() => navigate("library", { libraryView: "audio", librarySection: "all" })}
+              onExport={(name, sample, control) => {
+                modalOpener.current = control;
+                setExporting({
+                  schemaVersion: 2, engineVersion: ENGINE_VERSION, kind: "studio",
+                  id: sample.id, name, channels: [sample], master, createdAt: "",
+                });
+                setExportSeconds(sample.seconds);
+                setExportError("");
+              }}
+            />}
             {libraryView === "audio" && <>
-              <SoundTracks defaultOpen />
+              <SoundTracks defaultOpen catalog />
               <button onClick={() => navigate("library", { libraryView: "packs", librarySection: "all" })}>
                 Browse original audio samples <ArrowRight size={16} aria-hidden="true" />
               </button>
             </>}
             {libraryView === "packs" && <>
               <PacksPanel embedded />
-              <PacksPanel library master={master} onMaster={setMaster} />
+              <PacksPanel library />
             </>}
-            {!playlistView && librarySection === "recordings" && <VoicePanel />}
             {playlistView ? <PlaylistLibrary sessions={sessions} tracks={localTracks} trackError={trackReadError}/> : libraryView === "manifestation" ? (
               <ManifestLibrary
                 search={libraryQuery}
@@ -1384,9 +1395,15 @@ export default function App() {
                 initialCategory={category}
                 section={librarySection}
                 onCategory={(value) => navigate("library", { category: value })}
-                onPractice={manifestReady ? (id) =>
-                  id ? openManifest(id) : navigate("manifest", { manifestSection: "practice" })
-                : undefined}
+                onPractice={librarySection === "saved" ? (id) => {
+                  if (id) { openManifest(id); return; }
+                  const { draft, plans } = manifestationStore.snapshot().data;
+                  if (!confirmDraftReplacement(draft, plans)) return;
+                  try {
+                    manifestationStore.fresh();
+                    navigate("manifest", { manifestSection: "practice" });
+                  } catch (error) { setMessage((error as Error).message); }
+                } : undefined}
                 focusOnEntry={false}
               />
             ) : mixesView ? (
@@ -1438,17 +1455,17 @@ export default function App() {
                     </div>
 
                     <div className="saved-actions">
-                      <button aria-label={"Play saved mix " + row.name} onClick={() => {
+                      <button aria-label={"Test play " + row.name} onClick={() => {
                         void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions), row.name)
                           .catch(error => setMessage(error.message));
-                      }}>Play</button>
+                      }}>Test play</button>
                       {row.kind === "nature" ? <button onClick={() => {
                         if (!prepareSound(row.channels.map(channel => channel.id), false, true)) return;
                         setEditingMix(row);
                         setNatureSessionToLoad(row);
-                        navigate("library", { libraryView: "sounds", librarySection: "all" });
-                      }}>Edit mix</button> : rebuiltScreens.has(row.kind === "chakras" ? "chakras" : "studio") &&
-                        <button onClick={() => load(row, true)}>Edit mix</button>}
+                        navigate("explore", { exploreView: "nature" });
+                      }}>Edit in Sounds</button> : rebuiltScreens.has(row.kind === "chakras" ? "chakras" : "studio") &&
+                        <button onClick={() => load(row, true)}>Edit in Sounds</button>}
                     </div>
                     <details className="library-more library-card-more">
                       <summary aria-label={"More options for " + row.name}>More options</summary>
@@ -1456,13 +1473,6 @@ export default function App() {
                         <PinButton item={{kind:"session",id:row.id}}/>
                         <LibraryLabels item={{kind:"session",id:row.id}}/>
                         <button onClick={()=>{try{storeRows([...sessions,{...row,id:crypto.randomUUID(),name:(row.name+" copy").slice(0,80)}]);}catch(e){setMessage((e as Error).message);}}}>Duplicate</button>
-                        {manifestReady && <button disabled={practiceBusy || row.channels.length > 8} onClick={() => {
-                          try {
-                            const { draft } = manifestationStore.snapshot().data;
-                            manifestationStore.draft({ ...draft, background: null, backgroundMix: attachMix(row) });
-                            navigate("manifest", { manifestSection: "practice" });
-                          } catch (error) { setMessage((error as Error).message); }
-                        }}>Use in Manifest</button>}
                         <button
                           onClick={() => {
                             const name = prompt("Session name", row.name);
@@ -1616,7 +1626,8 @@ export default function App() {
             onClick={() => {
               if (id === "manifest") navigate(id, { manifestSection: "practices" });
               else if (id === "library") navigate(id, { libraryView: "overview", librarySection: "all" });
-              else navigate(id === "studio" ? lastSoundTab : id);
+              else if (id === "studio" && lastSoundTab === "explore") navigate("explore", { exploreView: "nature" });
+              else navigate(id);
             }}
           >
             <span className="nav-icon" aria-hidden="true"><Icon size={21} /></span>
