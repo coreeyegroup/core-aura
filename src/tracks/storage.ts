@@ -1,6 +1,8 @@
 export const MAX_TRACK_BYTES = 50 * 1024 * 1024;
 export const MAX_LIBRARY_BYTES = 200 * 1024 * 1024;
+export type TrackCollection = "sounds" | "backgrounds" | "audio";
 export type Track = {
+    collection?: TrackCollection;
     id: string;
     title: string;
     filename: string;
@@ -62,9 +64,12 @@ async function read<T>(operation: (store: IDBObjectStore) => IDBRequest<T>): Pro
         tx.onerror = tx.onabort = () => { db.close(); reject(Error("Tracks could not be read.")); };
     });
 }
-export async function tracks(): Promise<Track[]> {
+export function trackCollection(track: Pick<Track, "collection">): TrackCollection {
+    return track.collection ?? "audio";
+}
+export async function tracks(collection?: TrackCollection): Promise<Track[]> {
     const rows = await read<StoredTrack[]>(store => store.getAll());
-    return rows.map(({ blob: _blob, ...row }) => row).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return rows.filter(row => !collection || trackCollection(row) === collection).map(({ blob: _blob, ...row }) => row).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 export async function trackBlob(id: string) {
     const row = await read<StoredTrack | undefined>(store => store.get(id));
@@ -96,13 +101,14 @@ export async function changeTrack(id: string, value: Partial<Track> | null) {
         tx.onabort = tx.onerror = () => { db.close(); reject(Error("Track changes could not be saved. The previous file was kept.")); };
     });
 }
-export async function importTrack(file: File, duration: number) {
+export async function importTrack(file: File, duration: number, collection: TrackCollection = "audio") {
     validateTrackFile(file);
     if (!Number.isFinite(duration) || duration <= 0 || duration > 7200)
         throw Error("Choose playable audio up to two hours long.");
     const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()));
-    const id = "track:" + Array.from(hash, n => n.toString(16).padStart(2, "0")).join("");
-    const row: StoredTrack = { id, title: file.name.replace(/\.[^.]+$/, "").slice(0, 80) || "Audio track", filename: file.name.slice(0, 160), bytes: file.size, duration, volume: .5, muted: false, loop: false, createdAt: new Date().toISOString(), blob: file };
+    const digest = Array.from(hash, n => n.toString(16).padStart(2, "0")).join("");
+    const id = "track:" + (collection === "audio" ? "" : collection + ":") + digest;
+    const row: StoredTrack = { id, collection, title: file.name.replace(/\.[^.]+$/, "").slice(0, 80) || "Audio track", filename: file.name.slice(0, 160), bytes: file.size, duration, volume: .5, muted: false, loop: false, createdAt: new Date().toISOString(), blob: file };
     const db = await open();
     await new Promise<void>((resolve, reject) => {
         const tx = db.transaction("tracks", "readwrite"), store = tx.objectStore("tracks"), request = store.getAll();
@@ -110,7 +116,7 @@ export async function importTrack(file: File, duration: number) {
         request.onsuccess = () => {
             const old = request.result as StoredTrack[];
             if (old.some(t => t.id === id)) {
-                reason = "This audio file is already in your tracks.";
+                reason = "This file is already in this collection.";
                 tx.abort();
                 return;
             }

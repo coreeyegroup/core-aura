@@ -16,10 +16,10 @@ function previewChannel(id: Sound): Channel {
   return { ...channel(id, hz), id: prefix + id, seconds: 8, volume: 0.25 };
 }
 
-export function LibrarySounds({ favorites, onFavorite, onImport, onExport }: {
+export function LibrarySounds({ favorites, onFavorite, onExport, backgrounds = false }: {
   favorites: Sound[];
   onFavorite: (sound: Sound) => void;
-  onImport: () => void;
+  backgrounds?: boolean;
   onExport: (name: string, sample: Channel, control: HTMLButtonElement) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -33,7 +33,7 @@ export function LibrarySounds({ favorites, onFavorite, onImport, onExport }: {
   }, []);
   const term = query.trim().toLowerCase();
   const visible = entries.filter(([id, sound]) =>
-    (!onlyFavorites || favorites.includes(id)) &&
+    isNature(id) === backgrounds && (!onlyFavorites || favorites.includes(id)) &&
     (sound.name + " " + family(id)).toLowerCase().includes(term),
   );
 
@@ -57,13 +57,13 @@ export function LibrarySounds({ favorites, onFavorite, onImport, onExport }: {
   }
 
   return (
-    <section className="library-starters" aria-label="Sound catalog">
+    <section className="library-starters" aria-label={backgrounds ? "Built-in background sounds" : "Sound catalog"}>
+      <h2>{backgrounds ? "Built-in background sounds" : "Built-in raw sounds"}</h2>
       <div className="fields">
-        <label>Search sounds<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <label>{backgrounds ? "Search background sounds" : "Search sounds"}<input type="search" value={query} onChange={event => setQuery(event.target.value)} /></label>
         <label className="check"><input type="checkbox" checked={onlyFavorites}
           onChange={event => setOnlyFavorites(event.target.checked)} /> Favorites only</label>
       </div>
-      <div className="home-actions"><button onClick={onImport}>Import your own sound</button></div>
       {error && <p role="status">{error}</p>}
       {!visible.length && <p role="status">No matching sounds.</p>}
       {visible.map(([id, sound]) => {

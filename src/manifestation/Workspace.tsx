@@ -29,7 +29,7 @@ import {
 import { manifestPlayer } from "./player";
 import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
-import { PreviewButton, RecordSentence, PersonalVoices } from "./VoiceControls";
+import { PreviewButton, RecordSentence, PersonalVoices, DefaultVoiceList } from "./VoiceControls";
 import { withoutRecordings } from "./recordings";
 import { pushStatus, disablePushReminders } from "./push";
 import { deliverFile } from "../files/deliver";
@@ -672,17 +672,13 @@ export function Manifestation({
 }
 export function ManifestLibrary({
   onPractice,
-  initialCategory = "Health",
   search = "",
   sort = "recent",
   section = "all",
-  onCategory,
   focusOnEntry = true,
 }: {
   onPractice?: (id?: string) => void;
-  initialCategory?: string;
   section?: "all" | "saved" | "recordings";
-  onCategory?: (category: string) => void;
   focusOnEntry?: boolean;
   search?:string;
   sort?:string;
@@ -696,8 +692,7 @@ export function ManifestLibrary({
     affirmationLibrary.subscribe,
     affirmationLibrary.snapshot,
   );
-  const [editing, setEditing] = useState<EditLibrary>(),
-    [manage, setManage] = useState(false);
+  const [editing, setEditing] = useState<EditLibrary>();
   const libraryInput = useRef<HTMLInputElement>(null);
   const savedSection = useRef<HTMLElement>(null);
   const recordingsSection = useRef<HTMLDivElement>(null);
@@ -709,8 +704,7 @@ export function ManifestLibrary({
       recordingsSection.current?.focus({ preventScroll: true });
     }
   }, [section, focusOnEntry]);
-  const [category, setCategory] = useState<string>(initialCategory),
-    [query, setQuery] = useState(""),
+  const [query, setQuery] = useState(""),
     [selectedPlans,setSelectedPlans]=useState<string[]>([]),
     [message, setMessage] = useState("");
   const visiblePlans = data.plans.filter(plan => matchesItem(plan.name, "practice", plan.id, search));
@@ -719,18 +713,10 @@ export function ManifestLibrary({
   const chosenPlans = visiblePlans.filter(plan => selectedPlans.includes(plan.id));
   const needle = query.trim().toLowerCase();
   const matchingAffirmations = catalog.data.affirmations.filter(
-    affirmation => affirmation.category === category && affirmation.text.toLowerCase().includes(needle),
+    affirmation => affirmation.text.toLowerCase().includes(needle),
   );
   const selectedCount = data.draft.lines.length;
   useEffect(() => setSelectedPlans([]), [search]);
-  useEffect(() => setCategory(initialCategory), [initialCategory]);
-  useEffect(() => {
-    if (!catalog.data.categories.includes(category)) {
-      const next = catalog.data.categories[0] || "";
-      setCategory(next);
-      onCategory?.(next);
-    }
-  }, [catalog.data, category]);
   const input = useRef<HTMLInputElement>(null);
   const active = practiceActive(state);
   function select(id: string, text: string) {
@@ -777,204 +763,49 @@ export function ManifestLibrary({
   return (
     <section className="manifest-workspace" aria-label="Manifestation library">
       {section === "all" && <>
-      <div className="affirmation-toolbar">
-        <div className="section-heading affirmation-heading">
-          <h2>Affirmation library</h2>
-          {onPractice && <button className="primary" disabled={!selectedCount} onClick={() => onPractice()}>
-            Use selection ({selectedCount})
-          </button>}
+        <div className="home-actions">
+          <button className="primary" disabled={active} onClick={() => setEditing({ kind: "affirmation-add" })}>Add affirmation</button>
+          <button disabled={active} onClick={() => libraryInput.current?.click()}>Import affirmations</button>
+          <button disabled={!!catalog.error} onClick={() => void download(
+            JSON.stringify({ schemaVersion: 1, affirmations: catalog.data.affirmations.map(item => item.text) }, null, 2),
+            "core-aura-affirmations.json", "application/json",
+          ).then(setMessage).catch(error => setMessage(error.message))}>Export affirmations</button>
         </div>
-        <div className="fields affirmation-filters">
-          <label>
-            Category
-            <select aria-label="Category" value={category} onChange={(e) => {
-              setCategory(e.target.value);
-              onCategory?.(e.target.value);
-            }}>
-              {catalog.data.categories.map(categoryName => <option key={categoryName}>{categoryName}</option>)}
-            </select>
-          </label>
-          <label>
-            Find a sentence
-            <input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search this category" />
-          </label>
-        </div>
-        <div className="affirmation-results">
-          <small aria-live="polite">{matchingAffirmations.length} {matchingAffirmations.length === 1 ? "affirmation" : "affirmations"}</small>
-          {needle && <button className="text-button" onClick={() => setQuery("")}>Clear search</button>}
-        </div>
-      </div>
-      {active && (
-        <p className="content-note">
-          Stop the current practice before changing its sentences.
-        </p>
-      )}
-      <details
-        className="library-management"
-        open={manage}
-        onToggle={(e) => setManage(e.currentTarget.open)}
-      >
-        <summary>Manage categories &amp; affirmations</summary>
-        <p className="content-note">
-          Changes are saved on this device. Export your library to back it up or
-          move it to another device.
-        </p>
-        <div className="affirmation-management-groups">
-        <fieldset><legend>Categories</legend><div className="admin-actions">
-          <button disabled={active || catalog.data.categories.indexOf(category) <= 0} onClick={()=>{try{affirmationLibrary.reorderCategory(category,-1);}catch(e){setMessage((e as Error).message);}}}>Move category up</button>
-          <button disabled={active || !category || catalog.data.categories.indexOf(category) >= catalog.data.categories.length - 1} onClick={()=>{try{affirmationLibrary.reorderCategory(category,1);}catch(e){setMessage((e as Error).message);}}}>Move category down</button>
-          <button
-            disabled={active}
-            onClick={() => setEditing({ kind: "category-add", category })}
-          >
-            Add category
-          </button>
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "category-edit", category })}
-          >
-            Rename category
-          </button>
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "category-delete", category })}
-          >
-            Delete category
-          </button>
-        </div></fieldset>
-        <fieldset><legend>Affirmations</legend><div className="admin-actions">
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "affirmation-add", category })}
-          >
-            Add affirmation
-          </button>
-        </div></fieldset>
-        <fieldset><legend>Library backup</legend><div className="admin-actions">
-          <button
-            disabled={!!catalog.error}
-            onClick={() =>
-              void download(
-                JSON.stringify(catalog.data, null, 2),
-                "core-aura-affirmation-library.json",
-                "application/json",
-              )
-                .then(setMessage)
-                .catch((e) => setMessage(e.message))
-            }
-          >
-            Export library
-          </button>
-          <button
-            disabled={active}
-            onClick={() => libraryInput.current?.click()}
-          >
-            Import library
-          </button>
-        </div></fieldset>
-        </div>
-      </details>
-      <input
-        ref={libraryInput}
-        type="file"
-        accept="application/json,.json"
-        className="sr-only"
-        aria-label="Import affirmation library"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          if (file.size > 2 * 1024 * 1024) {
-            setMessage("Choose a library JSON file under 2 MB.");
-            return;
-          }
-          void file
-            .text()
-            .then((text) => {
-              if (
-                !confirm(
-                  "Replace this device’s affirmation library with this backup? Saved practices remain available.",
-                )
-              )
-                return;
-              affirmationLibrary.restore(JSON.parse(text));
-              setMessage("Affirmation library restored.");
-            })
-            .catch((e) => setMessage(e.message));
-        }}
-      />
-      {editing && (
-        <LibraryEditor
-          edit={editing}
-          onClose={() => setEditing(undefined)}
-          onCategory={(value) => {
-            setCategory(value);
-            onCategory?.(value);
-          }}
-        />
-      )}
-      {catalog.error && <p role="status">{catalog.error}</p>}
-      {!catalog.data.categories.length && (
-        <p className="notice">
-          Add a category to start your affirmation library.
-        </p>
-      )}
-      {onPractice && <VoicePanel />}
-      <div className="affirmation-list">
-        {!matchingAffirmations.length && category && (
-          <p className="affirmation-empty" role="status">
-            {needle ? "No affirmations match this search in the selected category." : "No affirmations in this category yet."}
-          </p>
-        )}
-        {matchingAffirmations
-          .map((a) => (
-            <div className="affirmation-row" key={a.id}>
-              <label className="affirmation-choice">
-                {onPractice && <input
-                  type="checkbox"
-                  disabled={active}
-                  checked={data.draft.lines.some((l) => l.text === a.text)}
-                  onChange={() => select(a.id, a.text)}
-                />}
-                <span>{a.text}</span>
-              </label>
-              <PreviewButton line={a} id={a.id} />
-              {manage && (
-                <div className="library-row-actions">
-                  <button
-                    disabled={active}
-                    aria-label={"Edit affirmation: " + a.text}
-                    onClick={() =>
-                      setEditing({
-                        kind: "affirmation-edit",
-                        category,
-                        item: a,
-                      })
-                    }
-                  >
-                    Edit / Move
-                  </button>
-                  <button disabled={active} onClick={()=>setEditing({kind:"affirmation-add",category,item:a})}>Duplicate and edit</button>
-                  <button
-                    disabled={active}
-                    aria-label={"Delete affirmation: " + a.text}
-                    onClick={() =>
-                      setEditing({
-                        kind: "affirmation-delete",
-                        category,
-                        item: a,
-                      })
-                    }
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
+        <label>Search affirmations<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
+        <input ref={libraryInput} type="file" accept="application/json,.json" className="sr-only"
+          aria-label="Import affirmation JSON" onChange={e => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { setMessage("Choose an affirmations JSON file under 2 MB."); return; }
+            void file.text().then(text => {
+              const count = affirmationLibrary.importTexts(JSON.parse(text));
+              setMessage(count === 1 ? "1 affirmation imported." : count + " affirmations imported.");
+            }).catch(error => setMessage(error.message));
+          }} />
+        {editing && <LibraryEditor edit={editing} onClose={() => setEditing(undefined)} />}
+        {catalog.error && <p role="status">{catalog.error}</p>}
+        {onPractice && <button disabled={!selectedCount} onClick={() => onPractice()}>Use selection ({selectedCount})</button>}
+        <div className="affirmation-list">
+          {!matchingAffirmations.length && <p role="status">{needle ? "No matching affirmations." : "No affirmations yet."}</p>}
+          {matchingAffirmations.map(item => (
+            <article className="affirmation-row" key={item.id}>
+              {onPractice ? <label className="affirmation-choice"><input type="checkbox" disabled={active}
+                checked={data.draft.lines.some(line => line.text === item.text)}
+                onChange={() => select(item.id, item.text)} /><span>{item.text}</span></label> : <p>{item.text}</p>}
+              <div className="library-row-actions">
+                <PreviewButton line={item} id={item.id} label={"Test play: " + item.text} catalog />
+                <button disabled={active} aria-label={"Edit affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-edit", item })}>Edit</button>
+                <button disabled={active} aria-label={"Delete affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-delete", item })}>Delete</button>
+              </div>
+            </article>
           ))}
-      </div>
+        </div>
       </>}
       {section === "recordings" && <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
+        <DefaultVoiceList />
         <PersonalVoices initiallyOpen allowAttach={Boolean(onPractice)} />
       </div>}
       {section === "saved" && <section

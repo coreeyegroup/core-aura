@@ -4,6 +4,8 @@ import { Capacitor } from "@capacitor/core";
 import { Play, Square } from "lucide-react";
 import { deliverFile } from "../files/deliver";
 import { importVoice, exportVoice } from "./voice-files";
+import { speech, type Voice } from "./speech";
+import { coreVoices } from "./server-voice";
 import { Line } from "./model";
 import { manifestPlayer } from "./player";
 import { manifestationStore as store } from "./store";
@@ -20,11 +22,15 @@ export function PreviewButton({
   id,
   recorded = false,
   label,
+  voice,
+  catalog = false,
 }: {
   line: Line;
   id: string;
   recorded?: boolean;
   label?: string;
+  voice?: string;
+  catalog?: boolean;
 }) {
   const state = useSyncExternalStore(
       manifestPlayer.subscribe,
@@ -60,6 +66,7 @@ export function PreviewButton({
                 seconds: 60,
                 gap: 0,
                 mode: "speech",
+                voice: voice ?? store.snapshot().data.draft.voice,
                 background: null,
                 backgroundMix: null,
                 useRecordings: recorded,
@@ -74,12 +81,12 @@ export function PreviewButton({
         ) : (
           <Play size={16} aria-hidden="true" />
         )}
-        <span>{playing ? "Stop" : label ? "Test voice" : "Play"}</span>
+        <span>{playing ? "Stop" : catalog ? "Test play" : label ? "Test voice" : "Play"}</span>
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">
           <span>{error || state.error}</span>
-          <button
+          {!catalog && <button
             onClick={(event) => {
               const panel = event.currentTarget
                 .closest(".manifest-workspace")
@@ -91,7 +98,7 @@ export function PreviewButton({
             }}
           >
             Voice settings
-          </button>
+          </button>}
         </span>
       )}
     </>
@@ -101,11 +108,13 @@ export function RecordSentence({
   line,
   onSave,
   onClose,
+  closeLabel = "Cancel",
   saveLabel = "Use recording",
 }: {
   line: Line;
   onSave: (clip: PersonalRecording) => void;
   onClose: () => void;
+  closeLabel?: string;
   saveLabel?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
@@ -327,12 +336,45 @@ export function RecordSentence({
           </button>
         )}
         <button disabled={phase === "saving"} onClick={onClose}>
-          Cancel
+          {closeLabel}
         </button>
       </div>
     </dialog>
   );
 }
+export function DefaultVoiceList() {
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const [device, core] = await Promise.all([speech.voices().catch(() => []), coreVoices()]);
+      if (!alive) return;
+      setVoices([...new Map([...device, ...core].map(voice => [voice.voiceURI, voice])).values()]);
+      setLoading(false);
+    };
+    load();
+    window.speechSynthesis?.addEventListener("voiceschanged", load);
+    return () => { alive = false; window.speechSynthesis?.removeEventListener("voiceschanged", load); };
+  }, []);
+
+  const available = [{ name: "Device default", lang: "System language", voiceURI: "", localService: true },
+    ...voices.filter(voice => voice.voiceURI)];
+  return (
+    <section aria-label="Default voices" className="library-starters">
+      <h2>Default voices</h2>
+      {loading && <p role="status">Checking available voices…</p>}
+      {available.map((voice, index) => (
+        <article className="library-starter" key={voice.voiceURI}>
+          <div><h3>{voice.name}</h3><small>{voice.lang}</small></div>
+          <PreviewButton line={{ id: "voice-sample", text: "I can return to a moment of calm." }}
+            id={"default-voice-" + index} voice={voice.voiceURI} label={"Test play " + voice.name} catalog />
+        </article>
+      ))}
+    </section>
+  );
+}
+
 export function PersonalVoices({
   initiallyOpen = false,
   allowAttach = true,
@@ -394,7 +436,7 @@ export function PersonalVoices({
           Record or import WAV
         </button>
       </form>
-      {recordLine && <RecordSentence line={recordLine} saveLabel="Save to Library"
+      {recordLine && <RecordSentence line={recordLine} saveLabel="Save to Library" closeLabel="Back to voices"
         onClose={() => setRecordLine(undefined)}
         onSave={() => {
           setRecordLine(undefined);
@@ -411,7 +453,7 @@ export function PersonalVoices({
               setError("");
               setBusy(true);
               void renameRecording(c.id, title).catch(error => setError(error.message)).finally(() => setBusy(false));
-            }}>Rename recording</button>
+            }}>Edit name</button>
             <PreviewButton
               id={"clip-" + c.id}
               line={{
@@ -421,6 +463,8 @@ export function PersonalVoices({
                 recordedText: c.text,
               }}
               recorded
+              catalog
+              label={"Test play " + (c.title || c.text)}
             />
             <button
               disabled={busy}

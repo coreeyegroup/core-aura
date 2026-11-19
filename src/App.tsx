@@ -1,5 +1,5 @@
 import { resolveItems } from "./playlists/model";
-import { Track, tracks, trackEvent } from "./tracks/storage";
+import { Track, tracks, trackEvent, trackCollection } from "./tracks/storage";
 import { confirmSourceDeletion } from "./playlists/store";
 import {queuePlayer, startQueue} from "./playlists/runtime";
 import {QueueTransport} from "./playlists/QueueTransport";
@@ -124,7 +124,6 @@ export default function App() {
   const {
     tab,
     manifestSection,
-    category,
     libraryView,
     librarySection,
     exploreView,
@@ -606,7 +605,7 @@ export default function App() {
     const next = { ...routeRef.current, tab: value, ...patch };
     if (value === "library" && next.librarySection === "playlists") next.libraryView = "overview";
     const hash = routeHash(next);
-    if (location.hash !== hash) history.pushState(null, "", hash);
+    if (location.hash !== hash) history.pushState({ coreAuraFrom: location.hash || routeHash(routeRef.current) }, "", hash);
     routeRef.current = next;
     setRoute(next);
     setMessage("");
@@ -830,14 +829,21 @@ export default function App() {
       && (!isNatureView || soundStates.some(state => !state.id.startsWith("nature:")));
   const playingSounds = sequence.status==="playing" || soundStates.some((state) => state.status === "playing");
   function openPlayingSound() {
+    if (soundStates.some(state => state.id.startsWith("library:preview:"))) {
+      const id = soundStates.find(state => state.id.startsWith("library:preview:"))!.id.slice("library:preview:".length);
+      navigate("library", { libraryView: isNature(id) ? "backgrounds" : "sounds", librarySection: "all" });
+      return;
+    }
     if (soundStates.some(state => state.id.startsWith("nature:"))) {
       navigate("explore", { exploreView: "nature" });
       return;
     }
     if (soundStates.some(state => state.id.startsWith("pack:")))
       navigate("library", { libraryView: "packs", librarySection: "all" });
-    else if (soundStates.some(state => state.id.startsWith("track:")))
-      navigate("library", { libraryView: "audio", librarySection: "all" });
+    else if (soundStates.some(state => state.id.startsWith("track:"))) {
+      const track = localTracks.find(row => soundStates.some(state => state.id === row.id));
+      navigate("library", { libraryView: track ? trackCollection(track) : "audio", librarySection: "all" });
+    }
     else
       navigate(
         soundStates.some((state) =>
@@ -1329,8 +1335,11 @@ export default function App() {
           <>
             {collection ? (
               <header className="library-collection-header">
-                <button onClick={() => navigate("library", { libraryView: "overview", librarySection: "all" })}>
-                  All collections
+                <button onClick={() => {
+                  if (typeof history.state?.coreAuraFrom === "string") history.back();
+                  else navigate("library", { libraryView: "overview", librarySection: "all" });
+                }}>
+                  Back
                 </button>
                 <div>
                   <h1>{collection.label}</h1>
@@ -1338,11 +1347,32 @@ export default function App() {
                 </div>
               </header>
             ) : <LibraryOverview onOpen={route => navigate("library", route)} />}
+            {(libraryView === "sounds" || backgroundsView || libraryView === "audio") && (
+              <SoundTracks key={"imports-" + libraryView} collection={backgroundsView ? "backgrounds" : libraryView === "sounds" ? "sounds" : "audio"} />
+            )}
+            {playlistView && <LibraryStarters section="playlists" />}
+            {librarySection === "saved" && <LibraryStarters section="practices" query={libraryQuery} />}
+            {(libraryView === "sounds" || backgroundsView) && <LibrarySounds
+              key={"built-in-" + libraryView}
+              backgrounds={backgroundsView}
+              favorites={starred}
+              onFavorite={favorite}
+              onExport={(name, sample, control) => {
+                modalOpener.current = control;
+                setExporting({
+                  schemaVersion: 2, engineVersion: ENGINE_VERSION, kind: "studio",
+                  id: sample.id, name, channels: [sample], master, createdAt: "",
+                });
+                setExportSeconds(sample.seconds);
+                setExportError("");
+              }}
+            />}
+            {mixesView && <h2>{backgroundsView ? "Saved background mixes" : "Saved mixes on this device"}</h2>}
             {mixesView && <div className="home-actions">
               <button onClick={() => navigate("explore", { exploreView: "nature" })}>
                 Open Sounds
               </button>
-              <button onClick={() => importInput.current?.click()}><Upload size={18} /> Import mix</button>
+              <button onClick={() => importInput.current?.click()}><Upload size={18} /> Import mix settings</button>
             </div>}
             {(mixesView || librarySection === "saved") && <div className="fields">
               <label>{backgroundsView ? "Search backgrounds" : mixesView ? "Search saved mixes" : "Search saved practices"}
@@ -1354,36 +1384,14 @@ export default function App() {
                 <option value="recent">Recently saved</option><option value="name">Name A–Z</option>
               </select></label>
             </div>}
-            {playlistView && <LibraryStarters section="playlists" />}
-            {librarySection === "saved" && <LibraryStarters section="practices" query={libraryQuery} />}
             {mixesView && <LibraryStarters
-              key={libraryView}
+              key={"starters-" + libraryView}
               section={backgroundsView ? "backgrounds" : "mixes"}
               query={libraryQuery}
               onSaveMix={session => storeRows([...sessions, {
                 ...session, id: crypto.randomUUID(), createdAt: new Date().toISOString(),
               }])}
             />}
-            {libraryView === "sounds" && <LibrarySounds
-              favorites={starred}
-              onFavorite={favorite}
-              onImport={() => navigate("library", { libraryView: "audio", librarySection: "all" })}
-              onExport={(name, sample, control) => {
-                modalOpener.current = control;
-                setExporting({
-                  schemaVersion: 2, engineVersion: ENGINE_VERSION, kind: "studio",
-                  id: sample.id, name, channels: [sample], master, createdAt: "",
-                });
-                setExportSeconds(sample.seconds);
-                setExportError("");
-              }}
-            />}
-            {libraryView === "audio" && <>
-              <SoundTracks defaultOpen catalog />
-              <button onClick={() => navigate("library", { libraryView: "packs", librarySection: "all" })}>
-                Browse original audio samples <ArrowRight size={16} aria-hidden="true" />
-              </button>
-            </>}
             {libraryView === "packs" && <>
               <PacksPanel embedded />
               <PacksPanel library />
@@ -1392,9 +1400,7 @@ export default function App() {
               <ManifestLibrary
                 search={libraryQuery}
                 sort={librarySort}
-                initialCategory={category}
                 section={librarySection}
-                onCategory={(value) => navigate("library", { category: value })}
                 onPractice={librarySection === "saved" ? (id) => {
                   if (id) { openManifest(id); return; }
                   const { draft, plans } = manifestationStore.snapshot().data;
@@ -1403,7 +1409,8 @@ export default function App() {
                     manifestationStore.fresh();
                     navigate("manifest", { manifestSection: "practice" });
                   } catch (error) { setMessage((error as Error).message); }
-                } : undefined}
+                } : librarySection === "all" && history.state?.coreAuraFrom === "#manifest"
+                  ? () => history.back() : undefined}
                 focusOnEntry={false}
               />
             ) : mixesView ? (

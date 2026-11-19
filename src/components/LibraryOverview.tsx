@@ -8,12 +8,12 @@ import type { Route } from "../navigation";
 type LibraryRoute = Pick<Route, "libraryView" | "librarySection">;
 
 export const collections = [
-  { label: "Sounds", description: "Nature, instruments and tones", icon: AudioLines, libraryView: "sounds", librarySection: "all" },
-  { label: "Backgrounds", description: "Atmospheres for your practice", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
-  { label: "Voices", description: "Personal voice recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
-  { label: "Affirmations", description: "Sentences and categories", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
+  { label: "Sounds", description: "Core sounds, instruments and raw samples", icon: AudioLines, libraryView: "sounds", librarySection: "all" },
+  { label: "Backgrounds", description: "Ambient sounds and background mixes", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
+  { label: "Voices", description: "Default voices and personal recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
+  { label: "Affirmations", description: "All your affirmations in one list", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
   { label: "Manifestation practices", description: "Saved and silent practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
-  { label: "Audio files", description: "Manage your imported tracks", icon: Music2, libraryView: "audio", librarySection: "all" },
+  { label: "Audio files", description: "Meditation music and classical audio", icon: Music2, libraryView: "audio", librarySection: "all" },
   { label: "Sound packs", description: "Browse and download audio", icon: Package, libraryView: "packs", librarySection: "all" },
   { label: "Saved mixes", description: "Layered sounds and chakra sets", icon: Layers, libraryView: "mixes", librarySection: "all" },
   { label: "Playlists", description: "Arrange and play your sessions", icon: ListMusic, libraryView: "overview", librarySection: "playlists" },

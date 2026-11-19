@@ -4,15 +4,22 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play, Pause, Square, Plus, Volume2, VolumeX } from "lucide-react";
 import { engine } from "../audio/engine";
 import { deliverFile } from "../files/deliver";
-import { audioDuration, changeTrack, importTrack, tracks, Track, trackBlob, trackEvent, validateTrackFile } from "./storage";
+import { audioDuration, changeTrack, importTrack, tracks, Track, trackBlob, trackEvent, validateTrackFile, type TrackCollection } from "./storage";
 const clock = (n: number) => Math.floor(Math.max(0, n) / 60) + ":" + String(Math.floor(Math.max(0, n) % 60)).padStart(2, "0");
-export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultOpen?: boolean; catalog?: boolean } = {}) {
+const collectionLabels = {
+    sounds: { title: "Your raw sounds", import: "Import sounds", empty: "No raw sounds imported." },
+    backgrounds: { title: "Your background sounds", import: "Import backgrounds", empty: "No background sounds imported." },
+    audio: { title: "Your music and audio", import: "Import audio", empty: "Import meditation music, classical recordings, or other long-form audio." },
+};
+export function SoundTracks({ defaultOpen = false, collection }: { defaultOpen?: boolean; collection?: TrackCollection } = {}) {
+    const catalog = Boolean(collection);
+    const labels = collection ? collectionLabels[collection] : undefined;
     const [rows, setRows] = useState<Track[]>([]), [message, setMessage] = useState(""), [busy, setBusy] = useState("");
     const [editing, setEditing] = useState(""), [title, setTitle] = useState("");
     const input = useRef<HTMLInputElement>(null), alive = useRef(true), states = useSyncExternalStore(engine.subscribe, engine.snapshot);
     useEffect(() => {
         alive.current = true;
-        const refresh = () => tracks().then(rows => {
+        const refresh = () => tracks(collection).then(rows => {
             if (alive.current) {
                 setRows(rows);
             }
@@ -22,7 +29,7 @@ export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultO
         addEventListener(trackEvent, refresh);
         addEventListener("core-aura-track-error", error);
         return () => { alive.current = false; removeEventListener(trackEvent, refresh); removeEventListener("core-aura-track-error", error); };
-    }, []);
+    }, [collection]);
     async function add(files: File[]) {
         if (busy)
             return;
@@ -34,7 +41,7 @@ export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultO
             try {
                 validateTrackFile(file);
                 const duration = await audioDuration(file);
-                await importTrack(file, duration);
+                await importTrack(file, duration, collection);
                 added++;
             }
             catch (e) {
@@ -74,22 +81,27 @@ export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultO
             setMessage((e as Error).message);
         }
     }
-    return <details className="soundtrack-panel" id="soundtracks" open={defaultOpen || undefined}>
-    <summary>{defaultOpen ? "Your tracks" : "Sound tracks"} <span>{rows.length} on device · {states.filter(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:") && s.status === "playing").length} playing</span></summary>
+    const active = states.filter(state => rows.some(row => row.id === state.id));
+    const Wrapper = catalog ? "section" : "details";
+    return <Wrapper className="soundtrack-panel" id="soundtracks" open={catalog ? undefined : defaultOpen || undefined}>
+    {labels ? <h2>{labels.title}</h2> : <summary>{defaultOpen ? "Your tracks" : "Sound tracks"} <span>{rows.length} on device · {active.filter(s => s.status === "playing").length} playing</span></summary>}
     <div className="track-toolbar">
-      <button onClick={() => input.current?.click()} disabled={Boolean(busy)}><Plus size={17}/> {catalog ? "Import audio" : "Add audio"}</button>
-      <button disabled={!states.some(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:"))} onClick={() => states.filter(s => s.id.startsWith("track:") && !s.id.startsWith("track:queue:")).forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button>
+      <button onClick={() => input.current?.click()} disabled={Boolean(busy)}><Plus size={17}/> {labels?.import ?? "Add audio"}</button>
+      {!catalog && <button disabled={!active.length} onClick={() => active.forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button>}
     </div>
-    <input ref={input} className="sr-only" aria-label="Import sound tracks" type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
+    <input ref={input} className="sr-only" aria-label={labels ? labels.import + " from device" : "Import sound tracks"} type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
         void add(files); }}/>
     {!catalog && <p className="content-note">Mix up to 3 audio files with chakra or generated layers.</p>}
-    {!rows.length && <p className="content-note">No sound tracks yet. Add music, nature sounds or a recording from your device.</p>}
+    {catalog && <p className="content-note">Choose audio files from this device.</p>}
+    {!rows.length && <p className="content-note">{labels?.empty ?? "No sound tracks yet."}</p>}
     <div className="track-list">{rows.map(row => {
             const state = states.find(s => s.id === row.id), playing = state?.status === "playing", position = state?.time || 0;
             return <article className="soundtrack-row" key={row.id} aria-label={row.title + " sound track"}>
         <div className="track-head"><div><strong>{row.title}</strong><small>{clock(row.duration)} · {(row.bytes / 1024 / 1024).toFixed(1)} MB · {row.muted ? "Muted" : state ? state.status : "Ready"}{row.loop ? " · Repeat" : ""}</small></div>
           <button className="icon-button primary" disabled={Boolean(busy)} aria-label={(playing ? "Pause " : state ? "Resume " : catalog ? "Test play " : "Play ") + row.title} onClick={() => {if(!state&&!prepareSound([row.id], !catalog, catalog))return;void run(() => engine.toggleSoundtrack(row.id, () => trackBlob(row.id), catalog ? { ...row, loop: false } : row), row.id);}}>{playing ? <Pause size={19}/> : <Play size={19}/>}</button>
           <button className="icon-button" aria-label={"Stop " + row.title} disabled={!state && busy !== row.id} onClick={() => engine.stop(row.id)}><Square size={17}/></button>
+          {catalog && <button aria-label={"Export " + row.title} disabled={Boolean(busy)}
+            onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export</button>}
         </div>
         {!catalog && <>
         <label className="track-seek"><span className="sr-only">{row.title + " position"}</span><input aria-label={row.title + " position"} type="range" min="0" max={row.duration} step="0.1" value={Math.min(row.duration, position)} disabled={!state} onChange={e => engine.seekSoundtrack(row.id, Number(e.target.value))}/><output>{clock(position)} / {clock(row.duration)}</output></label>
@@ -104,7 +116,7 @@ export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultO
           <button disabled={!state} aria-label={"Forward 10 seconds " + row.title} onClick={() => engine.seekSoundtrack(row.id, position + 10)}>+10 sec</button>
           </>}
           <button onClick={() => { setEditing(row.id); setTitle(row.title); }}>Rename</button>
-          <button disabled={Boolean(busy)} onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export original</button>
+          {!catalog && <button disabled={Boolean(busy)} onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export original</button>}
           <button disabled={Boolean(busy)} onClick={() => { if (confirmSourceDeletion("track", [{id: row.id, name: row.title}], "Export its original first if you need a backup."))
                 void run(async () => { await changeTrack(row.id, null); engine.stop(row.id); setEditing(""); }, row.id); }}>Delete track</button>
         </div>
@@ -115,5 +127,5 @@ export function SoundTracks({ defaultOpen = false, catalog = false }: { defaultO
         })}</div>
     {!catalog && <p className="content-note">Tracks run separately from the session timer. Stop tracks when finished.</p>}
     {message && <p role="status" className="track-message">{message}</p>}
-  </details>;
+  </Wrapper>;
 }

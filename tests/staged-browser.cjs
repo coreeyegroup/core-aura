@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { readFile } = require("node:fs/promises");
 const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 
@@ -6,10 +7,10 @@ const origin = "http://localhost:8089";
 const screens = ["Home", "Chakras"];
 const palettes = ["system", "light", "dark", "green", "yellow", "custom"];
 const collections = [
-  ["Sounds", "#library/sounds", "Import your own sound"],
+  ["Sounds", "#library/sounds", "Import sounds"],
   ["Backgrounds", "#library/backgrounds", "Saved mix"],
   ["Voices", "#library/recordings", "My voice recordings (0)"],
-  ["Affirmations", "#library/affirmations", "Affirmation library"],
+  ["Affirmations", "#library/affirmations", "Add affirmation"],
   ["Manifestation practices", "#library/practices", "Saved practice"],
   ["Audio files", "#library/audio", "Import audio"],
   ["Sound packs", "#library/packs", "Available packs"],
@@ -109,15 +110,16 @@ function testAudio(name) {
       assert.equal(new URL(page.url()).hash.split("?")[0], route);
       await page.getByText(evidence, { exact: true }).first().waitFor();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-      await page.getByRole("button", { name: "All collections", exact: true }).click();
+      await page.getByRole("button", { name: "Back", exact: true }).click();
     }
     await page.goto(origin + "/#library/sounds");
     const catalog = page.getByRole("region", { name: "Sound catalog" });
-    await catalog.getByRole("searchbox", { name: "Search sounds" }).fill("rain");
-    const testSound = catalog.getByRole("button", { name: /^Test play .*rain/i }).first();
+    assert.equal(await catalog.getByRole("button", { name: /^Test play .*rain/i }).count(), 0);
+    await catalog.getByRole("searchbox", { name: "Search sounds" }).fill("bell");
+    const testSound = catalog.getByRole("button", { name: "Test play Bell" });
     await testSound.click();
     await catalog.getByRole("button", { name: /^Stop test / }).click();
-    await catalog.getByRole("button", { name: /^Export WAV .*rain/i }).first().click();
+    await catalog.getByRole("button", { name: "Export WAV Bell" }).click();
     const sampleDownload = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download WAV" }).click();
     assert.match((await sampleDownload).suggestedFilename(), /\.wav$/);
@@ -125,20 +127,76 @@ function testAudio(name) {
 
     assert.equal(await page.getByRole("button", { name: "Add frequency tone" }).count(), 0);
     assert.equal(await page.getByLabel("Nature mix duration").count(), 0);
+    const [picker] = await Promise.all([
+      page.waitForEvent("filechooser", { timeout: 5000 }),
+      page.getByRole("button", { name: "Import sounds", exact: true }).click({ timeout: 5000 }),
+    ]);
+    await picker.setFiles(testAudio("Raw bell.wav"));
+    await page.getByText("Raw bell", { exact: true }).waitFor();
+    assert.equal(new URL(page.url()).hash, "#library/sounds");
+    const rawExport = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export Raw bell" }).click();
+    const rawFile = await rawExport;
+    assert.equal(rawFile.suggestedFilename(), "Raw-bell.wav");
+    assert.deepEqual(await readFile(await rawFile.path()), testAudio("Raw bell.wav").buffer);
+    await page.goto(origin + "/#library/backgrounds");
+    await page.getByRole("region", { name: "Built-in background sounds" }).waitFor();
+    assert.equal(await page.getByText("Raw bell", { exact: true }).count(), 0);
+    await page.getByLabel("Import backgrounds from device").setInputFiles(testAudio("Ambient layer.wav"));
+    await page.getByText("Ambient layer", { exact: true }).waitFor();
     await page.goto(origin + "/#library/audio");
-    await page.getByLabel("Import sound tracks").setInputFiles(testAudio("Quiet audio.wav"));
+    assert.equal(await page.getByText("Raw bell", { exact: true }).count(), 0);
+    assert.equal(await page.getByText("Ambient layer", { exact: true }).count(), 0);
+    await page.getByLabel("Import audio from device").setInputFiles(testAudio("Quiet audio.wav"));
     await page.getByText("Quiet audio", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Test play Quiet audio" }).click();
+    const audioExport = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export Quiet audio" }).click();
+    assert.equal((await audioExport).suggestedFilename(), "Quiet-audio.wav");
+
+    await page.goto(origin + "/#library/affirmations");
+    assert.equal(await page.getByLabel("Category", { exact: true }).count(), 0);
+    assert.ok(await page.locator(".affirmation-row").count() > 5);
+    await page.getByRole("button", { name: "Add affirmation", exact: true }).click();
+    await page.getByLabel("Affirmation text").fill("I can start again.");
+    await page.getByRole("button", { name: "Save affirmation" }).click();
+    await page.getByRole("button", { name: "Edit affirmation: I can start again." }).click();
+    await page.getByLabel("Affirmation text").fill("I can take my time.");
+    await page.getByRole("button", { name: "Save affirmation" }).click();
+    await page.getByRole("button", { name: "Delete affirmation: I can take my time." }).click();
+    await page.getByRole("button", { name: "Confirm delete" }).click();
+    await page.getByLabel("Import affirmation JSON").setInputFiles({
+      name: "affirmations.json", mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ schemaVersion: 1, affirmations: ["I make time to rest."] })),
+    });
+    await page.getByRole("button", { name: "Test play: I make time to rest." }).waitFor();
+    const affirmationExport = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export affirmations" }).click();
+    assert.equal((await affirmationExport).suggestedFilename(), "core-aura-affirmations.json");
+
     await page.goto(origin + "/#library/recordings");
+    await page.getByRole("button", { name: "Test play Device default", exact: true }).waitFor();
     await page.getByRole("textbox", { name: "Words in the recording" }).fill("A quiet moment.");
+    await page.getByRole("button", { name: "Record or import WAV" }).click();
+    await page.getByRole("button", { name: "Back to voices" }).click();
+    await page.getByRole("button", { name: "Test play Device default", exact: true }).waitFor();
     await page.getByRole("button", { name: "Record or import WAV" }).click();
     await page.getByLabel("Import sentence WAV").setInputFiles(testAudio("Quiet voice.wav"));
     await page.getByRole("button", { name: "Save to Library" }).click();
     await page.getByText("A quiet moment.", { exact: true }).waitFor();
+    const recording = page.locator(".personal-voices .saved-card").filter({ hasText: "A quiet moment." });
+    page.once("dialog", dialog => dialog.accept("My calm voice"));
+    await recording.getByRole("button", { name: "Edit name", exact: true }).click();
+    await recording.getByRole("button", { name: "Test play My calm voice", exact: true }).waitFor();
+    const voiceExport = page.waitForEvent("download");
+    await recording.getByRole("button", { name: "Download WAV", exact: true }).click();
+    assert.match((await voiceExport).suggestedFilename(), /\.wav$/);
+
     await page.goto(origin + "/#library/practices");
     await page.getByRole("heading", { name: "Saved practice", exact: true }).waitFor();
     await page.getByRole("button", { name: "Play practice: Saved practice" }).click();
     await page.getByRole("button", { name: "Stop practice", exact: true }).click();
-    await page.getByRole("button", { name: "All collections", exact: true }).click();
+    await page.getByRole("button", { name: "Back", exact: true }).click();
 
     await settings.click();
     const theme = page.getByLabel("Theme", { exact: true });
@@ -204,8 +262,7 @@ function testAudio(name) {
     assert.equal(practiceData.draft.id, "practice");
     assert.equal(practiceData.plans.length, 2);
 
-    await page.goto(origin + "/#library/audio");
-    await page.getByRole("button", { name: "Browse original audio samples" }).click();
+    await page.goto(origin + "/#library/packs");
     await page.getByRole("heading", { name: "Core Resonance", exact: true }).waitFor();
     await page.goto(origin + "/#library/backgrounds");
     await starters.getByRole("button", { name: "Save a copy of Gentle rain" }).click();
