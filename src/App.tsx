@@ -78,6 +78,7 @@ import {
   readAppearance,
   saveAppearance,
   applyAppearance,
+  chakraThemes,
   Appearance,
 } from "./appearance";
 
@@ -109,6 +110,10 @@ const tabs = [
   ["chakras", "Chakras", Flower2],
   ["library", "Library", Library],
 ] as const;
+
+// Add each rebuilt screen here as it is ready. Explore shares the Sounds tab.
+const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set();
+
 export default function App() {
   const [route, setRoute] = useState<Route>(() => {
     let previous = defaultRoute;
@@ -132,6 +137,9 @@ export default function App() {
     librarySection,
     exploreView,
   } = route;
+  const primaryTab = tab === "explore" ? "studio" : tab;
+  const showWorkspace = primaryTab === "admin" || rebuiltScreens.has(primaryTab);
+  const screenName = tabs.find(([id]) => id === primaryTab)?.[1];
   const playlistView = librarySection === "playlists";
   const backgroundsView = !playlistView && libraryView === "backgrounds";
   const [lastSoundTab, setLastSoundTab] = useState<"explore" | "studio">(() => {
@@ -178,7 +186,7 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    if (tab === "library" && librarySection !== "all") return;
+    if (showWorkspace && tab === "library" && librarySection !== "all") return;
     const heading = document.querySelector<HTMLElement>("#main h1");
     if (heading) {
       heading.tabIndex = -1;
@@ -193,13 +201,21 @@ export default function App() {
     manifestPlayer.snapshot,
   );
   useEffect(
-    () => (Capacitor.isNativePlatform() ? undefined : observePushReminders()),
+    () => {
+      if (rebuiltScreens.has("manifest") && !Capacitor.isNativePlatform()) {
+        return observePushReminders();
+      }
+    },
     [],
   );
   useEffect(() => {
     void cleanupExports();
   }, []);
   function openManifest(id: string) {
+    if (!rebuiltScreens.has("manifest")) {
+      navigate("manifest");
+      return false;
+    }
     try {
       const playing = manifestPlayer.snapshot();
       if (
@@ -221,33 +237,32 @@ export default function App() {
       );
     }
   }
-  useEffect(
-    () =>
-      observeReminders((reminder) => {
-        const { draft, plans } = manifestationStore.snapshot().data;
-        const scheduled = plans.find((p) => p.id === reminder.planId);
-        const unsaved = draftChanged(draft, plans);
-        const playing = manifestPlayer.snapshot().status;
-        if (
-          scheduled &&
-          reminder.autoStart &&
-          document.visibilityState === "visible" &&
-          location.hash !== "#admin" &&
-          !unsaved &&
-          !document.querySelector("dialog[open], [role=dialog]") &&
-          !fileSharing() &&
-          !["playing", "paused"].includes(playing) &&
-          engine.snapshot().length === 0
-        ) {
-          try {
-            if (openManifest(reminder.planId)) manifestPlayer.start(scheduled);
-            return;
-          } catch {}
-        }
-        setDue(reminder);
-      }, openManifest),
-    [],
-  );
+  useEffect(() => {
+    if (!rebuiltScreens.has("manifest")) return;
+    return observeReminders((reminder) => {
+      const { draft, plans } = manifestationStore.snapshot().data;
+      const scheduled = plans.find((p) => p.id === reminder.planId);
+      const unsaved = draftChanged(draft, plans);
+      const playing = manifestPlayer.snapshot().status;
+      if (
+        scheduled &&
+        reminder.autoStart &&
+        document.visibilityState === "visible" &&
+        location.hash !== "#admin" &&
+        !unsaved &&
+        !document.querySelector("dialog[open], [role=dialog]") &&
+        !fileSharing() &&
+        !["playing", "paused"].includes(playing) &&
+        engine.snapshot().length === 0
+      ) {
+        try {
+          if (openManifest(reminder.planId)) manifestPlayer.start(scheduled);
+          return;
+        } catch {}
+      }
+      setDue(reminder);
+    }, openManifest);
+  }, []);
   useEffect(() => {
     const url = new URL(location.href);
     const id = url.searchParams.get("manifestPlan");
@@ -924,11 +939,13 @@ export default function App() {
           </span>
         </a>
         <div className="header-actions">
-          <span className={"connection-status " + (online ? "connected" : "")}>
-            <i aria-hidden="true" />
-            {online ? "Online" : "Offline"}
-          </span>
-          {!Capacitor.isNativePlatform() && (
+          {showWorkspace && (
+            <span className={"connection-status " + (online ? "connected" : "")}>
+              <i aria-hidden="true" />
+              {online ? "Online" : "Offline"}
+            </span>
+          )}
+          {showWorkspace && !Capacitor.isNativePlatform() && (
             <a
               className="header-download"
               href="/download.html"
@@ -949,6 +966,7 @@ export default function App() {
         </div>
       </header>
       <main id="main" tabIndex={-1} inert={settings||saving||!!exporting ? true : undefined}>
+        {showWorkspace ? <>
         {!queueBusy && showPlaybackBar &&
           (isStudio || isChakras || isNatureView || (tab === "manifest" && !practiceBusy)) &&
           playbackBar}
@@ -1516,7 +1534,9 @@ export default function App() {
             </button>
           </div>
         )}
+        </> : <h1 className="sr-only">{screenName}</h1>}
       </main>
+      {showWorkspace && <>
       {!queueBusy && (isStudio || isChakras) && (
         <section
           ref={dockRef}
@@ -1585,6 +1605,7 @@ export default function App() {
         tab !== "manifest" &&
         playbackBar}
       <QueueTransport/>
+      </>}
       <nav className="bottom-nav" aria-label="Main navigation">
         {tabs.map(([id, label, Icon]) => (
           <button
@@ -1642,6 +1663,11 @@ export default function App() {
                   <option value="light">Light</option>
                   <option value="dark">Dark</option>
                   <option value="contrast">High contrast</option>
+                  <optgroup label="Chakra colours">
+                    {Object.entries(chakraThemes).map(([value, palette]) => (
+                      <option key={value} value={value}>{palette.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </label>
 

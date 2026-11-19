@@ -8,11 +8,11 @@
   --pad: 12px;
   --radius: 8px;
   --app-width: 1440px;
-  --paper: #f4f6f8;
+  --paper: var(--theme-paper, #f4f6f8);
   --surface: #ffffff;
   --surface-alt: #eaf0f2;
   --input: #f8fafb;
-  --action: #16645d;
+  --action: var(--theme-accent, #16645d);
   --on-action: #ffffff;
   --positive: #087962;
   --positive-soft: #e5f5ee;
@@ -20,9 +20,9 @@
   --muted: #526270;
   --line: #dce4e8;
   --control-line: #82939e;
-  --accent: #16645d;
+  --accent: var(--theme-accent, #16645d);
   --on-accent: #ffffff;
-  --accent-soft: #def0eb;
+  --accent-soft: var(--theme-accent-soft, #def0eb);
   --danger: #a12727;
   --focus: #0866c9;
   --overlay: #111c2bb3;
