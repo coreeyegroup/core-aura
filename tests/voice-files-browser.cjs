@@ -103,7 +103,7 @@ function wav() {
     await p
       .getByRole("button", { name: "Choose affirmations", exact: true })
       .click();
-    await p.getByRole("button", { name: "Saved practices", exact: true }).click();
+    await p.locator(".bottom-nav").getByRole("button", { name: "Manifest", exact: true }).click();
     await p
       .getByRole("button", {
         name: "Play practice: Voice import practice",
@@ -128,6 +128,7 @@ function wav() {
         exact: true,
       })
       .waitFor();
+    await p.locator(".bottom-nav").getByRole("button", { name: "Library", exact: true }).click();
     await p.getByRole("button", { name: "Recordings", exact: true }).click();
     const downloading = p.waitForEvent("download");
     await p.getByRole("button", { name: "Download WAV", exact: true }).click();
@@ -140,7 +141,7 @@ function wav() {
     await p.reload();
     await p.waitForFunction(() => !!navigator.serviceWorker.controller);
     await c.setOffline(true);
-    await p.getByRole("button", { name: "Browse", exact: true }).click();
+    await p.getByRole("button", { name: "Affirmations", exact: true }).click();
     await p
       .getByRole("button", { name: "Use selection (1)", exact: true })
       .click();

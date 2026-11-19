@@ -84,15 +84,21 @@ function NumberField({
 export function Manifestation({
   queueActive = false,
   onLibrary,
+  onOpenPractice,
+  onPlaylists,
+  onBackgrounds,
   sessions = [],
   initialView = "practice",
   onView,
 }: {
   onLibrary: () => void;
+  onOpenPractice: (id: string) => void;
+  onPlaylists: () => void;
+  onBackgrounds: () => void;
   sessions?: Session[];
   queueActive?: boolean;
   initialView?: string;
-  onView?: (view: "practice" | "schedule") => void;
+  onView?: (view: "practices" | "practice" | "schedule") => void;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
@@ -111,6 +117,8 @@ export function Manifestation({
     }),
     [message, setMessage] = useState("");
   useEffect(() => setView(initialView), [initialView]);
+  const [practiceSearch, setPracticeSearch] = useState("");
+  const [practiceSort, setPracticeSort] = useState("recent");
   const [recordLine, setRecordLine] = useState<Line>();
   const [selectedLines,setSelectedLines]=useState<string[]>([]);
   const dock = useRef<HTMLElement>(null);
@@ -128,7 +136,7 @@ export function Manifestation({
       observer.disconnect();
       document.documentElement.style.removeProperty("--dock-height");
     };
-  }, []);
+  }, [view, queueActive, state.status]);
   const active = practiceActive(state),
     p = active && state.plan ? state.plan : data.draft;
   function composer(value: string) {
@@ -155,6 +163,15 @@ export function Manifestation({
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
       : null;
+  function newPractice() {
+    if (!confirmDraftReplacement(data.draft, data.plans)) return;
+    try {
+      store.fresh();
+      setMessage("");
+      setView("practice");
+      onView?.("practice");
+    } catch (error) { setMessage((error as Error).message); }
+  }
   function start() {
     try {
       if (active && state.status === "playing") manifestPlayer.pause();
@@ -169,9 +186,12 @@ export function Manifestation({
     <section className="manifest-workspace" data-view={view}>
       <div className="section-heading">
         <h1>Manifestation</h1>
-        <button onClick={onLibrary}>Choose affirmations</button>
       </div>
       <div className="segmented" aria-label="Manifestation workspace">
+        <button aria-pressed={view === "practices"} onClick={() => {
+          setView("practices");
+          onView?.("practices");
+        }}>Practices</button>
         <button
           aria-pressed={view === "practice"}
           onClick={() => {
@@ -191,7 +211,24 @@ export function Manifestation({
           Schedule
         </button>
       </div>
-      {view === "practice" ? (
+      {view === "practices" ? <>
+        <div className="home-actions">
+          <button className="primary" disabled={active} onClick={newPractice}>New practice</button>
+          <button onClick={onPlaylists}>Playlists</button>
+        </div>
+        <div className="fields">
+          <label>Search saved practices
+            <input type="search" aria-label="Search library" value={practiceSearch} onChange={event => setPracticeSearch(event.target.value)} />
+          </label>
+          <label>Sort saved practices
+            <select value={practiceSort} onChange={event => setPracticeSort(event.target.value)}>
+              <option value="recent">Recently saved</option><option value="name">Name A–Z</option>
+            </select>
+          </label>
+        </div>
+        <ManifestLibrary section="saved" search={practiceSearch} sort={practiceSort}
+          onPractice={id => id && onOpenPractice(id)} focusOnEntry={false} />
+      </> : view === "practice" ? (
         <>
           {(active ||
             (!isPreview(state) &&
@@ -220,42 +257,52 @@ export function Manifestation({
               {state.error && <p role="status">{state.error}</p>}
             </div>
           )}
-          <div
-            className="workspace-summary"
-            aria-label="Practice configuration summary"
-          >
-            <div>
-              <small>Sentences</small>
-              <strong>{p.lines.length}/50</strong>
-            </div>
-            <div>
-              <small>Repetitions</small>
-              <strong>{p.repeats} rounds</strong>
-            </div>
-            <div>
-              <small>Session limit</small>
-              <strong>{p.seconds / 60} min</strong>
-            </div>
-            <div>
-              <small>Voice level</small>
-              <strong>{Math.round(p.volume * 100)}%</strong>
-            </div>
-          </div>
-          <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
-          <VoicePanel />
           <div className="practice-grid">
             <div className="practice-editor">
-              <fieldset className="manifest-fields sentence-fields">
-                <legend>Sentences ({p.lines.length}/50)</legend>
-                <label>
-                  Practice name
-                  <input
-                    disabled={active}
-                    value={p.name}
-                    maxLength={80}
-                    onChange={(e) => change({ name: e.target.value })}
-                  />
+              <fieldset className="manifest-fields">
+                <legend>1. Practice details</legend>
+                <label>Practice name
+                  <input disabled={active} value={p.name} maxLength={80}
+                    onChange={event => change({ name: event.target.value })} />
                 </label>
+                <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
+              </fieldset>
+              <fieldset className="manifest-fields sentence-fields">
+                <legend>2. Sentences ({p.lines.length}/50)</legend>
+                <button onClick={onLibrary}>Choose affirmations</button>
+                <details className="custom-sentence">
+                  <summary>Write your own affirmation</summary>
+                  <label>
+                    Your own sentence
+                    <textarea
+                      aria-label="Your own sentence"
+                      disabled={active}
+                      rows={2}
+                      value={custom}
+                      maxLength={300}
+                      placeholder="Write the words you want to repeat"
+                      onChange={(e) => composer(e.target.value)}
+                    />
+                  </label>
+                  <div className="admin-actions">
+                    <button
+                      disabled={
+                        active || !custom.trim() || p.lines.length >= 50
+                      }
+                      onClick={() => {
+                        const added = change({
+                          lines: [
+                            ...p.lines,
+                            { id: crypto.randomUUID(), text: custom.trim() },
+                          ],
+                        });
+                        if (added) composer("");
+                      }}
+                    >
+                      Add sentence
+                    </button>
+                  </div>
+                </details>
                 <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>
                 <div className="manifest-lines">
                   {p.lines.map((line, i) => (
@@ -366,44 +413,10 @@ export function Manifestation({
                   <div className="queue-empty">
                     <BookOpen size={21} />
                     <p>
-                      Your sequence is empty. Choose affirmations from the
-                      library or write your own below.
+                      Choose affirmations from the library or write your own.
                     </p>
                   </div>
                 )}
-                <details className="custom-sentence">
-                  <summary>Write your own affirmation</summary>
-                  <label>
-                    Your own sentence
-                    <textarea
-                      aria-label="Your own sentence"
-                      disabled={active}
-                      rows={2}
-                      value={custom}
-                      maxLength={300}
-                      placeholder="Write the words you want to repeat"
-                      onChange={(e) => composer(e.target.value)}
-                    />
-                  </label>
-                  <div className="admin-actions">
-                    <button
-                      disabled={
-                        active || !custom.trim() || p.lines.length >= 50
-                      }
-                      onClick={() => {
-                        const added = change({
-                          lines: [
-                            ...p.lines,
-                            { id: crypto.randomUUID(), text: custom.trim() },
-                          ],
-                        });
-                        if (added) composer("");
-                      }}
-                    >
-                      Add sentence
-                    </button>
-                  </div>
-                </details>
                 {!p.lines.length && (
                   <button
                     onClick={() => {
@@ -430,56 +443,28 @@ export function Manifestation({
                   </button>
                 )}
               </fieldset>
-              <div className="admin-actions practice-actions">
-                <button
-                  className="primary"
-                  disabled={active || !p.lines.length}
-                  onClick={() => {
-                    try {
-                      store.save();
-                      setMessage("Practice saved in Library.");
-                    } catch (e) {
-                      setMessage((e as Error).message);
-                    }
-                  }}
-                >
-                  Save practice
-                </button>
-                <button disabled={active||!p.lines.length} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
-                <button
-                  disabled={active}
-                  onClick={() => {
-                    if (!confirmDraftReplacement(data.draft, data.plans))
-                      return;
-                    try {
-                      store.fresh();
-                      setMessage("");
-                    } catch (e) {
-                      setMessage((e as Error).message);
-                    }
-                  }}
-                >
-                  New practice
-                </button>
-                {data.plans.some((plan) => plan.id === p.id) && (
-                  <button
-                    disabled={active}
-                    onClick={() => {
-                      setView("schedule");
-                      onView?.("schedule");
-                    }}
-                  >
-                    Schedule practice
-                  </button>
-                )}
-              </div>
             </div>
             <div className="practice-settings">
               <fieldset
                 disabled={active}
                 className="manifest-fields repeat-fields"
               >
-                <legend>Repetition</legend>
+                <legend>3. Playback options</legend>
+                <div className="practice-mode">
+                  <label>
+                    Practice mode
+                    <select
+                      aria-label="Practice mode"
+                      value={p.mode}
+                      onChange={(e) =>
+                        change({ mode: e.target.value as Plan["mode"] })
+                      }
+                    >
+                      <option value="speech">Spoken voice</option>
+                      <option value="read">Silent reading</option>
+                    </select>
+                  </label>
+                </div>
                 <div className="fields">
                   <label>
                     Repeat order
@@ -511,19 +496,6 @@ export function Manifestation({
                     : "Repeat each sentence the chosen number of times before moving to the next."}
                 </p>
                 <div className="fields">
-                  <label>
-                    Practice mode
-                    <select
-                      aria-label="Practice mode"
-                      value={p.mode}
-                      onChange={(e) =>
-                        change({ mode: e.target.value as Plan["mode"] })
-                      }
-                    >
-                      <option value="speech">Spoken voice</option>
-                      <option value="read">Silent reading</option>
-                    </select>
-                  </label>
                   <label>
                     Maximum session
                     <select
@@ -567,12 +539,72 @@ export function Manifestation({
                 </div>
 
               </fieldset>
+              <VoicePanel />
               <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
                 try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
                 catch(error){setMessage((error as Error).message);}
               }}/>
+              <button className="text-button" onClick={onBackgrounds}>Manage background library</button>
+              <details className="workbench-panel practice-summary">
+                <summary>Practice summary</summary>
+          <div
+            className="workspace-summary"
+            aria-label="Practice configuration summary"
+          >
+            <div>
+              <small>Sentences</small>
+              <strong>{p.lines.length}/50</strong>
+            </div>
+            <div>
+              <small>Repetitions</small>
+              <strong>{p.repeats} rounds</strong>
+            </div>
+            <div>
+              <small>Session limit</small>
+              <strong>{p.seconds / 60} min</strong>
+            </div>
+            <div>
+              <small>Voice level</small>
+              <strong>{Math.round(p.volume * 100)}%</strong>
             </div>
           </div>
+              </details>
+            </div>
+          </div>
+              <div className="admin-actions practice-actions">
+                <button
+                  className="primary"
+                  disabled={active || !p.lines.length}
+                  onClick={() => {
+                    try {
+                      store.save();
+                      setMessage("Practice saved.");
+                    } catch (e) {
+                      setMessage((e as Error).message);
+                    }
+                  }}
+                >
+                  Save practice
+                </button>
+                <button disabled={active||!p.lines.length} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
+                <button
+                  disabled={active}
+                  onClick={newPractice}
+                >
+                  New practice
+                </button>
+                {data.plans.some((plan) => plan.id === p.id) && (
+                  <button
+                    disabled={active}
+                    onClick={() => {
+                      setView("schedule");
+                      onView?.("schedule");
+                    }}
+                  >
+                    Schedule practice
+                  </button>
+                )}
+              </div>
         </>
       ) : (
         <Schedules
@@ -599,7 +631,7 @@ export function Manifestation({
           }}
         />
       )}
-      {!queueActive&&<section
+      {!queueActive&&(view !== "practices" || active)&&<section
         ref={dock}
         className="player-dock manifest-player-dock"
         aria-label="Manifestation player"
@@ -645,11 +677,13 @@ export function ManifestLibrary({
   sort = "recent",
   section = "all",
   onCategory,
+  focusOnEntry = true,
 }: {
   onPractice: (id?: string) => void;
   initialCategory?: string;
   section?: "all" | "saved" | "recordings";
   onCategory?: (category: string) => void;
+  focusOnEntry?: boolean;
   search?:string;
   sort?:string;
 }) {
@@ -668,12 +702,13 @@ export function ManifestLibrary({
   const savedSection = useRef<HTMLElement>(null);
   const recordingsSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!focusOnEntry) return;
     if (section === "saved") {
       savedSection.current?.focus({ preventScroll: true });
     } else if (section === "recordings") {
       recordingsSection.current?.focus({ preventScroll: true });
     }
-  }, [section]);
+  }, [section, focusOnEntry]);
   const [category, setCategory] = useState<string>(initialCategory),
     [query, setQuery] = useState(""),
     [selectedPlans,setSelectedPlans]=useState<string[]>([]),
@@ -1008,7 +1043,7 @@ export function ManifestLibrary({
                 }
               }}
             >
-              Open practice
+              Edit practice
             </button>
             <div className="saved-actions">
               <button
@@ -1037,22 +1072,6 @@ export function ManifestLibrary({
                     ? "Resume"
                     : "Play"}
               </button>
-              <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
-              <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
-              <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
-              <button
-                onClick={() =>
-                  download(
-                    JSON.stringify(withoutRecordings(plan), null, 2),
-                    "core-aura-practice.json",
-                    "application/json",
-                  )
-                    .then(setMessage)
-                    .catch((e) => setMessage(e.message))
-                }
-              >
-                Export practice
-              </button>
               <button
                 onClick={() => {
                   if (!confirmSourceDeletion("practice", [plan], "Schedules for this practice will also be removed.")) return;
@@ -1072,6 +1091,27 @@ export function ManifestLibrary({
                 Delete practice
               </button>
             </div>
+            <details className="practice-actions">
+              <summary>More options</summary>
+              <div className="saved-actions">
+                <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
+                <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
+                <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
+                <button
+                  onClick={() =>
+                    download(
+                      JSON.stringify(withoutRecordings(plan), null, 2),
+                      "core-aura-practice.json",
+                      "application/json",
+                    )
+                      .then(setMessage)
+                      .catch((e) => setMessage(e.message))
+                  }
+                >
+                  Export practice
+                </button>
+              </div>
+            </details>
           </article>
         ))}
       </section>}

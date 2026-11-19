@@ -155,7 +155,7 @@ function speechMock() {
       .getByLabel("Gap between sentences (sec)", { exact: true })
       .fill("0");
     await p.getByRole("button", { name: "Save practice", exact: true }).click();
-    await p.getByText("Practice saved in Library.", { exact: true }).waitFor();
+    await p.getByText("Practice saved.", { exact: true }).waitFor();
     await p.getByRole("button", { name: "Play practice", exact: true }).click();
     await p.getByText("Practice complete", { exact: true }).waitFor();
     assert.deepEqual(await p.evaluate(() => window.__spoken), [
@@ -270,10 +270,11 @@ function speechMock() {
       .getByRole("button", { name: "Library", exact: true })
       .last()
       .click();
-    await p.getByRole("button", { name: "Saved practices", exact: true }).click();
+    await p.locator(".bottom-nav").getByRole("button", { name: "Manifest", exact: true }).click();
     await p
       .getByRole("heading", { name: "Morning manifestation", exact: true })
       .waitFor();
+    await p.locator(".practice-actions > summary").click();
     const exporting = p.waitForEvent("download");
     await p
       .getByRole("button", { name: "Export practice", exact: true })

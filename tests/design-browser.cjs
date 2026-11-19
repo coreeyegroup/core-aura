@@ -154,6 +154,7 @@ const { chromium } = require("playwright"),
       .getByRole("button", { name: "Manifest", exact: true })
       .last()
       .click();
+    await p.getByRole("button", { name: "Practice", exact: true }).click();
     await p.screenshot({
       path: "mobile-verification/design-desktop-manifest.png",
     });

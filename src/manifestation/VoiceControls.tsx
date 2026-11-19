@@ -13,6 +13,7 @@ import {
   saveRecording,
   recordings,
   deleteRecording,
+  renameRecording,
 } from "./recordings";
 export function PreviewButton({
   line,
@@ -100,10 +101,12 @@ export function RecordSentence({
   line,
   onSave,
   onClose,
+  saveLabel = "Use recording",
 }: {
   line: Line;
   onSave: (clip: PersonalRecording) => void;
   onClose: () => void;
+  saveLabel?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     session = useRef<Capture | undefined>(undefined),
@@ -320,7 +323,7 @@ export function RecordSentence({
                 });
             }}
           >
-            Use recording
+            {saveLabel}
           </button>
         )}
         <button disabled={phase === "saving"} onClick={onClose}>
@@ -336,6 +339,8 @@ export function PersonalVoices({
   initiallyOpen?: boolean;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
+  const [newText, setNewText] = useState("");
+  const [recordLine, setRecordLine] = useState<Line>();
   useEffect(() => {
     setOpen(initiallyOpen);
   }, [initiallyOpen]);
@@ -376,10 +381,35 @@ export function PersonalVoices({
         contain sentences and settings; export WAV recordings separately to keep
         reimportable audio copies.
       </p>
+      <form className="voice-library-add" onSubmit={event => {
+        event.preventDefault();
+        if (newText.trim()) setRecordLine({ id: crypto.randomUUID(), text: newText.trim() });
+      }}>
+        <label>Words in the recording
+          <input value={newText} maxLength={300} onChange={event => setNewText(event.target.value)} />
+        </label>
+        <button className="primary" disabled={!newText.trim() || busy || ["playing", "paused"].includes(playback.status)}>
+          Record or import WAV
+        </button>
+      </form>
+      {recordLine && <RecordSentence line={recordLine} saveLabel="Save to Library"
+        onClose={() => setRecordLine(undefined)}
+        onSave={() => {
+          setRecordLine(undefined);
+          setNewText("");
+          setMessage("Recording saved in Library.");
+        }} />}
       {clips.map((c) => (
         <article className="saved-card" key={c.id}>
-          <p>{c.text}</p>
+          <div><strong>{c.title || c.text}</strong>{c.title && <p className="content-note">{c.text}</p>}</div>
           <div className="admin-actions">
+            <button disabled={busy} onClick={() => {
+              const title = prompt("Recording name", c.title || "");
+              if (title === null) return;
+              setError("");
+              setBusy(true);
+              void renameRecording(c.id, title).catch(error => setError(error.message)).finally(() => setBusy(false));
+            }}>Rename recording</button>
             <PreviewButton
               id={"clip-" + c.id}
               line={{

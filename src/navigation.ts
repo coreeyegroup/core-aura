@@ -1,8 +1,8 @@
 import type { Tab } from "./model";
 export type Route = {
   tab: Tab;
-  manifestSection: "practice" | "schedule";
-  libraryView: "manifestation" | "audio";
+  manifestSection: "practices" | "practice" | "schedule";
+  libraryView: "manifestation" | "audio" | "backgrounds";
   librarySection: "all" | "saved" | "recordings" | "playlists";
   category: string;
   exploreView: "sounds" | "packs" | "nature" | "tracks";
@@ -32,12 +32,12 @@ export function parseRoute(hash: string, previous = defaultRoute): Route {
     tab: known.includes(page) ? (page as Tab) : "home",
   };
   if (page === "manifest")
-    route.manifestSection = section === "schedule" ? "schedule" : "practice";
+    route.manifestSection = section === "schedule" ? "schedule" : section === "practices" ? "practices" : "practice";
   if (page === "explore")
     route.exploreView = section === "packs" ? "packs" : section === "nature" ? "nature" : section === "tracks" ? "tracks" : "sounds";
   if (page === "library") {
     if (section && section !== "playlists")
-      route.libraryView = section === "audio" ? "audio" : "manifestation";
+      route.libraryView = section === "audio" || section === "backgrounds" ? section : "manifestation";
     route.librarySection =
       section === "playlists" ? "playlists" :
       section === "practices"
@@ -53,13 +53,13 @@ export function parseRoute(hash: string, previous = defaultRoute): Route {
 export function routeHash(route: Route) {
   if (route.tab === "manifest")
     return (
-      "#manifest" + (route.manifestSection === "schedule" ? "/schedule" : "")
+      "#manifest" + (route.manifestSection === "practice" ? "" : "/" + route.manifestSection)
     );
   if (route.tab === "explore")
     return "#explore" + (route.exploreView === "packs" ? "/packs" : route.exploreView === "nature" ? "/nature" : route.exploreView === "tracks" ? "/tracks" : "");
   if (route.tab === "library") {
     if (route.librarySection === "playlists") return "#library/playlists";
-    if (route.libraryView === "audio") return "#library/audio";
+    if (route.libraryView !== "manifestation") return "#library/" + route.libraryView;
     const section =
       route.librarySection === "saved"
         ? "practices"
