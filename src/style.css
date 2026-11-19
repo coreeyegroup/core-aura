@@ -2612,3 +2612,19 @@ progress {
 .library-starter-order { display: block; margin-top: 4px; overflow-wrap: anywhere; }
 .library-starter h4 { margin: 0; font-size: calc(14px * var(--text-scale)); }
 .queue-reading { margin: 6px 0; overflow-wrap: anywhere; }
+
+.catalog-footer { display:flex; flex-wrap:wrap; gap:8px; padding-block:10px; }
+.affirmation-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; }
+.affirmation-row > p { margin:0; overflow-wrap:anywhere; }
+.affirmation-row .library-row-actions { display:flex; flex-wrap:nowrap; gap:4px; }
+.affirmation-row .icon-button { min-width:40px; min-height:40px; padding:4px; }
+@media (max-width:360px) {
+  .affirmation-row { grid-template-columns:minmax(0,1fr); }
+  .affirmation-row .library-row-actions { justify-self:end; }
+}
+
+.library-mix-settings { padding:8px 0; }
+.library-mix-settings > summary { display:flex; align-items:center; gap:7px; }
+.library-mix-settings fieldset { margin-top:8px; }
+.library-layer-field { display:grid; align-content:start; gap:7px; min-width:0; }
+.chakra-row-menu .library-mix-settings { flex-basis:100%; margin-top:5px; }

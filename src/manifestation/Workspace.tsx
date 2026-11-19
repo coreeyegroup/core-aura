@@ -3,9 +3,11 @@ import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
 import {Presets} from "../workbench/Presets";
 import {HistoryPanel} from "../workbench/HistoryPanel";
+import { LibraryLayers } from "../components/LibraryLayers";
+import type { Track } from "../tracks/storage";
 import { BackgroundControls } from "./BackgroundControls";
 import { Session } from "../model";
-import { BookOpen, Pencil } from "lucide-react";
+import { BookOpen, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -88,6 +90,7 @@ export function Manifestation({
   onPlaylists,
   onBackgrounds,
   sessions = [],
+  tracks = [],
   initialView = "practice",
   onView,
 }: {
@@ -96,6 +99,7 @@ export function Manifestation({
   onPlaylists: () => void;
   onBackgrounds: () => void;
   sessions?: Session[];
+  tracks?: Track[];
   queueActive?: boolean;
   initialView?: string;
   onView?: (view: "practices" | "practice" | "schedule") => void;
@@ -540,6 +544,8 @@ export function Manifestation({
 
               </fieldset>
               <VoicePanel />
+              <LibraryLayers prefix="Manifest" tracks={tracks} value={p.accompaniment} disabled={active}
+                onChange={accompaniment => change({ accompaniment })} />
               <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
                 try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
                 catch(error){setMessage((error as Error).message);}
@@ -764,12 +770,7 @@ export function ManifestLibrary({
     <section className="manifest-workspace" aria-label="Manifestation library">
       {section === "all" && <>
         <div className="home-actions">
-          <button className="primary" disabled={active} onClick={() => setEditing({ kind: "affirmation-add" })}>Add affirmation</button>
-          <button disabled={active} onClick={() => libraryInput.current?.click()}>Import affirmations</button>
-          <button disabled={!!catalog.error} onClick={() => void download(
-            JSON.stringify({ schemaVersion: 1, affirmations: catalog.data.affirmations.map(item => item.text) }, null, 2),
-            "core-aura-affirmations.json", "application/json",
-          ).then(setMessage).catch(error => setMessage(error.message))}>Export affirmations</button>
+          <button className="primary" disabled={active} onClick={() => setEditing({ kind: "affirmation-add" })}><Plus size={16} aria-hidden="true" /> Add affirmation</button>
         </div>
         <label>Search affirmations<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <input ref={libraryInput} type="file" accept="application/json,.json" className="sr-only"
@@ -794,14 +795,21 @@ export function ManifestLibrary({
                 checked={data.draft.lines.some(line => line.text === item.text)}
                 onChange={() => select(item.id, item.text)} /><span>{item.text}</span></label> : <p>{item.text}</p>}
               <div className="library-row-actions">
-                <PreviewButton line={item} id={item.id} label={"Test play: " + item.text} catalog />
-                <button disabled={active} aria-label={"Edit affirmation: " + item.text}
-                  onClick={() => setEditing({ kind: "affirmation-edit", item })}>Edit</button>
-                <button disabled={active} aria-label={"Delete affirmation: " + item.text}
-                  onClick={() => setEditing({ kind: "affirmation-delete", item })}>Delete</button>
+                <PreviewButton line={item} id={item.id} label={"Test play: " + item.text} catalog iconOnly />
+                <button className="icon-button" title="Edit affirmation" disabled={active} aria-label={"Edit affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-edit", item })}><Pencil size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Delete affirmation" disabled={active} aria-label={"Delete affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-delete", item })}><Trash2 size={16} aria-hidden="true" /></button>
               </div>
             </article>
           ))}
+        </div>
+        <div className="catalog-footer">
+          <button disabled={active} onClick={() => libraryInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import affirmations</button>
+          <button disabled={!!catalog.error} onClick={() => void download(
+            JSON.stringify({ schemaVersion: 1, affirmations: catalog.data.affirmations.map(item => item.text) }, null, 2),
+            "core-aura-affirmations.json", "application/json",
+          ).then(setMessage).catch(error => setMessage(error.message))}><Download size={16} aria-hidden="true" /> Export affirmations</button>
         </div>
       </>}
       {section === "recordings" && <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
@@ -817,9 +825,6 @@ export function ManifestLibrary({
         <div className="section-heading">
           <h2>Saved practices</h2>
           {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>Add practice</button>}
-          <button onClick={() => input.current?.click()}>
-            Import practice
-          </button>
         </div>
         <input
           className="sr-only"
@@ -945,6 +950,10 @@ export function ManifestLibrary({
             </details>
           </article>
         ))}
+        <div className="catalog-footer">          <button onClick={() => input.current?.click()}>
+            Import practice
+          </button>
+</div>
       </section>}
       {(message || error) && (
         <p role="status" className="notice">

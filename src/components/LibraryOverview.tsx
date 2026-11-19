@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import {
-  ArrowRight, AudioLines, BookOpen, Layers, ListMusic, Mic, Music2,
+  ArrowRight, AudioLines, BookOpen, Flower2, Layers, ListMusic, Mic, Music2,
   Package, Search, Sparkles, Waves, X,
 } from "lucide-react";
 import type { Route } from "../navigation";
@@ -9,13 +9,14 @@ type LibraryRoute = Pick<Route, "libraryView" | "librarySection">;
 
 export const collections = [
   { label: "Sounds", description: "Core sounds, instruments and raw samples", icon: AudioLines, libraryView: "sounds", librarySection: "all" },
-  { label: "Backgrounds", description: "Ambient sounds and background mixes", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
+  { label: "Backgrounds", description: "Ambient sounds and imported backgrounds", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
   { label: "Voices", description: "Default voices and personal recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
   { label: "Affirmations", description: "All your affirmations in one list", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
   { label: "Manifestation practices", description: "Saved and silent practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
   { label: "Audio files", description: "Meditation music and classical audio", icon: Music2, libraryView: "audio", librarySection: "all" },
   { label: "Sound packs", description: "Browse and download audio", icon: Package, libraryView: "packs", librarySection: "all" },
   { label: "Saved mixes", description: "Layered sounds and chakra sets", icon: Layers, libraryView: "mixes", librarySection: "all" },
+  { label: "Chakras", description: "Seven chakra profiles", icon: Flower2, libraryView: "chakras", librarySection: "all" },
   { label: "Playlists", description: "Arrange and play your sessions", icon: ListMusic, libraryView: "overview", librarySection: "playlists" },
 ] as const satisfies readonly (LibraryRoute & { label: string; description: string; icon: typeof Mic })[];
 

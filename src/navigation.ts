@@ -1,5 +1,5 @@
 import type { Tab } from "./model";
-export const libraryViews = ["overview", "manifestation", "sounds", "backgrounds", "audio", "mixes", "packs"] as const;
+export const libraryViews = ["overview", "manifestation", "sounds", "backgrounds", "audio", "mixes", "packs", "chakras"] as const;
 type LibraryView = (typeof libraryViews)[number];
 
 export type Route = {

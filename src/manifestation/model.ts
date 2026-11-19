@@ -1,4 +1,4 @@
-import { Channel, validChannel } from "../model";
+import { Channel, validChannel, validAccompaniment, type Accompaniment } from "../model";
 export type Category =
   | "Health"
   | "Wealth"
@@ -102,6 +102,7 @@ export type Plan = {
     master: number;
     volume: number;
   } | null;
+  accompaniment?: Accompaniment;
   backgroundDucking?: boolean;
   backgroundMuted?: boolean;
   backgroundDuckLevel?: number;
@@ -206,6 +207,7 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
         !finite(m.master,0,1) || !finite(m.volume,0,1))
       throw Error("The attached background mix has invalid settings.");
   }
+  if (p.accompaniment !== undefined && !validAccompaniment(p.accompaniment)) throw Error("Invalid practice sound layers.");
   if(p.backgroundMuted!==undefined&&typeof p.backgroundMuted!=="boolean")throw Error("Invalid background mute setting.");
   if ((p.backgroundDucking !== undefined && typeof p.backgroundDucking !== "boolean") ||
       (p.backgroundDuckLevel !== undefined && !finite(p.backgroundDuckLevel,0,1)))

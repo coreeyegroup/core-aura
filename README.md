@@ -2,6 +2,10 @@
 
 Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
+## v0.39.0 Library layers
+
+Library lists have import controls below their items. Backgrounds contains ambient and imported files. Manifest and each chakra can use an extra generated sound, an ambient layer with a filter frequency, and an imported file with its own level and loop control. File references are saved with the practice or chakra mix; the audio remains in the on-device Library.
+
 ## v0.38.0 Library collections
 
 Sounds holds raw instruments, tones, and user samples. Backgrounds holds ambient sources and background mixes. Audio files is for music and longer recordings. Each collection uses the device file picker and can export its original imports. Voices lists the speech voices available to the device and Core-aura service, and manages personal WAV recordings. Affirmations is a flat list with additive JSON import.

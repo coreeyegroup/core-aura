@@ -8,12 +8,21 @@ export function attachMix(value: Session): NonNullable<Plan["backgroundMix"]> {
 }
 export function backgroundChannels(plan: Plan, speaking = false): Channel[] {
   const factor = pMuted(plan) ? 0 : speaking && (plan.backgroundDucking ?? true) ? (plan.backgroundDuckLevel ?? .25) : 1;
-  if (plan.backgroundMix) {
-    const mix = plan.backgroundMix;
-    return mix.channels.map((c,index)=>({...c,id:"manifest-background:"+index,seconds:plan.seconds,
-      volume:c.volume*mix.master*mix.volume*factor}));
+  const channels: Channel[] = plan.backgroundMix
+    ? plan.backgroundMix.channels.map((c, index) => ({...c, id: "manifest-background:" + index,
+      seconds: plan.seconds, volume: c.volume * plan.backgroundMix!.master * plan.backgroundMix!.volume * factor }))
+    : plan.background ? [{...plan.background, id: "manifest-background", muted: false,
+      seconds: plan.seconds, volume: plan.background.volume * factor }] : [];
+  const layers = plan.accompaniment;
+  if (layers?.tone || layers?.ambience || layers?.audio) {
+    channels.push({ id: "manifest-background:layers", sound: "sine", hz: 432, volume: 0,
+      muted: false, seconds: plan.seconds, accompaniment: {
+        tone: layers.tone && { ...layers.tone, volume: layers.tone.volume * factor },
+        ambience: layers.ambience && { ...layers.ambience, volume: layers.ambience.volume * factor },
+        audio: layers.audio && { ...layers.audio, volume: layers.audio.volume * factor },
+      } });
   }
-  return plan.background ? [{...plan.background,id:"manifest-background",muted:false,seconds:plan.seconds,volume:plan.background.volume*factor}] : [];
+  return channels;
 }
 
 function pMuted(plan:Plan){return plan.backgroundMuted??false;}

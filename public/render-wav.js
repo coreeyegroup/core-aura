@@ -32,15 +32,17 @@ export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap)
   view.setUint16(34, 16, true);
   text(36, "data");
   view.setUint32(40, frames * 2, true);
-  const states = channels.map((c) =>
-    createState({ ...c, seconds: Math.min(c.seconds, seconds) }),
-  );
+  const states = [], starts = [];
   let offset = 0;
-  const starts = channels.map(channel => {
-    const start = offset;
+  for (const channel of channels) {
+    const layers = [channel, ...[channel.accompaniment?.tone, channel.accompaniment?.ambience]
+      .flatMap((source, index) => source ? [{ ...source, focus: index === 1, muted: channel.muted }] : [])];
+    for (const layer of layers) {
+      states.push(createState({ ...layer, seconds: Math.min(channel.seconds, seconds) }));
+      starts.push(offset);
+    }
     if (sequenceGap !== undefined) offset += Math.round((channel.seconds + sequenceGap) * rate);
-    return start;
-  });
+  }
   for (let start = 0; start < frames; start += 8192) {
     // Match the live mixer's normalization at each rendering block.
     const weight = sequenceGap === undefined ? states.reduce(

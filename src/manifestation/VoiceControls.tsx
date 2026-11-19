@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { engine } from "../audio/engine";
 import { Capacitor } from "@capacitor/core";
-import { Play, Square } from "lucide-react";
+import { Mic, Play, Square, Upload } from "lucide-react";
 import { deliverFile } from "../files/deliver";
 import { importVoice, exportVoice } from "./voice-files";
 import { speech, type Voice } from "./speech";
@@ -24,6 +24,7 @@ export function PreviewButton({
   label,
   voice,
   catalog = false,
+  iconOnly = false,
 }: {
   line: Line;
   id: string;
@@ -31,6 +32,7 @@ export function PreviewButton({
   label?: string;
   voice?: string;
   catalog?: boolean;
+  iconOnly?: boolean;
 }) {
   const state = useSyncExternalStore(
       manifestPlayer.subscribe,
@@ -43,7 +45,8 @@ export function PreviewButton({
   return (
     <>
       <button
-        className="preview-button"
+        className={iconOnly ? "icon-button preview-button" : "preview-button"}
+        title={iconOnly ? playing ? "Stop test" : "Test play" : undefined}
         disabled={!line.text.trim()}
         aria-label={
           label
@@ -81,7 +84,7 @@ export function PreviewButton({
         ) : (
           <Play size={16} aria-hidden="true" />
         )}
-        <span>{playing ? "Stop" : catalog ? "Test play" : label ? "Test voice" : "Play"}</span>
+        {!iconOnly && <span>{playing ? "Stop" : catalog ? "Test play" : label ? "Test voice" : "Play"}</span>}
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">
@@ -375,6 +378,38 @@ export function DefaultVoiceList() {
   );
 }
 
+function ImportRecording({ file, onCancel, onSave }: { file: File; onCancel: () => void; onSave: () => void }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  return <dialog className="voice-dialog" ref={dialog} aria-labelledby="import-voice-title" onCancel={event => {
+    event.preventDefault();
+    if (!saving) onCancel();
+  }}>
+    <form onSubmit={event => {
+      event.preventDefault();
+      if (saving || !text.trim()) return;
+      setSaving(true);
+      setError("");
+      void importVoice(file, text.trim()).then(saveRecording).then(onSave).catch(error => {
+        setError(error.message);
+        setSaving(false);
+      });
+    }}>
+      <h2 id="import-voice-title">Import voice WAV</h2>
+      <p>{file.name}</p>
+      <label>Words in the recording<input required autoFocus maxLength={300} value={text} onChange={event => setText(event.target.value)} /></label>
+      {error && <p role="alert">{error}</p>}
+      <div className="catalog-footer">
+        <button type="button" disabled={saving} onClick={onCancel}>Back to voices</button>
+        <button className="primary" disabled={saving || !text.trim()}>Save to Library</button>
+      </div>
+    </form>
+  </dialog>;
+}
+
 export function PersonalVoices({
   initiallyOpen = false,
   allowAttach = true,
@@ -385,6 +420,8 @@ export function PersonalVoices({
   const [open, setOpen] = useState(initiallyOpen);
   const [newText, setNewText] = useState("");
   const [recordLine, setRecordLine] = useState<Line>();
+  const [importFile, setImportFile] = useState<File>();
+  const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setOpen(initiallyOpen);
   }, [initiallyOpen]);
@@ -425,24 +462,6 @@ export function PersonalVoices({
         contain sentences and settings; export WAV recordings separately to keep
         reimportable audio copies.
       </p>
-      <form className="voice-library-add" onSubmit={event => {
-        event.preventDefault();
-        if (newText.trim()) setRecordLine({ id: crypto.randomUUID(), text: newText.trim() });
-      }}>
-        <label>Words in the recording
-          <input value={newText} maxLength={300} onChange={event => setNewText(event.target.value)} />
-        </label>
-        <button className="primary" disabled={!newText.trim() || busy || ["playing", "paused"].includes(playback.status)}>
-          Record or import WAV
-        </button>
-      </form>
-      {recordLine && <RecordSentence line={recordLine} saveLabel="Save to Library" closeLabel="Back to voices"
-        onClose={() => setRecordLine(undefined)}
-        onSave={() => {
-          setRecordLine(undefined);
-          setNewText("");
-          setMessage("Recording saved in Library.");
-        }} />}
       {clips.map((c) => (
         <article className="saved-card" key={c.id}>
           <div><strong>{c.title || c.text}</strong>{c.title && <p className="content-note">{c.text}</p>}</div>
@@ -537,10 +556,40 @@ export function PersonalVoices({
       ))}
       {!clips.length && (
         <p>
-          No recordings yet. Use Record or import WAV to add a clip, or record beside a sentence in your
+          No recordings yet. Record a voice or import a WAV file, or record beside a sentence in your
           practice.
         </p>
       )}
+      <form className="voice-library-add" onSubmit={event => {
+        event.preventDefault();
+        if (newText.trim()) setRecordLine({ id: crypto.randomUUID(), text: newText.trim() });
+      }}>
+        <label>Words in the recording
+          <input value={newText} maxLength={300} onChange={event => setNewText(event.target.value)} />
+        </label>
+        <button className="primary" disabled={!newText.trim() || busy || ["playing", "paused"].includes(playback.status)}>
+          <Mic size={16} aria-hidden="true" /> Record voice
+        </button>
+      </form>
+      {recordLine && <RecordSentence line={recordLine} saveLabel="Save to Library" closeLabel="Back to voices"
+        onClose={() => setRecordLine(undefined)}
+        onSave={() => {
+          setRecordLine(undefined);
+          setNewText("");
+          setMessage("Recording saved in Library.");
+        }} />}
+      <div className="catalog-footer">
+        <button disabled={busy || ["playing", "paused"].includes(playback.status)} onClick={() => importInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import voice WAV</button>
+        <input ref={importInput} className="sr-only" type="file" accept="audio/wav,audio/x-wav,.wav"
+          aria-label="Import voice WAV from device" onChange={event => {
+            setImportFile(event.target.files?.[0]);
+            event.target.value = "";
+          }} />
+      </div>
+      {importFile && <ImportRecording file={importFile} onCancel={() => setImportFile(undefined)} onSave={() => {
+        setImportFile(undefined);
+        setMessage("Recording saved in Library.");
+      }} />}
       {(error || message) && <p role="status">{error || message}</p>}
     </details>
   );

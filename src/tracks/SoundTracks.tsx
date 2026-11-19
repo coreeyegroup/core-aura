@@ -11,7 +11,7 @@ const collectionLabels = {
     backgrounds: { title: "Your background sounds", import: "Import backgrounds", empty: "No background sounds imported." },
     audio: { title: "Your music and audio", import: "Import audio", empty: "Import meditation music, classical recordings, or other long-form audio." },
 };
-export function SoundTracks({ defaultOpen = false, collection }: { defaultOpen?: boolean; collection?: TrackCollection } = {}) {
+export function SoundTracks({ defaultOpen = false, collection, children }: { defaultOpen?: boolean; collection?: TrackCollection; children?: React.ReactNode } = {}) {
     const catalog = Boolean(collection);
     const labels = collection ? collectionLabels[collection] : undefined;
     const [rows, setRows] = useState<Track[]>([]), [message, setMessage] = useState(""), [busy, setBusy] = useState("");
@@ -85,12 +85,7 @@ export function SoundTracks({ defaultOpen = false, collection }: { defaultOpen?:
     const Wrapper = catalog ? "section" : "details";
     return <Wrapper className="soundtrack-panel" id="soundtracks" open={catalog ? undefined : defaultOpen || undefined}>
     {labels ? <h2>{labels.title}</h2> : <summary>{defaultOpen ? "Your tracks" : "Sound tracks"} <span>{rows.length} on device · {active.filter(s => s.status === "playing").length} playing</span></summary>}
-    <div className="track-toolbar">
-      <button onClick={() => input.current?.click()} disabled={Boolean(busy)}><Plus size={17}/> {labels?.import ?? "Add audio"}</button>
-      {!catalog && <button disabled={!active.length} onClick={() => active.forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button>}
-    </div>
-    <input ref={input} className="sr-only" aria-label={labels ? labels.import + " from device" : "Import sound tracks"} type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
-        void add(files); }}/>
+    {!catalog && <div className="track-toolbar"><button disabled={!active.length} onClick={() => active.forEach(s => engine.stop(s.id))}><Square size={16}/> Stop tracks</button></div>}
     {!catalog && <p className="content-note">Mix up to 3 audio files with chakra or generated layers.</p>}
     {catalog && <p className="content-note">Choose audio files from this device.</p>}
     {!rows.length && <p className="content-note">{labels?.empty ?? "No sound tracks yet."}</p>}
@@ -126,6 +121,12 @@ export function SoundTracks({ defaultOpen = false, collection }: { defaultOpen?:
       </article>;
         })}</div>
     {!catalog && <p className="content-note">Tracks run separately from the session timer. Stop tracks when finished.</p>}
+    {children}
+    <div className="track-toolbar catalog-footer">
+      <button onClick={() => input.current?.click()} disabled={Boolean(busy)}><Plus size={17}/> {labels?.import ?? "Add audio"}</button>
+    </div>
+    <input ref={input} className="sr-only" aria-label={labels ? labels.import + " from device" : "Import sound tracks"} type="file" multiple accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" onChange={e => { const files = Array.from(e.target.files || []); e.target.value = ""; if (files.length)
+        void add(files); }}/>
     {message && <p role="status" className="track-message">{message}</p>}
   </Wrapper>;
 }
