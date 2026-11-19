@@ -168,6 +168,34 @@ function testAudio(name) {
     await page.getByRole("heading", { name: "Evening practice mix", exact: true }).waitFor();
     assert.equal(await card.count(), 0);
     assert.equal(await page.locator(".saved-card").count(), 2);
+    await page.goto(origin + "/#library/practices");
+    const starters = page.getByRole("region", { name: "Starter collection" });
+    await starters.getByRole("button", { name: "Save a copy of A quiet moment" }).click();
+    await page.locator(".saved-card").getByRole("heading", { name: "A quiet moment" }).waitFor();
+    const practiceData = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")));
+    assert.equal(practiceData.draft.id, "practice");
+    assert.equal(practiceData.plans.length, 2);
+
+    await page.goto(origin + "/#library/audio");
+    await page.getByRole("button", { name: "Browse original audio samples" }).click();
+    await page.getByRole("heading", { name: "Core Resonance", exact: true }).waitFor();
+    await page.goto(origin + "/#library/backgrounds");
+    await starters.getByRole("button", { name: "Save a copy of Gentle rain" }).click();
+    await page.locator(".saved-card").getByRole("heading", { name: "Gentle rain", exact: true }).waitFor();
+
+    await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+    await context.setOffline(true);
+    await page.goto(origin + "/#library/playlists");
+    await page.reload();
+    await starters.getByRole("button", { name: "Play Morning pause" }).click();
+    const player = page.getByRole("region", { name: "Playlist player" });
+    await player.getByText("I can return my attention to this moment.", { exact: true }).waitFor();
+    await player.getByRole("button", { name: "Next item" }).click();
+    await player.getByText("Stream and breeze", { exact: true }).waitFor();
+    await player.getByRole("button", { name: "Pause playlist" }).waitFor();
+    await player.getByRole("button", { name: "Stop playlist" }).click();
+    await player.waitFor({ state: "detached" });
+    await context.setOffline(false);
     assert.deepEqual(errors, []);
     console.log("Verified four staged screens, nine Library collections, mix editing, six themes, custom colour persistence, keyboard focus, accessibility and saved data.");
   } finally {

@@ -52,6 +52,7 @@ import {
 import { engine } from "./audio/engine";
 import { favorites, readSessions, writeSessions } from "./storage";
 import { ChannelEditor, Transport } from "./components/Controls";
+import { LibraryStarters } from "./components/LibraryStarters";
 import { ChakraMixer } from "./components/ChakraMixer";
 import { SoundTracks } from "./tracks/SoundTracks";
 import { AndroidUpdates } from "./android/AndroidUpdates";
@@ -1364,8 +1365,22 @@ export default function App() {
                 <option value="recent">Recently saved</option><option value="name">Name A–Z</option>
               </select></label>
             </div>}
+            {playlistView && <LibraryStarters section="playlists" />}
+            {librarySection === "saved" && <LibraryStarters section="practices" />}
+            {mixesView && <LibraryStarters
+              key={libraryView}
+              section={backgroundsView ? "backgrounds" : "mixes"}
+              onSaveMix={session => storeRows([...sessions, {
+                ...session, id: crypto.randomUUID(), createdAt: new Date().toISOString(),
+              }])}
+            />}
             {isLibrarySounds && natureLibrary}
-            {libraryView === "audio" && <SoundTracks defaultOpen />}
+            {libraryView === "audio" && <>
+              <SoundTracks defaultOpen />
+              <button onClick={() => navigate("library", { libraryView: "packs", librarySection: "all" })}>
+                Browse original audio samples <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </>}
             {libraryView === "packs" && <>
               <PacksPanel embedded />
               <PacksPanel library master={master} onMaster={setMaster} />

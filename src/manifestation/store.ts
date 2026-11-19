@@ -83,6 +83,11 @@ export const manifestationStore = {
     const p=parsePlan({...structuredClone(original),id:crypto.randomUUID(),name:(original.name+" copy").slice(0,80)});
     commit({...state.data,plans:[...state.data.plans,p],draft:p});return p;
   },
+  addCopy: (value: Plan) => {
+    if (state.data.plans.length >= 100) throw Error("The library supports up to 100 practices.");
+    const plan = { ...withoutRecordings(parsePlan(value)), id: crypto.randomUUID() };
+    commit({ ...state.data, plans: [...state.data.plans, plan] });
+  },
   rename: (id:string,name:string) => {
     const original=state.data.plans.find(p=>p.id===id);
     if(!original)throw Error("Practice unavailable.");

@@ -2556,3 +2556,21 @@ progress {
 }
 .library-destinations button { justify-content: space-between; min-height: 52px; }
 .app:has(.queue-player) .nature-player { display: none; }
+
+.library-starters { display: grid; gap: var(--gap); }
+.library-starter {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--gap);
+  padding: var(--pad);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.library-starter small { color: var(--muted); }
+.library-starter-actions { display: flex; flex-wrap: wrap; gap: var(--gap); }
+.library-starter-actions button { min-height: 44px; }
+.library-starter-order { flex-basis: 100%; }
+.queue-reading { margin: 6px 0; overflow-wrap: anywhere; }
