@@ -7,7 +7,7 @@ import { LibraryLayers } from "../components/LibraryLayers";
 import type { Track } from "../tracks/storage";
 import { BackgroundControls } from "./BackgroundControls";
 import { Session } from "../model";
-import { BookOpen, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { BookOpen, Download, Mic, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -31,8 +31,9 @@ import {
 import { manifestPlayer } from "./player";
 import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
-import { PreviewButton, RecordSentence, PersonalVoices, DefaultVoiceList } from "./VoiceControls";
-import { withoutRecordings } from "./recordings";
+import { PreviewButton, RecordSentence, PersonalVoices, DefaultVoiceList, ImportRecording } from "./VoiceControls";
+import { recordings, withoutRecordings, type PersonalRecording } from "./recordings";
+import { exportVoice } from "./voice-files";
 import { pushStatus, disablePushReminders } from "./push";
 import { deliverFile } from "../files/deliver";
 function download(text: string, name: string, type: string) {
@@ -319,7 +320,7 @@ export function Manifestation({
                         <div className="queue-copy">
                           <p>{line.text}</p>
                           <small>
-                            {line.recordingId
+                            {line.audioAffirmation ? "Audio affirmation" : line.recordingId
                               ? "Personal voice"
                               : "Selected voice"}
                           </small>
@@ -342,7 +343,7 @@ export function Manifestation({
                           <textarea
                             rows={2}
                             aria-label={"Sentence " + (i + 1)}
-                            disabled={active}
+                            disabled={active || !!line.audioAffirmation}
                             value={line.text}
                             maxLength={300}
                             onChange={(e) =>
@@ -357,13 +358,13 @@ export function Manifestation({
                           />
                         </label>
                         <div className="line-actions">
-                          <button
+                          {!line.audioAffirmation && <button
                             disabled={active || !line.text.trim()}
                             onClick={() => setRecordLine(line)}
                           >
                             {line.recordingId ? "Record again" : "Record voice"}
-                          </button>
-                          {line.recordingId && (
+                          </button>}
+                          {line.recordingId && !line.audioAffirmation && (
                             <span className="content-note">
                               Personal voice saved
                             </span>
@@ -700,6 +701,27 @@ export function ManifestLibrary({
   );
   const [editing, setEditing] = useState<EditLibrary>();
   const libraryInput = useRef<HTMLInputElement>(null);
+  const audioInput = useRef<HTMLInputElement>(null);
+  const [audioFile, setAudioFile] = useState<File>();
+  const [recordAudio, setRecordAudio] = useState(false);
+  const [audioClips, setAudioClips] = useState<PersonalRecording[]>([]);
+  const [audioError, setAudioError] = useState("");
+  useEffect(() => {
+    if (section !== "all") return;
+    let alive = true;
+    const read = () => void recordings("affirmation").then(clips => {
+      if (alive) {
+        setAudioClips(clips);
+        setAudioError("");
+      }
+    }).catch(error => { if (alive) setAudioError(error.message); });
+    read();
+    addEventListener("core-aura-recordings-changed", read);
+    return () => {
+      alive = false;
+      removeEventListener("core-aura-recordings-changed", read);
+    };
+  }, [section]);
   const savedSection = useRef<HTMLElement>(null);
   const recordingsSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -721,28 +743,29 @@ export function ManifestLibrary({
   const matchingAffirmations = catalog.data.affirmations.filter(
     affirmation => affirmation.text.toLowerCase().includes(needle),
   );
+  const matchingAudio = audioClips.filter(clip => (clip.title ?? clip.text).toLowerCase().includes(needle));
   const selectedCount = data.draft.lines.length;
   useEffect(() => setSelectedPlans([]), [search]);
   const input = useRef<HTMLInputElement>(null);
   const active = practiceActive(state);
-  function select(id: string, text: string) {
+  function selectedLine(line: Line) {
+    return data.draft.lines.find(candidate => line.audioAffirmation
+      ? candidate.recordingId === line.recordingId
+      : !candidate.audioAffirmation && candidate.text === line.text);
+  }
+  function select(line: Line) {
     try {
-      const selected = data.draft.lines.some((l) => l.text === text);
+      const selected = selectedLine(line);
       if (!selected && data.draft.lines.length >= 50)
         throw Error("Choose up to 50 sentences.");
       store.draft({
         ...data.draft,
         lines: selected
-          ? data.draft.lines.filter((l) => l.text !== text)
-          : [
-              ...data.draft.lines,
-              {
-                id: data.draft.lines.some((l) => l.id === id)
-                  ? crypto.randomUUID()
-                  : id,
-                text,
-              },
-            ],
+          ? data.draft.lines.filter(candidate => candidate.id !== selected.id)
+          : [...data.draft.lines, {
+            ...line,
+            id: data.draft.lines.some(candidate => candidate.id === line.id) ? crypto.randomUUID() : line.id,
+          }],
       });
       setMessage("");
     } catch (e) {
@@ -771,6 +794,7 @@ export function ManifestLibrary({
       {section === "all" && <>
         <div className="home-actions">
           <button className="primary" disabled={active} onClick={() => setEditing({ kind: "affirmation-add" })}><Plus size={16} aria-hidden="true" /> Add affirmation</button>
+          <button disabled={active} onClick={() => setRecordAudio(true)}><Mic size={16} aria-hidden="true" /> Record audio affirmation</button>
         </div>
         <label>Search affirmations<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <input ref={libraryInput} type="file" accept="application/json,.json" className="sr-only"
@@ -784,16 +808,46 @@ export function ManifestLibrary({
               setMessage(count === 1 ? "1 affirmation imported." : count + " affirmations imported.");
             }).catch(error => setMessage(error.message));
           }} />
+        <input ref={audioInput} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" className="sr-only"
+          aria-label="Import affirmation audio from device" onChange={event => {
+            setAudioFile(event.target.files?.[0]);
+            event.target.value = "";
+          }} />
+        {audioFile && <ImportRecording file={audioFile} audioAffirmation onCancel={() => setAudioFile(undefined)}
+          onSave={() => { setAudioFile(undefined); setMessage("Audio affirmation imported."); }} />}
+        {recordAudio && <RecordSentence line={{ id: "new-audio-affirmation", text: "" }} audioAffirmation
+          saveLabel="Save audio affirmation" closeLabel="Back to affirmations" onClose={() => setRecordAudio(false)}
+          onSave={() => { setRecordAudio(false); setMessage("Audio affirmation saved."); }} />}
+        {audioError && <p role="status">{audioError}</p>}
         {editing && <LibraryEditor edit={editing} onClose={() => setEditing(undefined)} />}
         {catalog.error && <p role="status">{catalog.error}</p>}
         {onPractice && <button disabled={!selectedCount} onClick={() => onPractice()}>Use selection ({selectedCount})</button>}
         <div className="affirmation-list">
-          {!matchingAffirmations.length && <p role="status">{needle ? "No matching affirmations." : "No affirmations yet."}</p>}
+          {!matchingAffirmations.length && !matchingAudio.length && <p role="status">{needle ? "No matching affirmations." : "No affirmations yet."}</p>}
+          {matchingAudio.map(clip => {
+            const name = clip.title ?? clip.text;
+            const line: Line = { id: clip.id, text: name, recordedText: name, recordingId: clip.id, audioAffirmation: true };
+            const label = <span className="affirmation-audio-title">{name}<small>Audio · {Math.max(1, Math.round(clip.seconds))} sec</small></span>;
+            return <article className="affirmation-row" key={clip.id}>
+              {onPractice ? <label className="affirmation-choice"><input type="checkbox" disabled={active}
+                checked={!!selectedLine(line)} onChange={() => select(line)} />{label}</label> : label}
+              <div className="library-row-actions">
+                <PreviewButton line={line} id={clip.id} label={"Test play: " + name} catalog iconOnly />
+                <button className="icon-button" title="Edit affirmation" disabled={active} aria-label={"Edit affirmation: " + name}
+                  onClick={() => setEditing({ kind: "audio-edit", clip })}><Pencil size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Export audio" aria-label={"Export audio: " + name}
+                  onClick={() => void exportVoice(clip).then(blob => deliverFile(blob, `core-aura-affirmation-${clip.id}.wav`))
+                    .then(setMessage).catch(error => setMessage(error.message))}><Download size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Delete affirmation" disabled={active} aria-label={"Delete affirmation: " + name}
+                  onClick={() => setEditing({ kind: "audio-delete", clip })}><Trash2 size={16} aria-hidden="true" /></button>
+              </div>
+            </article>;
+          })}
           {matchingAffirmations.map(item => (
             <article className="affirmation-row" key={item.id}>
               {onPractice ? <label className="affirmation-choice"><input type="checkbox" disabled={active}
-                checked={data.draft.lines.some(line => line.text === item.text)}
-                onChange={() => select(item.id, item.text)} /><span>{item.text}</span></label> : <p>{item.text}</p>}
+                checked={!!selectedLine(item)}
+                onChange={() => select({ id: item.id, text: item.text })} /><span>{item.text}</span></label> : <p>{item.text}</p>}
               <div className="library-row-actions">
                 <PreviewButton line={item} id={item.id} label={"Test play: " + item.text} catalog iconOnly />
                 <button className="icon-button" title="Edit affirmation" disabled={active} aria-label={"Edit affirmation: " + item.text}
@@ -805,6 +859,7 @@ export function ManifestLibrary({
           ))}
         </div>
         <div className="catalog-footer">
+          <button disabled={active} onClick={() => audioInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import audio affirmation</button>
           <button disabled={active} onClick={() => libraryInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import affirmations</button>
           <button disabled={!!catalog.error} onClick={() => void download(
             JSON.stringify({ schemaVersion: 1, affirmations: catalog.data.affirmations.map(item => item.text) }, null, 2),

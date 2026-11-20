@@ -1,7 +1,7 @@
 import { confirmSourceDeletion } from "../playlists/store";
 import {prepareSound} from "../workbench/actions";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Play, Pause, Square, Plus, Volume2, VolumeX } from "lucide-react";
+import { Play, Pause, Square, Plus, Trash2, Volume2, VolumeX } from "lucide-react";
 import { engine } from "../audio/engine";
 import { deliverFile } from "../files/deliver";
 import { audioDuration, changeTrack, importTrack, tracks, Track, trackBlob, trackEvent, validateTrackFile, type TrackCollection } from "./storage";
@@ -13,6 +13,7 @@ const collectionLabels = {
 };
 export function SoundTracks({ defaultOpen = false, collection, children }: { defaultOpen?: boolean; collection?: TrackCollection; children?: React.ReactNode } = {}) {
     const catalog = Boolean(collection);
+    const showDelete = collection === "sounds" || collection === "backgrounds";
     const labels = collection ? collectionLabels[collection] : undefined;
     const [rows, setRows] = useState<Track[]>([]), [message, setMessage] = useState(""), [busy, setBusy] = useState("");
     const [editing, setEditing] = useState(""), [title, setTitle] = useState("");
@@ -81,6 +82,14 @@ export function SoundTracks({ defaultOpen = false, collection, children }: { def
             setMessage((e as Error).message);
         }
     }
+    function remove(row: Track) {
+        if (!confirmSourceDeletion("track", [{ id: row.id, name: row.title }], "Export the original first if you need a backup. Mixes and practices using this file will need a replacement.")) return;
+        void run(async () => {
+            await changeTrack(row.id, null);
+            engine.stop(row.id);
+            setEditing("");
+        }, row.id);
+    }
     const active = states.filter(state => rows.some(row => row.id === state.id));
     const Wrapper = catalog ? "section" : "details";
     return <Wrapper className="soundtrack-panel" id="soundtracks" open={catalog ? undefined : defaultOpen || undefined}>
@@ -97,6 +106,8 @@ export function SoundTracks({ defaultOpen = false, collection, children }: { def
           <button className="icon-button" aria-label={"Stop " + row.title} disabled={!state && busy !== row.id} onClick={() => engine.stop(row.id)}><Square size={17}/></button>
           {catalog && <button aria-label={"Export " + row.title} disabled={Boolean(busy)}
             onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export</button>}
+          {showDelete && <button className="icon-button" title="Delete track" aria-label={"Delete " + row.title}
+            disabled={Boolean(busy)} onClick={() => remove(row)}><Trash2 size={16} aria-hidden="true" /></button>}
         </div>
         {!catalog && <>
         <label className="track-seek"><span className="sr-only">{row.title + " position"}</span><input aria-label={row.title + " position"} type="range" min="0" max={row.duration} step="0.1" value={Math.min(row.duration, position)} disabled={!state} onChange={e => engine.seekSoundtrack(row.id, Number(e.target.value))}/><output>{clock(position)} / {clock(row.duration)}</output></label>
@@ -112,8 +123,7 @@ export function SoundTracks({ defaultOpen = false, collection, children }: { def
           </>}
           <button onClick={() => { setEditing(row.id); setTitle(row.title); }}>Rename</button>
           {!catalog && <button disabled={Boolean(busy)} onClick={() => void run(async () => deliverFile(await trackBlob(row.id), row.filename), row.id)}>Export original</button>}
-          <button disabled={Boolean(busy)} onClick={() => { if (confirmSourceDeletion("track", [{id: row.id, name: row.title}], "Export its original first if you need a backup."))
-                void run(async () => { await changeTrack(row.id, null); engine.stop(row.id); setEditing(""); }, row.id); }}>Delete track</button>
+          {!showDelete && <button disabled={Boolean(busy)} onClick={() => remove(row)}>Delete track</button>}
         </div>
         <p className="content-note">Files and settings stay on this device. Supported formats depend on the device. Export original for a backup; generated-session exports do not include imported audio.</p>
         {editing === row.id && <form className="track-rename" onSubmit={e => { e.preventDefault(); void run(async () => { await changeTrack(row.id, { title }); setEditing(""); }, row.id); }}><label>Track name<input aria-label="Track name" maxLength={80} value={title} onChange={e => setTitle(e.target.value)}/></label><button disabled={Boolean(busy)}>Save name</button><button type="button" onClick={() => setEditing("")}>Cancel</button></form>}

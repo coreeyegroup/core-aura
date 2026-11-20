@@ -73,7 +73,7 @@ export class ManifestPlayer {
     this.accumulated = 0;
     this.update({ status: "playing", plan, step: 0, elapsed: 0, error: "" });
     this.speaking = plan.mode === "speech";
-    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.background || plan.backgroundMix || plan.accompaniment)
+    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.lines.some(line => line.audioAffirmation) || plan.background || plan.backgroundMix || plan.accompaniment)
       void this.audio.unlock?.().catch(() => {});
     this.clockStart();
     this.background();

@@ -79,6 +79,7 @@ export type Line = {
   id: string;
   text: string;
   recordingId?: string;
+  audioAffirmation?: true;
   recordedText?: string;
 };
 export type Plan = {
@@ -217,10 +218,11 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
   if (
     p.lines.some(
       (l) =>
-        l.recordingId !== undefined &&
-        (typeof l.recordingId !== "string" ||
-          !/^[a-zA-Z0-9-]{1,100}$/.test(l.recordingId) ||
-          l.recordedText !== l.text),
+        (l.audioAffirmation !== undefined && (l.audioAffirmation !== true || !l.recordingId)) ||
+        (l.recordingId !== undefined &&
+          (typeof l.recordingId !== "string" ||
+            !/^[a-zA-Z0-9-]{1,100}$/.test(l.recordingId) ||
+            l.recordedText !== l.text)),
     )
   )
     throw Error("A personal recording no longer matches its sentence.");

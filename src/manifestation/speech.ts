@@ -42,14 +42,17 @@ export const speech: SpeechDriver = {
       speechSynthesis.cancel();
   },
   async speakLine(line, plan) {
-    if (plan.useRecordings && line.recordingId) {
+    if ((line.audioAffirmation || plan.useRecordings) && line.recordingId) {
       overlay?.abort();
       const controller = new AbortController();
       overlay = controller;
       try {
         const clip = await recording(line.recordingId);
-        if (clip.text !== line.text)
+        if (line.audioAffirmation) {
+          if (clip.kind !== "affirmation") throw Error("This audio affirmation is unavailable.");
+        } else if (clip.text !== line.text) {
           throw Error("Record this sentence again: its words changed.");
+        }
         await engine.playOverlay(
           () => clip.blob.arrayBuffer(),
           plan.volume,

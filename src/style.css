@@ -2544,8 +2544,6 @@ progress {
 :root .app .library-collections { flex-wrap: wrap; }
 :root .app .library-collections button { flex: 1 1 auto; }
 .practice-mode { max-width: 24rem; }
-.voice-library-add { display: flex; align-items: end; flex-wrap: wrap; gap: 6px; margin-block: 8px; }
-.voice-library-add label { flex: 1 1 13rem; }
 
 .settings-sheet .appearance-controls .custom-colour { grid-column: 1 / -1; }
 .custom-colour input { width: 100%; min-height: 44px; }
@@ -2628,3 +2626,6 @@ progress {
 .library-mix-settings fieldset { margin-top:8px; }
 .library-layer-field { display:grid; align-content:start; gap:7px; min-width:0; }
 .chakra-row-menu .library-mix-settings { flex-basis:100%; margin-top:5px; }
+
+.affirmation-audio-title { display:grid; gap:2px; min-width:0; overflow-wrap:anywhere; }
+.affirmation-audio-title small { color:var(--muted); }

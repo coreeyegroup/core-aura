@@ -1,3 +1,4 @@
+import { withoutRecordings } from "../src/manifestation/recordings";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   newPlan,
@@ -160,5 +161,14 @@ describe("personal recording references", () => {
     p.lines[0].recordedText = "My words";
     p.useRecordings = true;
     expect(parsePlan(p).lines[0].recordingId).toBe("clip");
+  });
+  it("preserves an audio affirmation in a saved plan and strips the local clip reference from backups", () => {
+    const plan = newPlan();
+    plan.lines = [{ id: "line", text: "Calm breath", recordedText: "Calm breath", recordingId: "clip", audioAffirmation: true }];
+    plan.useRecordings = false;
+    expect(parsePlan(plan).lines[0].audioAffirmation).toBe(true);
+    expect(parsePlan(withoutRecordings(plan)).lines).toEqual([{ id: "line", text: "Calm breath" }]);
+    delete plan.lines[0].recordingId;
+    expect(() => parsePlan(plan)).toThrow();
   });
 });

@@ -58,11 +58,17 @@ function testAudio(name) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ args: ["--no-sandbox"] });
+  const browser = await chromium.launch({ args: ["--no-sandbox", "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
   try {
     const context = await browser.newContext({ viewport: { width: 320, height: 740 }, colorScheme: "light" });
     await context.addInitScript(() => {
       window.testMediaElements = [];
+      window.testBufferStarts = 0;
+      const start = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        window.testBufferStarts++;
+        return start.apply(this, args);
+      };
       const create = AudioContext.prototype.createMediaElementSource;
       AudioContext.prototype.createMediaElementSource = function (audio) {
         window.testMediaElements.push(audio);
@@ -133,6 +139,14 @@ function testAudio(name) {
     await page.getByRole("button", { name: "Download WAV" }).click();
     assert.match((await sampleDownload).suggestedFilename(), /\.wav$/);
     await page.getByRole("button", { name: "Close audio export" }).click();
+    page.once("dialog", dialog => dialog.accept());
+    await catalog.getByRole("button", { name: "Delete Bell", exact: true }).click();
+    await testSound.waitFor({ state: "detached" });
+    await page.reload();
+    await catalog.getByText("Removed built-in sounds").click();
+    await catalog.getByRole("button", { name: "Restore Bell", exact: true }).click();
+    await catalog.getByRole("searchbox", { name: "Search sounds" }).fill("bell");
+    await testSound.waitFor();
 
     assert.equal(await page.getByRole("button", { name: "Add frequency tone" }).count(), 0);
     assert.equal(await page.getByLabel("Nature mix duration").count(), 0);
@@ -148,11 +162,36 @@ function testAudio(name) {
     const rawFile = await rawExport;
     assert.equal(rawFile.suggestedFilename(), "Raw-bell.wav");
     assert.deepEqual(await readFile(await rawFile.path()), testAudio("Raw bell.wav").buffer);
+    const deleteRaw = page.getByRole("button", { name: "Delete Raw bell", exact: true });
+    page.once("dialog", dialog => dialog.dismiss());
+    await deleteRaw.click();
+    await deleteRaw.waitFor();
+    page.once("dialog", dialog => dialog.accept());
+    await deleteRaw.click();
+    await deleteRaw.waitFor({ state: "detached" });
     await page.goto(origin + "/#library/backgrounds");
     await page.getByRole("region", { name: "Built-in background sounds" }).waitFor();
     assert.equal(await page.getByText("Raw bell", { exact: true }).count(), 0);
     await page.getByLabel("Import backgrounds from device").setInputFiles(testAudio("Ambient layer.wav"));
     await page.getByText("Ambient layer", { exact: true }).waitFor();
+    const backgroundPicker = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Import backgrounds", exact: true }).click();
+    const spareBackground = testAudio("Spare background.wav");
+    spareBackground.buffer.writeInt16LE(1000, 44);
+    await (await backgroundPicker).setFiles(spareBackground);
+    page.once("dialog", dialog => dialog.accept());
+    const deleteBackground = page.getByRole("button", { name: "Delete Spare background", exact: true });
+    await deleteBackground.click();
+    await deleteBackground.waitFor({ state: "detached" });
+    const builtInBackgrounds = page.getByRole("region", { name: "Built-in background sounds" });
+    const builtInBackgroundDelete = builtInBackgrounds.getByRole("button", { name: /^Delete / }).first();
+    const backgroundName = (await builtInBackgroundDelete.getAttribute("aria-label")).slice(7);
+    page.once("dialog", dialog => dialog.accept());
+    await builtInBackgroundDelete.click();
+    await builtInBackgrounds.getByText("Removed built-in sounds").click();
+    await builtInBackgrounds.getByRole("button", { name: "Restore " + backgroundName, exact: true }).click();
+    await builtInBackgrounds.getByRole("button", { name: "Delete " + backgroundName, exact: true }).waitFor();
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.goto(origin + "/#library/audio");
     assert.equal(await page.getByText("Raw bell", { exact: true }).count(), 0);
     assert.equal(await page.getByText("Ambient layer", { exact: true }).count(), 0);
@@ -183,8 +222,44 @@ function testAudio(name) {
     await page.getByRole("button", { name: "Export affirmations" }).click();
     assert.equal((await affirmationExport).suggestedFilename(), "core-aura-affirmations.json");
 
+    const importAffirmationAudio = page.getByLabel("Import affirmation audio from device");
+    await importAffirmationAudio.setInputFiles({ name: "Broken.mp3", mimeType: "audio/mpeg", buffer: Buffer.from("not audio") });
+    const audioDialog = page.getByRole("dialog", { name: "Import audio affirmation" });
+    await audioDialog.getByRole("button", { name: "Save to Library" }).click();
+    await audioDialog.getByRole("alert").waitFor();
+    await audioDialog.getByRole("button", { name: "Back to affirmations" }).click();
+    await importAffirmationAudio.setInputFiles(testAudio("A calm breath.wav"));
+    await audioDialog.getByRole("button", { name: "Save to Library" }).click();
+    await page.getByRole("button", { name: "Edit affirmation: A calm breath" }).click();
+    await page.getByLabel("Affirmation name").fill("A calmer breath");
+    await page.getByRole("button", { name: "Save affirmation" }).click();
+    await page.getByRole("button", { name: "Test play: A calmer breath", exact: true }).waitFor();
+    await page.reload();
+    await page.getByRole("button", { name: "Test play: A calmer breath", exact: true }).click();
+    await page.waitForFunction(() => window.testBufferStarts === 1);
+    const audioAffirmationExport = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Export audio: A calmer breath", exact: true }).click();
+    assert.match((await audioAffirmationExport).suggestedFilename(), /\.wav$/);
+
+    await page.getByRole("button", { name: "Record audio affirmation", exact: true }).click();
+    const recordDialog = page.getByRole("dialog", { name: "Record audio affirmation" });
+    await recordDialog.getByLabel("Affirmation name").fill("My own affirmation");
+    await recordDialog.getByRole("button", { name: "Start recording", exact: true }).click();
+    const finishRecording = recordDialog.getByRole("button", { name: "Finish recording", exact: true });
+    await finishRecording.waitFor();
+    await page.waitForTimeout(600);
+    await finishRecording.click();
+    await recordDialog.getByRole("button", { name: "Save audio affirmation", exact: true }).click();
+    const deleteAffirmation = page.getByRole("button", { name: "Delete affirmation: My own affirmation", exact: true });
+    await deleteAffirmation.click();
+    await page.getByRole("button", { name: "Confirm delete", exact: true }).click();
+    await deleteAffirmation.waitFor({ state: "detached" });
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+
     await page.goto(origin + "/#library/recordings");
     await page.getByRole("button", { name: "Test play Device default", exact: true }).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Record voice", exact: true }).count(), 0);
+    assert.equal(await page.getByText("A calmer breath", { exact: true }).count(), 0);
     await page.getByLabel("Import voice WAV from device").setInputFiles(testAudio("Quiet voice.wav"));
     const voiceDialog = page.getByRole("dialog", { name: "Import voice WAV" });
     await voiceDialog.getByRole("button", { name: "Back to voices" }).click();
@@ -334,7 +409,13 @@ function testAudio(name) {
     assert.match(manifestPreset.accompaniment.audio.id, /^track:backgrounds:/);
     await page.getByRole("button", { name: "Choose affirmations", exact: true }).click();
     await page.getByRole("checkbox", { name: "I make time to rest.", exact: true }).check();
+    await page.getByRole("checkbox", { name: /^A calmer breath/ }).check();
     await page.getByRole("button", { name: /^Use selection/ }).click();
+    const chosenAudio = page.locator(".manifest-line").filter({ hasText: "Audio affirmation" });
+    const bufferStarts = await page.evaluate(() => window.testBufferStarts);
+    await chosenAudio.getByRole("button", { name: "Play preview: A calmer breath", exact: true }).click();
+    await page.waitForFunction(previous => window.testBufferStarts > previous, bufferStarts);
+    await chosenAudio.getByRole("button", { name: "Stop preview: A calmer breath", exact: true }).click();
     await page.getByRole("button", { name: "Save practice", exact: true }).click();
     await page.getByRole("button", { name: "Play practice", exact: true }).click();
     await page.waitForFunction(() => window.testMediaElements.some(audio => audio.loop && !audio.paused));

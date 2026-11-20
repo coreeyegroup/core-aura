@@ -2,6 +2,7 @@ export type PersonalRecording = {
   id: string;
   text: string;
   title?: string;
+  kind?: "affirmation";
   mime: string;
   seconds: number;
   createdAt: string;
@@ -20,14 +21,14 @@ function open(): Promise<IDBDatabase> {
       reject(Error("Close other Core-aura windows and try again."));
   });
 }
-export async function recordings(): Promise<PersonalRecording[]> {
+export async function recordings(kind: "voice" | "affirmation" = "voice"): Promise<PersonalRecording[]> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("recordings", "readonly"),
       r = tx.objectStore("recordings").getAll();
     tx.oncomplete = () => {
       db.close();
-      resolve(r.result);
+      resolve(r.result.filter((clip: PersonalRecording) => (clip.kind ?? "voice") === kind));
     };
     tx.onerror = () => {
       db.close();
@@ -139,6 +140,6 @@ export function withoutRecordings<
   return {
     ...plan,
     useRecordings: false,
-    lines: plan.lines.map(({ recordingId, recordedText, ...line }) => line),
+    lines: plan.lines.map(({ recordingId, recordedText, audioAffirmation, ...line }) => line),
   };
 }

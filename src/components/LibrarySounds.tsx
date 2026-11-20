@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Download, Heart, Play, Square } from "lucide-react";
+import { Download, Heart, Play, Square, Trash2 } from "lucide-react";
 import { engine } from "../audio/engine";
 import { channel, sounds, type Channel, type Sound } from "../model";
 import { isNature, natureCatalog } from "../nature/catalog";
@@ -7,6 +7,16 @@ import { queuePlayer } from "../playlists/runtime";
 import { preparePreview } from "../workbench/actions";
 
 const prefix = "library:preview:";
+const hiddenKey = "core-aura.library.hidden-sounds.v1";
+function hiddenSounds(): Sound[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(hiddenKey) ?? "[]");
+    return Array.isArray(value) ? value.filter((id): id is Sound =>
+      typeof id === "string" && Object.hasOwn(sounds, id)) : [];
+  } catch {
+    return [];
+  }
+}
 const entries = Object.entries(sounds) as [Sound, (typeof sounds)[Sound]][];
 const family = (id: Sound) => isNature(id) ? natureCatalog[id].family : sounds[id].type;
 
@@ -22,6 +32,7 @@ export function LibrarySounds({ favorites, onFavorite, onExport, backgrounds = f
   backgrounds?: boolean;
   onExport: (name: string, sample: Channel, control: HTMLButtonElement) => void;
 }) {
+  const [hidden, setHidden] = useState(hiddenSounds);
   const [query, setQuery] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [pending, setPending] = useState(false);
@@ -33,9 +44,21 @@ export function LibrarySounds({ favorites, onFavorite, onExport, backgrounds = f
   }, []);
   const term = query.trim().toLowerCase();
   const visible = entries.filter(([id, sound]) =>
-    isNature(id) === backgrounds && (!onlyFavorites || favorites.includes(id)) &&
+    isNature(id) === backgrounds && !hidden.includes(id) && (!onlyFavorites || favorites.includes(id)) &&
     (sound.name + " " + family(id)).toLowerCase().includes(term),
   );
+
+  function updateHidden(next: Sound[]) {
+    try {
+      localStorage.setItem(hiddenKey, JSON.stringify(next));
+      setHidden(next);
+      setError("");
+      return true;
+    } catch {
+      setError("The catalog could not be updated. Check device storage.");
+      return false;
+    }
+  }
 
   async function preview(id: Sound) {
     const key = prefix + id;
@@ -84,9 +107,25 @@ export function LibrarySounds({ favorites, onFavorite, onExport, backgrounds = f
               aria-pressed={favorites.includes(id)} onClick={() => onFavorite(id)}>
               <Heart size={16} aria-hidden="true" />
             </button>
+            <button className="icon-button" title="Remove from Library" aria-label={"Delete " + sound.name}
+              onClick={() => {
+                if (!confirm(`Remove “${sound.name}” from this Library? You can restore it below the list. Saved mixes can still play it.`)) return;
+                if (updateHidden([...hidden, id])) engine.stop(prefix + id);
+              }}>
+              <Trash2 size={16} aria-hidden="true" />
+            </button>
           </div>
         </article>;
       })}
+      {hidden.some(id => isNature(id) === backgrounds) && (
+        <details>
+          <summary>Removed built-in sounds</summary>
+          {hidden.filter(id => isNature(id) === backgrounds).map(id => <article className="library-starter" key={id}>
+            <h3>{sounds[id].name}</h3>
+            <button aria-label={"Restore " + sounds[id].name} onClick={() => updateHidden(hidden.filter(sound => sound !== id))}>Restore</button>
+          </article>)}
+        </details>
+      )}
     </section>
   );
 }
