@@ -26,7 +26,7 @@ The website remains the first-install/recovery route. The web build and APK chan
 (
   set -euo pipefail
   cd ~/core-aura
-  version=0.44.0
+  version=0.45.0
   release="android-v$version"
   git fetch origin tag "$release"
   checkout="$(mktemp -d)/core-aura"

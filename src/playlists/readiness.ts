@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { allRecordings, type PersonalRecording } from "../manifestation/recordings";
 import { chooseDeviceVoice, speech, type Voice } from "../manifestation/speech";
-import type { Line, Plan } from "../manifestation/model";
+import { practiceTrackIds, type Line, type Plan } from "../manifestation/model";
 import { tracks } from "../tracks/storage";
 import { resolveItems, type PlayItem } from "./model";
 
@@ -71,8 +71,7 @@ export async function verifyPracticeAudio(items: PlayItem[]) {
 }
 
 export async function verifyPractice(plan: Plan) {
-  const hasLayers = plan.accompaniment?.audio ||
-    plan.backgroundMix?.channels.some(channel => channel.accompaniment?.audio);
+  const hasLayers = practiceTrackIds(plan).length > 0;
   await verifyPracticeAudio(resolveItems([{ kind: "practice", id: plan.id }], [plan], [], hasLayers ? await tracks() : []));
 }
 

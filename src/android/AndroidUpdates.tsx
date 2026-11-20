@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { registerPlugin } from "@capacitor/core";
 import { ANDROID_ORIGIN } from "./channel";
 import { AndroidUpdateBridge, AndroidUpdateController } from "./updater";
@@ -12,6 +12,8 @@ export function AndroidUpdates({ audioActive }: {
     audioActive: boolean;
 }) {
     const state = useSyncExternalStore(updater.subscribe, updater.snapshot);
+    const [downloadError, setDownloadError] = useState("");
+    const recovery = state.migration || ["error", "closed", "confirmation-required", "permission-required"].includes(state.phase);
     useEffect(() => { void updater.initialize(); }, []);
     return <section className="android-updates" aria-label="Android app updates">
     <h3>Android app updates</h3>
@@ -23,7 +25,12 @@ export function AndroidUpdates({ audioActive }: {
       {!["installing", "confirming", "permission"].includes(state.phase) && <button className="wide" onClick={() => void updater.cancel()}>Cancel update</button>}
     </>}
     {state.message && <p role="status" className="content-note">{state.message}</p>}
-    {state.migration && <button className="wide" onClick={() => void distribution.openDownload({ url: ANDROID_ORIGIN + "/download.html" })}>Open stable app download</button>}
+    {recovery && <button className="wide" onClick={() => {
+      setDownloadError("");
+      void distribution.openDownload({ url: ANDROID_ORIGIN + "/download.html" })
+        .catch(() => setDownloadError("Open core-aura.coreeye.in/download.html in your browser to install the official update."));
+    }}>{state.migration ? "Open stable app download" : "Open official Android download"}</button>}
+    {downloadError && <p role="status" className="content-note">{downloadError}</p>}
     <p className="content-note">Updates download inside Core-aura. Supported Android versions can update directly; Android may ask for confirmation or one-time permission.</p>
   </section>;
 }

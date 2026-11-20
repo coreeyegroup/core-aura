@@ -1370,7 +1370,6 @@ export default function App() {
               </SoundTracks>
             )}
             {playlistView && <LibraryStarters section="playlists" />}
-            {librarySection === "saved" && <LibraryStarters section="practices" query={libraryQuery} />}
             {mixesView && <h2>Saved mixes on this device</h2>}
             {mixesView && <div className="home-actions">
               <button onClick={() => navigate("explore", { exploreView: "nature" })}>

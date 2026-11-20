@@ -23,6 +23,8 @@ import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
 import {
   Line,
+  hasPracticeContent,
+  practiceLayerLimit,
   nextOccurrence,
   parsePlan,
   Plan,
@@ -165,6 +167,8 @@ export function Manifestation({
       return false;
     }
   };
+  const canPlay = hasPracticeContent(p);
+  const additionalLayers = p.additionalLayers ?? [];
   const current =
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
@@ -254,7 +258,7 @@ export function Manifestation({
                 {current && state.status !== "idle"
                   ? state.plan!.lines[current.line].text
                   : p.lines[0]?.text ||
-                    "Select affirmations from the library or add your own sentence."}
+                    "Playing your audio and sound layers."}
               </p>
               {current && state.status !== "idle" && (
                 <p className="content-note">
@@ -274,10 +278,9 @@ export function Manifestation({
                   <input disabled={active} value={p.name} maxLength={80}
                     onChange={event => change({ name: event.target.value })} />
                 </label>
-                <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
               </fieldset>
-              <fieldset className="manifest-fields sentence-fields">
-                <legend>2. Sentences ({p.lines.length}/50)</legend>
+              <details className="manifest-fields sentence-fields" open={p.lines.length ? true : undefined}>
+                <summary>2. Sentences or recorded affirmations ({p.lines.length}/50)</summary>
                 <button onClick={onLibrary}>Choose affirmations</button>
                 <details className="custom-sentence">
                   <summary>Write your own affirmation</summary>
@@ -426,39 +429,39 @@ export function Manifestation({
                     </p>
                   </div>
                 )}
-                {!p.lines.length && (
-                  <button
-                    onClick={() => {
-                      const sample = {
-                        ...p,
-                        name: p.name.trim() || "Sample practice",
-                        lines: [
-                          {
-                            id: crypto.randomUUID(),
-                            text: "I take one clear step toward my goals today.",
-                          },
-                        ],
-                        mode: "speech" as const,
-                        volume: p.volume || 0.7,
-                        repeats: 1,
-                        background: null,
-                        backgroundMix: null,
-                      };
-                      change(sample);
-                      manifestPlayer.start(sample);
-                    }}
-                  >
-                    Play sample affirmation
-                  </button>
-                )}
-              </fieldset>
+              </details>
             </div>
             <div className="practice-settings">
+              <section className="manifest-fields" aria-label="Optional practice audio layers">
+                <h2>3. Audio, sounds and backgrounds</h2>
+                <p className="content-note">Choose any layers you want. Generated sounds use frequency, and nature backgrounds use a frequency filter. Imported files keep their original pitch.</p>
+                {(p.accompaniment?.tone || p.accompaniment?.ambience || p.accompaniment?.audio) && (
+                  <LibraryLayers prefix="Manifest" tracks={tracks} value={p.accompaniment} disabled={active}
+                    onChange={accompaniment => change({ accompaniment })} />
+                )}
+                <div className="admin-actions">
+                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { tone: { sound: "bell", hz: 432, volume: .2 } }] })}>Add sound</button>
+                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { ambience: { sound: "rain", hz: 1000, volume: .2 } }] })}>Add background</button>
+                  <button disabled={active || !tracks.length || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { audio: { id: tracks[0].id, volume: .35, loop: true } }] })}>Add audio</button>
+                </div>
+                {additionalLayers.map((layer, index) => {
+                  const remove = () => change({ additionalLayers: additionalLayers.filter((_, i) => index !== i) });
+                  return <LibraryLayers key={index} prefix={"Layer " + (index + 1)} only={layer.tone ? "tone" : layer.ambience ? "ambience" : "audio"}
+                    tracks={tracks} value={layer} disabled={active} onRemove={remove} onChange={next => {
+                      if (!next.tone && !next.ambience && !next.audio) { remove(); return; }
+                      change({ additionalLayers: additionalLayers.map((original, i) => i === index ? next : original) });
+                    }} />;
+                })}
+              </section>
               <fieldset
                 disabled={active}
                 className="manifest-fields repeat-fields"
               >
-                <legend>3. Playback options</legend>
+                <legend>Playback options</legend>
+                {p.lines.length > 0 && <>
                 <div className="practice-mode">
                   <label>
                     Practice mode
@@ -504,6 +507,7 @@ export function Manifestation({
                     ? "Repeat all selected sentences in order, then begin the next round."
                     : "Repeat each sentence the chosen number of times before moving to the next."}
                 </p>
+                </>}
                 <div className="fields">
                   <label>
                     Maximum session
@@ -524,7 +528,7 @@ export function Manifestation({
                     </select>
                   </label>
                 </div>
-                <div className="fields">
+                {p.lines.length > 0 && <div className="fields">
                   <label>
                     Gap between sentences (sec)
                     <NumberField
@@ -545,17 +549,15 @@ export function Manifestation({
                       />
                     </label>
                   )}
-                </div>
-
+                </div>}
               </fieldset>
-              <VoicePanel />
-              <LibraryLayers prefix="Manifest" tracks={tracks} value={p.accompaniment} disabled={active}
-                onChange={accompaniment => change({ accompaniment })} />
+              {p.lines.length > 0 && <VoicePanel />}
               <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
                 try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
                 catch(error){setMessage((error as Error).message);}
               }}/>
               <button className="text-button" onClick={onBackgrounds}>Manage background library</button>
+              <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
               <details className="workbench-panel practice-summary">
                 <summary>Practice summary</summary>
           <div
@@ -585,7 +587,7 @@ export function Manifestation({
               <div className="admin-actions practice-actions">
                 <button
                   className="primary"
-                  disabled={active || !p.lines.length}
+                  disabled={active || !canPlay || !p.name.trim()}
                   onClick={() => {
                     try {
                       store.save();
@@ -597,7 +599,7 @@ export function Manifestation({
                 >
                   Save practice
                 </button>
-                <button disabled={active||!p.lines.length} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
+                <button disabled={active||!canPlay||!p.name.trim()} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
                 <button
                   disabled={active}
                   onClick={newPractice}
@@ -649,12 +651,12 @@ export function Manifestation({
       >
         <p className="dock-caption">
           {active ? state.plan?.name : p.name} ·{" "}
-          {active ? labelTime(state.elapsed) : p.lines.length + " sentences"}
+          {active ? labelTime(state.elapsed) : p.lines.length ? p.lines.length + " sentences" : "Audio and sound layers"}
         </p>
         <div className="transport">
           <button
             className="primary"
-            disabled={!p.lines.length && !active}
+            disabled={(!canPlay || !p.name.trim()) && !active}
             onClick={start}
           >
             {active && state.status === "playing"
@@ -883,7 +885,7 @@ export function ManifestLibrary({
       >
         <div className="section-heading">
           <h2>Saved practices</h2>
-          {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>Add practice</button>}
+          {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>New practice</button>}
         </div>
         <input
           className="sr-only"

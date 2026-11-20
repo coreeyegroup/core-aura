@@ -12,7 +12,7 @@ export const collections = [
   { label: "Backgrounds", description: "Ambient sounds and imported backgrounds", icon: Waves, libraryView: "backgrounds", librarySection: "all" },
   { label: "Voices", description: "Default voices and personal recordings", icon: Mic, libraryView: "manifestation", librarySection: "recordings" },
   { label: "Affirmations", description: "All your affirmations in one list", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
-  { label: "Manifestation practices", description: "Saved and silent practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
+  { label: "Manifestation practices", description: "Create and manage saved practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
   { label: "Audio files", description: "Meditation music and classical audio", icon: Music2, libraryView: "audio", librarySection: "all" },
   { label: "Sound packs", description: "Download audio for offline listening", icon: Package, libraryView: "packs", librarySection: "all" },
   { label: "Saved mixes", description: "Layered sounds and chakra sets", icon: Layers, libraryView: "mixes", librarySection: "all" },

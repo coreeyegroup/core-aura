@@ -81,13 +81,15 @@ public class AppDistributionPlugin extends Plugin {
     @PluginMethod public void updateStatus(PluginCall call) { call.resolve(status()); }
     @PluginMethod public void cancelUpdate(PluginCall call) {
         if (!"installing".equals(phase) && !"confirming".equals(phase)) {
-            if(UpdateResultReceiver.listener.get()==this) UpdateResultReceiver.listener.clear();
-        cancelled.set(true);HttpURLConnection active=connection;if (active!=null) active.disconnect();
+            cancelled.set(true);
+            HttpURLConnection active=connection;
+            if (active!=null) active.disconnect();
         }
         call.resolve();
     }
     @PluginMethod public void installUpdate(PluginCall call) {
         if (!busy.compareAndSet(false,true)) { call.reject("An update is already in progress.");return; }
+        UpdateResultReceiver.listener=new java.lang.ref.WeakReference<>(this);
         cancelled.set(false);received=0;total=0;updateCall=call;
         try {
             JSObject r=call.getObject("release");if(r==null) throw new Exception("Missing update information.");
@@ -165,7 +167,16 @@ public class AppDistributionPlugin extends Plugin {
         }
     }
     @ActivityCallback private void updateInstallerResult(PluginCall call,ActivityResult result) {
-        if(Build.VERSION.SDK_INT>=31) return; // The PackageInstaller status receiver owns the final outcome.
+        if (Build.VERSION.SDK_INT>=31) {
+            // A dismissed confirmation can return before the final session broadcast.
+            // Release the UI so the verified file can be retried without an app restart.
+            if (call!=null && call==updateCall && result.getResultCode()==android.app.Activity.RESULT_CANCELED
+                    && "confirming".equals(phase)) {
+                UpdateSession.preferences(getContext()).edit().putInt("session",-1).putString("phase","closed").apply();
+                finish(call,"closed");
+            }
+            return;
+        }
         if(call==null) { busy.set(false);report("closed",received,total);return; }
         try { finish(call,pending!=null && code(installed())>=pending.versionCode ? "installed":"closed"); }
         catch(Exception error) { fail(call,error); }
@@ -174,7 +185,7 @@ public class AppDistributionPlugin extends Plugin {
         if(UpdateResultReceiver.listener.get()==this) UpdateResultReceiver.listener.clear();
         cancelled.set(true);HttpURLConnection active=connection;if(active!=null)active.disconnect();worker.shutdownNow();
     }
-    // Retained only for the one-time debug-key migration help page.
+    // Open the official Android download and migration instructions.
     @PluginMethod public void openDownload(PluginCall call) {
         String value=call.getString("url");
         if (!DownloadPolicy.allowed(value)) { call.reject("Only the official Core-aura download address is allowed.");return; }

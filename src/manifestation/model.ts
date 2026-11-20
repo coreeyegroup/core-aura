@@ -104,6 +104,7 @@ export type Plan = {
     volume: number;
   } | null;
   accompaniment?: Accompaniment;
+  additionalLayers?: Accompaniment[];
   backgroundDucking?: boolean;
   backgroundMuted?: boolean;
   backgroundDuckLevel?: number;
@@ -143,6 +144,18 @@ export function newPlan(): Plan {
 }
 const finite = (v: unknown, min: number, max: number) =>
   typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
+export const practiceLayerLimit = 5;
+export function hasPracticeContent(plan: Plan): boolean {
+  return !!(plan.lines.length || plan.background || plan.backgroundMix ||
+    plan.accompaniment?.tone || plan.accompaniment?.ambience || plan.accompaniment?.audio ||
+    plan.additionalLayers?.some(layer => layer.tone || layer.ambience || layer.audio));
+}
+export function practiceTrackIds(plan: Plan): string[] {
+  return [plan.accompaniment?.audio?.id,
+    ...(plan.additionalLayers?.map(layer => layer.audio?.id) ?? []),
+    ...(plan.backgroundMix?.channels.map(channel => channel.accompaniment?.audio?.id) ?? [])]
+    .filter((id): id is string => !!id);
+}
 export function parsePlan(value: unknown, allowEmpty = false): Plan {
   const p = value as Plan;
   if (
@@ -156,7 +169,6 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
     p.name.length > 80 ||
     !Array.isArray(p.lines) ||
     p.lines.length > 50 ||
-    (!allowEmpty && !p.lines.length) ||
     !p.lines.every(
       (l) =>
         l &&
@@ -209,6 +221,12 @@ export function parsePlan(value: unknown, allowEmpty = false): Plan {
       throw Error("The attached background mix has invalid settings.");
   }
   if (p.accompaniment !== undefined && !validAccompaniment(p.accompaniment)) throw Error("Invalid practice sound layers.");
+  if (p.additionalLayers !== undefined && (!Array.isArray(p.additionalLayers) ||
+    p.additionalLayers.length > practiceLayerLimit || !p.additionalLayers.every(layer =>
+      validAccompaniment(layer) && [layer.tone, layer.ambience, layer.audio].filter(Boolean).length === 1))) {
+    throw Error("Add up to five optional layers, with one source per layer.");
+  }
+  if (!allowEmpty && !hasPracticeContent(p)) throw Error("Add a sentence, audio, sound or background before saving or playing.");
   if(p.backgroundMuted!==undefined&&typeof p.backgroundMuted!=="boolean")throw Error("Invalid background mute setting.");
   if ((p.backgroundDucking !== undefined && typeof p.backgroundDucking !== "boolean") ||
       (p.backgroundDuckLevel !== undefined && !finite(p.backgroundDuckLevel,0,1)))

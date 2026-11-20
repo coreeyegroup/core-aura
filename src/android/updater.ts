@@ -99,7 +99,7 @@ export class AndroidUpdateController {
             }
             const result = assessAndroidUpdate(installed, candidate);
             if (result === "current") {
-                this.set({ busy: false, phase: "current", message: "You have the latest Android app." });
+                this.set({ busy: false, phase: "current", message: `You have the latest Android app. Installed and available: ${installed.versionName}.` });
                 return;
             }
             if (result === "test-migration") {

@@ -172,3 +172,26 @@ describe("personal recording references", () => {
     expect(() => parsePlan(plan)).toThrow();
   });
 });
+
+it("plays a layer-only practice without invoking speech and ends at its timer", async () => {
+  vi.useFakeTimers();
+  const value = parsePlan({
+    ...plan(), lines: [],
+    additionalLayers: [{ tone: { sound: "sine", hz: 528, volume: .3 } },
+      { ambience: { sound: "rain", hz: 1000, volume: .2 } }],
+  });
+  const voice = { voices: vi.fn(async () => []), speak: vi.fn(async () => {}), stop: vi.fn() };
+  const audio = { stopAll: vi.fn(), play: vi.fn(async () => {}), pause: vi.fn(), stop: vi.fn() };
+  const player = new ManifestPlayer(voice, audio);
+  try {
+    player.start(value);
+    expect(audio.play).toHaveBeenCalledTimes(2);
+    expect(audio.play.mock.calls[0]).toEqual([expect.objectContaining({
+      accompaniment: expect.objectContaining({ tone: { sound: "sine", hz: 528, volume: .3 } }),
+    })]);
+    expect(voice.speak).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(player.snapshot().status).toBe("completed");
+    expect(audio.stop).toHaveBeenCalledWith("manifest-background:layers:1");
+  } finally { player.dispose(); }
+});

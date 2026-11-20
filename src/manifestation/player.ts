@@ -72,8 +72,8 @@ export class ManifestPlayer {
     this.stop();
     this.accumulated = 0;
     this.update({ status: "playing", plan, step: 0, elapsed: 0, error: "" });
-    this.speaking = plan.mode === "speech";
-    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.lines.some(line => line.audioAffirmation) || plan.background || plan.backgroundMix || plan.accompaniment)
+    this.speaking = plan.mode === "speech" && plan.lines.length > 0;
+    if (plan.voice.startsWith("core:") || plan.useRecordings || plan.lines.some(line => line.audioAffirmation) || plan.background || plan.backgroundMix || plan.accompaniment || plan.additionalLayers?.length)
       void this.audio.unlock?.().catch(() => {});
     this.clockStart();
     this.background();
@@ -126,6 +126,7 @@ export class ManifestPlayer {
   private async run(token: number) {
     const p = this.state.plan;
     if (!p || token !== this.token || this.state.status !== "playing") return;
+    if (!p.lines.length) return; // Layer-only practices run until the session timer ends.
     const current = position(p, this.state.step);
     try {
       this.speaking = p.mode === "speech";
@@ -173,7 +174,7 @@ export class ManifestPlayer {
     if (this.state.status !== "paused") return;
     this.update({ status: "playing" });
     this.clockStart();
-    this.speaking = this.state.plan?.mode === "speech";
+    this.speaking = this.state.plan?.mode === "speech" && !!this.state.plan.lines.length;
     this.background();
     void this.run(this.token);
   }

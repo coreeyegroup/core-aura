@@ -25,19 +25,22 @@ export function FrequencyField({ value, sound, label, disabled, onChange }: {
   </label>;
 }
 
-export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange }: {
+export type LayerKind = "tone" | "ambience" | "audio";
+export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, only, onRemove }: {
   value?: Accompaniment; tracks: Track[]; disabled: boolean; prefix: string;
   onChange: (value: Accompaniment) => void;
+  only?: LayerKind;
+  onRemove?: () => void;
 }) {
   function editSource(key: "tone" | "ambience", patch: Partial<GeneratedLayer>) {
     const source = value[key];
     if (source) onChange({ ...value, [key]: { ...source, ...patch } });
   }
 
-  return <details className="library-mix-settings">
-    <summary><SlidersHorizontal size={16} aria-hidden="true" /> Library layers</summary>
+  return <details className="library-mix-settings" open={only ? true : undefined}>
+    <summary><SlidersHorizontal size={16} aria-hidden="true" /> {only === "tone" ? "Sound layer" : only === "ambience" ? "Background layer" : only === "audio" ? "Audio layer" : "Library layers"}</summary>
     <fieldset disabled={disabled} className="fields">
-      {(["tone", "ambience"] as const).map(key => {
+      {(["tone", "ambience"] as const).filter(key => !only || key === only).map(key => {
         const ambient = key === "ambience";
         const source = value[key];
         const label = ambient ? "background sound" : "extra sound";
@@ -61,10 +64,11 @@ export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange }
               <input aria-label={prefix + " " + label + " level"} type="range" min={0} max={100}
                 value={Math.round(source.volume * 100)} onChange={event => editSource(key, { volume: Number(event.target.value) / 100 })} />
             </label>
+            {!only && <button type="button" onClick={() => onChange({ ...value, [key]: undefined })}>Remove {ambient ? "background" : "sound"}</button>}
           </>}
         </div>;
       })}
-      <div className="library-layer-field">
+      {(!only || only === "audio") && <div className="library-layer-field">
         <label>Audio file
           <select aria-label={prefix + " audio file"} value={value.audio?.id ?? ""} onChange={event => {
             const id = event.target.value;
@@ -91,8 +95,10 @@ export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange }
           <label className="check"><input type="checkbox" checked={value.audio.loop} onChange={event => onChange({
             ...value, audio: { ...value.audio!, loop: event.target.checked },
           })} /> Loop audio</label>
+          {!only && <button type="button" onClick={() => onChange({ ...value, audio: undefined })}>Remove audio</button>}
         </>}
-      </div>
+      </div>}
+      {onRemove && <button type="button" onClick={onRemove}>Remove layer</button>}
     </fieldset>
   </details>;
 }

@@ -2,6 +2,10 @@
 
 Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
+## v0.45.0 Choose what goes into a manifestation practice
+
+Create a named practice from any combination of sentences, recordings, audio, sounds and backgrounds. Layer-only sessions play for the selected session time. Library lists saved practices and exposes creation, editing and deletion. Android update retries keep receiving installer progress and offer the official download page when recovery is needed.
+
 ## v0.44.0 Mobile listening interface
 
 Home opens with the selected playlist, quick playback, saved sessions and the playlist queue. The app uses bottom navigation on phones and a sidebar on desktop. The shared palette, headings and workspace panels bring the redesign to the existing application.

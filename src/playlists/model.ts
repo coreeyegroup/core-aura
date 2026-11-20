@@ -1,5 +1,5 @@
 import { parseSession, Session, sessionDuration } from "../model";
-import { parsePlan, Plan } from "../manifestation/model";
+import { parsePlan, Plan, practiceTrackIds } from "../manifestation/model";
 import type { Track } from "../tracks/storage";
 import type { ItemRef } from "../workbench/preferences";
 export type PlaylistRef = ItemRef | { kind: "track"; id: string };
@@ -53,8 +53,7 @@ export function resolveItems(refs: PlaylistRef[], plans: Plan[], sessions: Sessi
         if (ref.kind === "practice") {
             const plan = plans.find(plan => plan.id === ref.id);
             if (!plan) throw Error("A practice is unavailable. Edit the playlist to replace it.");
-            checkAudio(plan.name, [plan.accompaniment?.audio?.id,
-                ...(plan.backgroundMix?.channels.map(channel => channel.accompaniment?.audio?.id) ?? [])], "Manifest");
+            checkAudio(plan.name, practiceTrackIds(plan), "Manifest");
             return { kind: "practice", id: ref.id, name: plan.name, plan: parsePlan(plan) };
         }
         if (ref.kind === "track") {

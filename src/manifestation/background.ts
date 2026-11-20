@@ -13,15 +13,19 @@ export function backgroundChannels(plan: Plan, speaking = false): Channel[] {
       seconds: plan.seconds, volume: c.volume * plan.backgroundMix!.master * plan.backgroundMix!.volume * factor }))
     : plan.background ? [{...plan.background, id: "manifest-background", muted: false,
       seconds: plan.seconds, volume: plan.background.volume * factor }] : [];
-  const layers = plan.accompaniment;
-  if (layers?.tone || layers?.ambience || layers?.audio) {
-    channels.push({ id: "manifest-background:layers", sound: "sine", hz: 432, volume: 0,
-      muted: false, seconds: plan.seconds, accompaniment: {
+  const sources = [plan.accompaniment, ...(plan.additionalLayers ?? [])];
+  sources.forEach((layers, index) => {
+    if (!layers?.tone && !layers?.ambience && !layers?.audio) return;
+    channels.push({
+      id: index === 0 ? "manifest-background:layers" : "manifest-background:layers:" + index,
+      sound: "sine", hz: 432, volume: 0, muted: false, seconds: plan.seconds,
+      accompaniment: {
         tone: layers.tone && { ...layers.tone, volume: layers.tone.volume * factor },
         ambience: layers.ambience && { ...layers.ambience, volume: layers.ambience.volume * factor },
         audio: layers.audio && { ...layers.audio, volume: layers.audio.volume * factor },
-      } });
-  }
+      },
+    });
+  });
   return channels;
 }
 
