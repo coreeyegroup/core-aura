@@ -9,11 +9,7 @@ export function Dashboard({ children }: { children: ReactNode }) {
     <section className="dashboard" aria-label="Practice dashboard">
       <header className="dashboard-title">
         <h1>Your practice</h1>
-        <span>{new Date().toLocaleDateString(undefined, {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-        })}</span>
+        <p>Choose a saved playlist or start a practice.</p>
       </header>
       {children}
     </section>

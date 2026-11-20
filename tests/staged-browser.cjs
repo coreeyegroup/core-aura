@@ -89,6 +89,15 @@ function testAudio(name) {
     await page.getByRole("heading", { name: "Your practice", exact: true }).waitFor();
     const home = page.getByRole("region", { name: "Home playlists" });
     await home.getByRole("combobox", { name: "Home playlist" }).selectOption({ label: "Saved routine" });
+    await home.getByRole("heading", { name: "Saved routine" }).waitFor();
+    await page.getByRole("region", { name: "In this playlist" }).getByText("Saved mix").waitFor();
+    assert.match(await home.evaluate(element => getComputedStyle(element).backgroundImage), /morning-lake\.webp/);
+    const navPosition = () => nav.evaluate(element => getComputedStyle(element).flexDirection);
+    assert.equal(await navPosition(), "row");
+    await page.setViewportSize({ width: 1280, height: 850 });
+    assert.equal(await navPosition(), "column");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.setViewportSize({ width: 320, height: 740 });
     const homePlayer = page.getByRole("region", { name: "Playlist player" });
     await home.getByRole("button", { name: "Play selected playlist" }).click();
     await homePlayer.getByText("Saved mix", { exact: true }).waitFor();

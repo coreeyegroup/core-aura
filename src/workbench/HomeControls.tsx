@@ -1,7 +1,7 @@
 import type { Track } from "../tracks/storage";
 import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import {
-  ArrowDownRight, ArrowRight, AudioLines, BookOpen, Clock3,
+  ArrowDownRight, ArrowRight, AudioLines, BookOpen, Clock3, Download,
   Flower2, Heart, ListMusic, Play, Plus,
 } from "lucide-react";
 import { Session, sessionDuration } from "../model";
@@ -20,6 +20,7 @@ type Props = {
   onSession: (session: Session) => void;
   onOpen: (page: "manifest" | "studio" | "chakras" | "schedule" | "library") => void;
   tools: ReactNode;
+  onDownloads: () => void;
 };
 
 const sections = {
@@ -80,7 +81,7 @@ function SavedPicker({ id, name, choices, selectedId, onSelect, onPlay, onEdit }
   );
 }
 
-export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools }: Props) {
+export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools, onDownloads }: Props) {
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
   const { data: lists, error: listError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
   const { value: prefs, error } = useSyncExternalStore(preferences.subscribe, preferences.snapshot);
@@ -113,6 +114,12 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
     }
   }
   const readiness = playlist ? inspect(playlist.items) : undefined;
+  const duration = playlistEntries?.reduce((total, entry) => {
+    if (!entry) return total;
+    if ("duration" in entry) return total + entry.duration;
+    if ("channels" in entry) return total + sessionDuration(entry);
+    return total + entry.seconds;
+  }, 0) ?? 0;
   const upcoming = data.reminders
     .map((reminder) => ({ reminder, date: nextOccurrence(reminder, now) }))
     .filter((entry) => entry.date)
@@ -229,42 +236,29 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
     <div className="home-listening">
       <section className="home-playlists" aria-label="Home playlists">
         <div className="home-playlist-intro">
-          <div className="home-feature-mark"><ListMusic size={21} aria-hidden="true" /></div>
           <div>
-            <h2>Playlists</h2>
-            <p>{playlist ? `${playlist.items.length} ${playlist.items.length === 1 ? "item" : "items"} · Plays in order`
-              : "Combine saved practices and sounds into a routine."}</p>
+            <div className="home-playlist-label"><ListMusic size={15} aria-hidden="true" /> {playlist ? "Selected playlist" : "Playlists"}</div>
+            <h2>{playlist?.name ?? "Make time to listen"}</h2>
+            <p>{playlist ? `${playlist.items.length} ${playlist.items.length === 1 ? "item" : "items"} · ${durationLabel(duration)}`
+              : "Save practices and sounds together in a playlist."}</p>
+            {readiness && <p className="home-playlist-readiness" aria-live="polite">{readiness.message}</p>}
           </div>
         </div>
-        <div className="home-playlist-actions">
-          {playlist ? (
-            <>
-              <div className="home-select-play">
-                <select aria-label="Home playlist" value={playlist.id} onChange={(event) => setPlaylistId(event.target.value)}>
-                  {lists.playlists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-                <button className="primary" disabled={blocked(readiness)} aria-label="Play selected playlist"
-                  onClick={() => void play(playlist.items, playlist.name)}>
-                  <Play size={16} aria-hidden="true" /> Play
-                </button>
-              </div>
-              {readiness && <p className={readiness.status === "ready" ? "content-note" : "home-playlist-warning"}>{readiness.message}</p>}
-              <div className="home-playlist-footer">
-                <details className="home-playlist-preview">
-                  <summary>View playlist</summary>
-                  <ol>{playlistEntries?.map((item, index) => <li key={index}>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</li>)}</ol>
-                </details>
-                <button className="text-button" onClick={() => onOpen("library")}>
-                  Manage <ArrowRight size={14} aria-hidden="true" />
-                </button>
-              </div>
-            </>
-          ) : (
-            <button className="primary home-create-playlist" onClick={() => onOpen("library")}>
-              Open playlist library <ArrowRight size={16} aria-hidden="true" />
+        {playlist ? (
+          <div className="home-select-play home-hero-controls">
+            <button className="primary" disabled={blocked(readiness)} aria-label="Play selected playlist"
+              onClick={() => void play(playlist.items, playlist.name)}>
+              <Play size={16} aria-hidden="true" /> Play playlist
             </button>
-          )}
-        </div>
+            <select aria-label="Home playlist" value={playlist.id} onChange={(event) => setPlaylistId(event.target.value)}>
+              {lists.playlists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <button className="primary home-create-playlist" onClick={() => onOpen("library")}>
+            Open playlist library <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        )}
       </section>
 
       {!active && replay && (
@@ -279,7 +273,8 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
         </section>
       )}
 
-      <section className="home-saved" aria-label="Practice and shortcuts">
+      <section className="home-saved" aria-labelledby="home-saved-title">
+        <h2 id="home-saved-title">Saved sessions</h2>
         {prefs.order.map((id) => {
           const { icon: Icon, title } = sections[id];
           const collapsed = prefs.collapsed.includes(id);
@@ -301,6 +296,26 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
             </details>
           );
         })}
+      </section>
+      {playlist && (
+        <section className="home-queue-card" aria-label="In this playlist">
+          <h2>In this playlist</h2>
+          <ol>
+            {playlistEntries?.map((item, index) => <li key={index}>
+              <strong>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</strong>
+              <small>{!item ? "Replace in Library" : "title" in item ? "Audio file" : "channels" in item
+                ? item.kind === "chakras" ? "Chakra session" : "Sound mix" : "Manifestation"}</small>
+            </li>)}
+          </ol>
+          <button className="text-button" onClick={() => onOpen("library")}>
+            Manage playlists <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        </section>
+      )}
+
+      <section className="home-offline-card" aria-label="Offline library">
+        <h2>Offline library</h2>
+        <button className="text-button" onClick={onDownloads}><Download size={16} aria-hidden="true" /> View downloads</button>
       </section>
       {(message || error || listError) && <p className="notice" role="status">{message || error || listError}</p>}
     </div>

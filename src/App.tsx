@@ -1031,6 +1031,7 @@ export default function App() {
               tracks={localTracks}
               onPractice={openManifest}
               onSession={load}
+              onDownloads={() => navigate("library", { libraryView: "packs", librarySection: "all" })}
               onOpen={(page) => {
                 if (page === "manifest") navigate("manifest", { manifestSection: "practice" });
                 else if (page === "schedule") openTool("schedule");
@@ -1635,7 +1636,7 @@ export default function App() {
         playbackBar}
       <QueueTransport/>
       </>}
-      <nav className="bottom-nav" aria-label="Main navigation">
+      <nav className="bottom-nav" aria-label="Main navigation" inert={settings || saving || !!exporting ? true : undefined}>
         {tabs.map(([id, label, Icon]) => (
           <button
             key={id}

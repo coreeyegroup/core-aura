@@ -62,7 +62,7 @@ export function applyAppearance(value: Appearance) {
   root.style.setProperty("--theme-accent", palette?.accent ?? "");
   root.style.setProperty("--theme-accent-soft", palette?.soft ?? "");
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (meta) meta.content = palette?.paper ?? (resolved === "dark" ? "#10161d" : "#f4f6f8");
+  if (meta) meta.content = palette?.paper ?? (resolved === "dark" ? "#17231d" : "#f7f6f1");
 }
 export function saveAppearance(value: Appearance) {
   applyAppearance(value);

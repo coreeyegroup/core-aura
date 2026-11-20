@@ -48,7 +48,7 @@ describe("appearance preferences", () => {
       saveAppearance({ textSize: 100, density: "compact", theme: "system" }),
     ).toBe(false);
     expect(root.dataset.resolvedTheme).toBe("dark");
-    expect(meta.content).toBe("#10161d");
+    expect(meta.content).toBe("#17231d");
     applyAppearance({
       textSize: 125,
       density: "comfortable",

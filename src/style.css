@@ -2634,3 +2634,143 @@ progress {
 .offline-pack-controls p { margin:0; }
 .pack-download-progress { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .pack-download-progress label { display:grid; gap:4px; }
+
+/* Listening-first shell and shared themes. */
+:root {
+  --serif: Georgia, Cambria, serif;
+  --paper: var(--theme-paper, #f7f6f1);
+  --surface: #fffefa;
+  --surface-alt: #eef0e8;
+  --input: #fafaf4;
+  --ink: #24342b;
+  --muted: #536458;
+  --line: #dedfd3;
+  --control-line: #788779;
+  --accent: var(--theme-accent, #335c48);
+  --action: var(--theme-accent, #335c48);
+  --accent-soft: var(--theme-accent-soft, #e4ece2);
+  --positive: #34634a;
+  --positive-soft: #e4ece2;
+  --focus: #2b6c66;
+  --rail: #f0efe7;
+}
+:root[data-resolved-theme="dark"] {
+  --paper: #17231d;
+  --surface: #202d25;
+  --surface-alt: #293b30;
+  --input: #25352b;
+  --ink: #f0f3e9;
+  --muted: #c0cec3;
+  --line: #45594b;
+  --control-line: #809786;
+  --accent: #a7d1b3;
+  --action: #a7d1b3;
+  --on-action: #142a1c;
+  --on-accent: #142a1c;
+  --accent-soft: #31493a;
+  --focus: #b5ecc6;
+  --rail: #1b2921;
+}
+:root .app .brand-mark { border-radius: 50%; }
+:root .app .brand-name { font-family: var(--serif); font-weight: 400; font-size: calc(21px * var(--text-scale)); }
+:root .app main h1,
+:root .app .settings-sheet h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  letter-spacing: -.038em;
+}
+:root .app main h1 { font-size: calc(clamp(29px, 3.2vw, 46px) * var(--text-scale)); }
+:root .dashboard .dashboard-title h1 { font: 400 calc(clamp(32px, 4vw, 54px) * var(--text-scale))/1.1 var(--serif); }
+.dashboard-title { display: block; }
+.dashboard-title p { color: var(--muted); margin: 5px 0 0; font-size: calc(13px * var(--text-scale)); }
+
+.home-listening { grid-template-areas: "hero" "saved" "queue" "offline"; }
+.home-playlists {
+  grid-area: hero;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: end;
+  align-items: start;
+  min-height: 206px;
+  padding: 17px;
+  color: #fffdf1;
+  border: 0;
+  background: linear-gradient(90deg,#142c24f2,#172f28ae 60%,#172f284d), url("/morning-lake.webp") center 53% / cover, #20372d;
+}
+.home-playlist-label { display: flex; align-items: center; gap: 7px; font-size: calc(10px * var(--text-scale)); font-weight: 720; letter-spacing: .14em; text-transform: uppercase; }
+.home-playlist-label svg { flex: none; }
+:root .app .home-playlists h2 { font: 400 calc(clamp(31px, 4.4vw, 54px) * var(--text-scale))/1.04 var(--serif); letter-spacing: -.045em; margin: 9px 0 6px; overflow-wrap: anywhere; }
+.home-playlists p { color: #f6f5ec; }
+.home-playlist-readiness { max-width: 54ch; overflow-wrap: anywhere; }
+:root .app .home-playlists :is(.primary, select) { background: #faf6e7; color: #20362b; border-color: #faf6e7; }
+:root .app .home-playlists select { color-scheme: light; }
+.home-playlists :is(button,select):focus-visible { outline-color: #fff9dd; }
+.home-hero-controls { grid-template-columns: auto minmax(0, 1fr); width: min(100%, 500px); }
+.home-saved { grid-area: saved; }
+.home-saved > h2 { grid-column: 1 / -1; margin: 0; padding: 9px 11px 6px; }
+.home-continue { grid-area: recent; }
+.home-queue-card { grid-area: queue; }
+.home-offline-card { grid-area: offline; }
+.home-queue-card,.home-offline-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+:root .app :is(.home-saved,.home-queue-card,.home-offline-card) > h2 { font: 400 calc(24px * var(--text-scale))/1.15 var(--serif); letter-spacing: -.025em; }
+.home-queue-card ol { margin: 8px 0 0; padding-inline-start: 22px; max-height: 225px; overflow: auto; }
+.home-queue-card li { padding: 7px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.home-queue-card li::marker { color: var(--accent); font-weight: 650; }
+.home-queue-card small { display: block; }
+.home-listening:has(.home-continue) { grid-template-areas: "hero" "recent" "saved" "queue" "offline"; }
+.home-listening:not(:has(.home-queue-card)) { grid-template-areas: "hero" "saved" "offline"; }
+.home-listening:has(.home-continue):not(:has(.home-queue-card)) { grid-template-areas: "hero" "recent" "saved" "offline"; }
+.home-listening > .notice { grid-column: 1 / -1; }
+@media (max-width: 359px) {
+  .home-hero-controls { grid-template-columns: minmax(0, 1fr); }
+  .home-hero-controls button { justify-self: start; }
+}
+@media (min-width: 960px) {
+  .app {
+    --rail-width: 185px;
+    --shell-edge: max(0px, calc((100vw - var(--app-width)) / 2));
+    padding-left: var(--rail-width);
+  }
+  :root[data-density] .app { --nav: 0px; }
+  :root .app .app-header { justify-content: flex-end; min-height: 56px; }
+  .app-header .brand { position: fixed; top: 18px; left: calc(var(--shell-edge) + 15px); width: calc(var(--rail-width) - 25px); z-index: 18; }
+  :root .app .bottom-nav {
+    top: 0;
+    bottom: 0;
+    left: var(--shell-edge);
+    transform: none;
+    width: var(--rail-width);
+    height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 74px 11px 15px;
+    border: 0;
+    border-right: 1px solid var(--line);
+    background: var(--rail);
+    z-index: 15;
+  }
+  :root .app .bottom-nav button { flex: 0 0 auto; width: 100%; min-height: 44px; padding: 4px 8px; border-radius: 10px; flex-direction: row; justify-content: start; gap: 6px; font-size: calc(13px * var(--text-scale)); }
+  :root .app .bottom-nav button[aria-current="page"] { background: var(--accent-soft); color: var(--ink); }
+  :root .app :is(.queue-player,.player-dock,.mini-player) {
+    left: calc(var(--shell-edge) + var(--rail-width));
+    right: var(--shell-edge);
+    width: auto;
+    transform: none;
+  }
+  .home-listening { grid-template-columns: minmax(0, 2fr) minmax(210px, 1fr); grid-template-areas: "hero queue" "saved offline"; gap: 16px; align-items: start; }
+  .home-listening:has(.home-continue) { grid-template-areas: "hero queue" "recent offline" "saved offline"; }
+  .home-listening:not(:has(.home-queue-card)) { grid-template-areas: "hero offline" "saved offline"; }
+  .home-listening:has(.home-continue):not(:has(.home-queue-card)) { grid-template-areas: "hero offline" "recent offline" "saved offline"; }
+  .home-playlists { min-height: 264px; padding: 22px; }
+  .home-saved { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Keep editing surfaces distinct from playback across all workspaces. */
+:root .app :is(.manifest-fields,.studio-monitor,.library-collection-header,.playlist-library) { border-radius: 14px; }
+:root .app .manifest-fields { background: var(--surface); }
+:root .app .studio-monitor { background: var(--surface-alt); }
+:root .app .studio-monitor .monitor-hz { font-family: var(--serif); font-weight: 400; }
+:root .app .library-destinations button { border-radius: 11px; }
+:root .app .queue-player { border-top-color: var(--line); background: var(--surface); }
+/* Route changes focus headings for assistive technology. Interactive controls keep their focus rings. */
+.app main h1[tabindex="-1"]:focus { outline: none; }
