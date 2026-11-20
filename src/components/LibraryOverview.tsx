@@ -14,7 +14,7 @@ export const collections = [
   { label: "Affirmations", description: "All your affirmations in one list", icon: BookOpen, libraryView: "manifestation", librarySection: "all" },
   { label: "Manifestation practices", description: "Saved and silent practices", icon: Sparkles, libraryView: "manifestation", librarySection: "saved" },
   { label: "Audio files", description: "Meditation music and classical audio", icon: Music2, libraryView: "audio", librarySection: "all" },
-  { label: "Sound packs", description: "Browse and download audio", icon: Package, libraryView: "packs", librarySection: "all" },
+  { label: "Sound packs", description: "Download audio for offline listening", icon: Package, libraryView: "packs", librarySection: "all" },
   { label: "Saved mixes", description: "Layered sounds and chakra sets", icon: Layers, libraryView: "mixes", librarySection: "all" },
   { label: "Chakras", description: "Seven chakra profiles", icon: Flower2, libraryView: "chakras", librarySection: "all" },
   { label: "Playlists", description: "Arrange and play your sessions", icon: ListMusic, libraryView: "overview", librarySection: "playlists" },

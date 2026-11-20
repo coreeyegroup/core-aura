@@ -1,4 +1,4 @@
-# Android hosting and native updates — v0.22.0
+# Android hosting and native updates
 
 ## Customer flow
 
@@ -20,17 +20,20 @@ The earlier 0.18.0 test APK used a different temporary signing key. It still req
 - Latest APK: https://core-aura.coreeye.in/android/core-aura-latest.apk
 - Update metadata: https://core-aura.coreeye.in/android/latest.json
 
-The website remains the first-install/recovery route. APK hosting is independent of atomic web releases. Wait for the verified main workflow's android-publish job to publish `android-v0.22.0` inputs, then run:
+The website remains the first-install/recovery route. The web build and APK channel update separately. CI publishes unsigned build inputs after the web, backend and Android jobs pass on `main` or `release/v0.27.0-peaceful-home`. Wait for the matching `android-vVERSION` GitHub prerelease. On the VPS, use the same commit for website deployment and APK signing.
 
 ```bash
 cd ~/core-aura
-git pull --ff-only origin main
-sudo bash ops/deploy.sh origin/main
-sudo bash ops/start-backend.sh
-sudo bash ops/publish-android.sh
-bash ops/verify.sh 0.22.0
+git fetch origin release/v0.27.0-peaceful-home --tags
+release=android-v0.41.0
+git worktree add --detach "$HOME/core-aura-android-0.41.0" "$release"
+sudo bash ops/deploy.sh "$release"
+sudo bash "$HOME/core-aura-android-0.41.0/ops/publish-android.sh"
+bash ops/verify.sh 0.41.0
 curl -fsS https://core-aura.coreeye.in/android/latest.json
 ```
+
+Confirm that `versionName` in the Android metadata is also `0.41.0` before opening Update latest on the phone. If the website has updated while Android still shows the previous version, the signed APK has yet to be published.
 
 The VPS validates exact-version CI input hashes/source digest, signs the release with its existing permanent private key, verifies it and atomically publishes metadata/immutable APK paths. Java runtime/keytool are installed if missing; no Android SDK is needed on the VPS. Failed publication preserves the current release. Both app version and Android versionCode must increase for changed releases.
 

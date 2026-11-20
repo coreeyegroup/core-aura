@@ -1103,7 +1103,7 @@ export default function App() {
               <button aria-pressed={exploreView === "nature"} onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature library</button>
             </div>}
             {exploreView === "tracks" ? <SoundTracks defaultOpen/> : exploreView === "packs" ? (
-              <PacksPanel />
+              <PacksPanel online={online} />
             ) : exploreView === "nature" ? (
               natureLibrary
             ) : (
@@ -1406,7 +1406,7 @@ export default function App() {
               </article>)}
             </section>}
             {libraryView === "packs" && <>
-              <PacksPanel embedded />
+              <PacksPanel embedded online={online} offlineReady={offlineReady} />
               <PacksPanel library />
             </>}
             {playlistView ? <PlaylistLibrary sessions={sessions} tracks={localTracks} trackError={trackReadError}/> : libraryView === "manifestation" ? (

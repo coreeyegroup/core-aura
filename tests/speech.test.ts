@@ -54,4 +54,18 @@ describe("device speech diagnostics", () => {
     current.onend();
     await next;
   });
+  it("plays a same-language device voice for online speech when offline", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    let current: any;
+    const driver = setup(utterance => { current = utterance; });
+    const local = { name: "Hindi", lang: "hi-IN", localService: true, voiceURI: "hindi-local" };
+    const remote = { ...local, localService: false, voiceURI: "hindi-cloud" };
+    vi.spyOn(driver, "getVoices").mockReturnValue([remote, local] as never[]);
+    const plan = { ...newPlan(), voice: "core:hi+f2" };
+    const result = speech.speak("नमस्ते", plan);
+    expect(current.voice).toEqual(local);
+    current.onend();
+    await result;
+    await expect(speech.speak("Bonjour", { ...plan, voice: "core:fr-fr" })).rejects.toThrow("No offline voice");
+  });
 });

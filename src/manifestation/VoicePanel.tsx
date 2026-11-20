@@ -113,7 +113,7 @@ export function VoicePanel() {
             )}
             {visible.map((v, i) => (
               <option key={v.voiceURI + ":" + i} value={v.voiceURI}>
-                {v.name} · {v.lang}
+                {v.name} · {v.lang}{v.localService ? " · Offline" : " · Online"}
               </option>
             ))}
           </select>
@@ -135,8 +135,8 @@ export function VoicePanel() {
       <p className="content-note">
         {voices.filter((v) => !v.voiceURI.startsWith("core:")).length} device
         voices · {voices.filter((v) => v.voiceURI.startsWith("core:")).length}{" "}
-        Core-aura voices. Core-aura voices are synthetic and online; selected
-        text goes to your server without being saved.
+        Core-aura voices. Online Core-aura voices send the selected text to your server without saving it.
+        When offline, Core-aura uses an installed device voice for the same language when available.
       </p>
       {!voices.length && !busy && (
         <p role="status">

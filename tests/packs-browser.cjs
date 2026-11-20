@@ -1,4 +1,3 @@
-const { navigate } = require("./navigation.cjs");
 const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 const assert = require("node:assert/strict");
@@ -26,31 +25,22 @@ const fs = require("node:fs");
     await p.route("**/api/catalog", (route) =>
       route.fulfill({ json: { packs: [manifest] } }),
     );
-    await p.goto("http://localhost:8089/#explore");
-    await p.getByRole("button", { name: "Sound packs", exact: true }).click();
-    await p
-      .getByRole("heading", { name: "Published study", exact: true })
-      .waitFor();
-    await p.screenshot({ path: "mobile-verification/catalog-393.png" });
-    const audit = await new AxeBuilder({ page: p })
-      .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-      .analyze();
-    assert.deepEqual(
-      audit.violations.map((v) => ({
-        id: v.id,
-        nodes: v.nodes.map((n) => n.target),
-      })),
-      [],
-    );
-    const card = p.locator(".pack-card").filter({
+    await p.goto("http://localhost:8089/#library/packs");
+    const available = p.getByRole("region", { name: "Sound pack catalog" });
+    const downloaded = p.getByRole("region", { name: "Downloaded packs" });
+    const card = available.locator(".pack-card").filter({
       has: p.getByRole("heading", { name: "Published study", exact: true }),
     });
-    await card
-      .getByRole("button", { name: "Download pack", exact: true })
-      .click();
-    await card
-      .getByRole("button", { name: "Downloaded", exact: true })
-      .waitFor();
+    await card.getByRole("heading").waitFor();
+    const button = available.getByRole("button", { name: "Download all packs for offline use", exact: true });
+    await available.getByText("2 to download · 7.6 MB", { exact: true }).waitFor();
+    await button.click();
+    await available.getByText("2 of 2 packs are ready offline in Downloaded packs.", { exact: true }).waitFor();
+    await downloaded.getByText(/2 on this device · 7.6 MB/).waitFor();
+    await available.getByText("All compatible packs are up to date.", { exact: true }).waitFor();
+    const audit = await new AxeBuilder({ page: p }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    assert.deepEqual(audit.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) })), []);
+    assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.equal(
       await p.evaluate(async () => {
         let n = 0;
@@ -109,8 +99,7 @@ const fs = require("node:fs");
         { exact: true },
       )
       .waitFor();
-    await navigate(p, "Library");
-    const installed = p.locator(".pack-card").filter({
+    const installed = downloaded.locator(".pack-card").filter({
       has: p.getByRole("heading", { name: "Published study", exact: true }),
     });
     await installed.getByText("v1.0.0", { exact: true }).waitFor();
@@ -138,17 +127,7 @@ const fs = require("node:fs");
     await installed
       .getByRole("button", { name: "Pause Bell · 432 Hz", exact: true })
       .waitFor();
-    await navigate(p, "Studio");
-    await p.getByRole("button", { name: "Play", exact: true }).last().click();
-    await p
-      .getByRole("button", { name: "Pause", exact: true })
-      .last()
-      .waitFor();
-    await p.getByRole("button", { name: "Stop", exact: true }).last().click();
-    await navigate(p, "Library");
-    await installed
-      .getByRole("button", { name: "Play Bell · 432 Hz", exact: true })
-      .waitFor();
+    await installed.getByRole("button", { name: "Stop Bell · 432 Hz", exact: true }).click();
     await p.evaluate(() => navigator.serviceWorker.ready.then(() => true));
     await p.reload();
     await p.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
@@ -167,17 +146,10 @@ const fs = require("node:fs");
     await installed
       .getByRole("button", { name: "Remove download", exact: true })
       .click();
-    await p
-      .getByText("No packs downloaded. Find them in Explore → Sound packs.", {
-        exact: true,
-      })
-      .waitFor();
+    await installed.waitFor({ state: "detached" });
     await p.reload();
-    await p
-      .getByText("No packs downloaded. Find them in Explore → Sound packs.", {
-        exact: true,
-      })
-      .waitFor();
+    await downloaded.getByText(/1 on this device · 3.8 MB/).waitFor();
+    assert.equal(await installed.count(), 0);
     assert.deepEqual(errors, []);
     await ctx.close();
     console.log(

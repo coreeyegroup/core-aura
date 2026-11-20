@@ -2,6 +2,10 @@
 
 Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
+## v0.41.0 Offline Library and Android release channel
+
+Library → Sound packs can download available packs together, check their total size, and play them from Downloaded packs without internet. Generated sounds and imported files are already local. When a practice uses online speech, an installed device voice for the same language can read it offline.
+
 ## v0.40.0 Library audio affirmations
 
 Sounds and Backgrounds offer visible delete controls for imported files and reversible removal for built-in sounds. Voices keeps WAV import and clip management. Affirmations supports text, audio file import, and microphone recording. Audio affirmations can be previewed, exported as WAV, and included in a spoken practice.
@@ -89,7 +93,7 @@ The first Core Resonance pack contains original 15-second bell, bowl and flute s
 
 ## Android APK and updates
 
-The website links to /download.html and the persistent /android/core-aura-latest.apk download. Android Settings includes one Update latest action: it downloads a compatible update privately, verifies package/version/signing identity and submits a same-app update through Android without a browser or manual APK-opening step. Eligible Android 12+ devices can update without an extra installation prompt; Android confirmation is handled when required. Android may ask once to allow updates from Core-aura. Older stable app versions need a one-time normal upgrade to get the new native updater. The VPS signs verified CI build inputs with its permanent private key; a web deployment does not remove the APK channel. Publish using sudo bash ops/publish-android.sh after the verified main build. See [Android distribution](docs/android-distribution.md) for exact commands, private key backup and the one-time migration from the old temporary test APK.
+The website links to /download.html and the persistent /android/core-aura-latest.apk download. Android Settings includes one Update latest action: it downloads a compatible update privately, verifies package/version/signing identity and submits a same-app update through Android without a browser or manual APK-opening step. Eligible Android 12+ devices can update without an extra installation prompt; Android confirmation is handled when required. Android may ask once to allow updates from Core-aura. Older stable app versions need a one-time normal upgrade to get the new native updater. The VPS signs verified CI build inputs with its permanent private key; a web deployment does not remove the APK channel. Publish using sudo bash ops/publish-android.sh after CI has published build inputs from the verified release branch. See [Android distribution](docs/android-distribution.md) for exact commands, private key backup and the one-time migration from the old temporary test APK.
 
 Capacitor packages the shared interface in Android and iOS projects. Run npm run native:sync, then open Android Studio or Xcode. Automated verification builds Android debug/release packages, tests real APK signing/publication and compiles the iOS simulator project. Physical-device acceptance and iOS production signing/store distribution remain separate.
 
