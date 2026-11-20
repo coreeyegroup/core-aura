@@ -6,6 +6,7 @@ import type { Track } from "../tracks/storage";
 import { deliverFile } from "../files/deliver";
 import { playlistStore } from "./store";
 import { Playlist, PlaylistRef, resolveItems, durationLabel, itemDuration } from "./model";
+import { playbackReadiness, usePlaybackInventory, type Readiness } from "./readiness";
 import { startQueue } from "./runtime";
 export function PlaylistLibrary({ sessions, tracks, trackError }: {
     sessions: Session[];
@@ -14,6 +15,7 @@ export function PlaylistLibrary({ sessions, tracks, trackError }: {
 }) {
     const { data, error } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot), { data: manifest } = useSyncExternalStore(manifestationStore.subscribe, manifestationStore.snapshot);
     const [editing, setEditing] = useState<Playlist | null>(null), [source, setSource] = useState(""), [message, setMessage] = useState("");
+    const { inventory, online } = usePlaybackInventory();
     const importInput = useRef<HTMLInputElement>(null);
     const choices = [...manifest.plans.map(p => ({ ref: { kind: "practice" as const, id: p.id }, name: p.name, type: "Manifestation" })), ...sessions.map(s => ({ ref: { kind: "session" as const, id: s.id }, name: s.name, type: s.kind === "chakras" ? "Chakra" : "Sound" })), ...tracks.map(track => ({ ref: { kind: "track" as const, id: track.id }, name: track.title, type: "Imported track" }))];
     const title = (ref: PlaylistRef) => choices.find(c => c.ref.kind === ref.kind && c.ref.id === ref.id)?.name;
@@ -34,12 +36,17 @@ export function PlaylistLibrary({ sessions, tracks, trackError }: {
  <div className="home-actions"><button className="primary" disabled={!editing.name.trim() || !editing.items.length}>Save playlist</button><button type="button" onClick={() => { if ((editing.name || editing.items.length) && !confirm("Discard unfinished playlist edits?"))
             return; setEditing(null); }}>Cancel editing</button></div></form>}
  {!data.playlists.length && !editing && <p className="content-note">No playlists yet. Create a routine from your saved content.</p>}
- {data.playlists.map(p => { let duration = 0, missing = ""; try {
-        duration = resolveItems(p.items, manifest.plans, sessions, tracks).reduce((n, v) => n + itemDuration(v), 0);
+ {data.playlists.map(p => {
+    let duration = 0, readiness: Readiness;
+    try {
+        const items = resolveItems(p.items, manifest.plans, sessions, tracks);
+        duration = items.reduce((total, item) => total + itemDuration(item), 0);
+        readiness = playbackReadiness(items, inventory);
+    } catch (error) {
+        readiness = { status: "repair", message: (error as Error).message };
     }
-    catch (error) {
-        missing = (error as Error).message;
-    } return <article className="home-list-row" aria-label={p.name + " playlist"} key={p.id}><div><strong>{p.name}</strong><small>{p.items.length} items · {missing ? missing : durationLabel(duration) + " maximum"}</small></div><button className="icon-button primary" disabled={Boolean(missing)} aria-label={"Play playlist " + p.name} onClick={() => attempt(() => startQueue(resolveItems(p.items, manifest.plans, sessions, tracks), p.name))}><Play size={18}/></button><button disabled={!!editing} onClick={() => { setEditing(structuredClone(p)); setSource(""); }}>{missing ? "Repair playlist" : "Edit"}</button><button className="icon-button" aria-label={"Delete playlist " + p.name} onClick={() => { if (confirm("Delete this playlist? Saved practices and sound sessions remain."))
+    const missing = readiness.status === "repair";
+    const blocked = missing || !online && readiness.status === "connection"; return <article className="home-list-row" aria-label={p.name + " playlist"} key={p.id}><div><strong>{p.name}</strong><small>{p.items.length} items · {!missing && durationLabel(duration) + " maximum · "}{readiness.message}</small></div><button className="icon-button primary" disabled={blocked} aria-label={"Play playlist " + p.name} onClick={() => attempt(() => startQueue(resolveItems(p.items, manifest.plans, sessions, tracks), p.name))}><Play size={18}/></button><button disabled={!!editing} onClick={() => { setEditing(structuredClone(p)); setSource(""); }}>{missing ? "Repair playlist" : "Edit"}</button><button className="icon-button" aria-label={"Delete playlist " + p.name} onClick={() => { if (confirm("Delete this playlist? Saved practices and sound sessions remain."))
         attempt(() => playlistStore.remove(p.id)); }}><Trash2 size={16}/></button></article>; })}
  <div className="catalog-footer">
    <button disabled={!!editing || !!error} onClick={() => importInput.current?.click()}>Import playlists</button>

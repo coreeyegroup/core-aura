@@ -1,3 +1,4 @@
+import { verifyPractice } from "../playlists/readiness";
 import { confirmSourceDeletion } from "../playlists/store";
 import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
@@ -177,11 +178,14 @@ export function Manifestation({
       onView?.("practice");
     } catch (error) { setMessage((error as Error).message); }
   }
-  function start() {
+  async function start() {
     try {
       if (active && state.status === "playing") manifestPlayer.pause();
       else if (active && state.status === "paused") manifestPlayer.resume();
-      else manifestPlayer.start(p);
+      else {
+        await verifyPractice(p);
+        manifestPlayer.start(p);
+      }
       setMessage("");
     } catch (e) {
       setMessage((e as Error).message);
@@ -939,7 +943,7 @@ export function ManifestLibrary({
             <div className="saved-actions">
               <button
                 aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
-                onClick={() => {
+                onClick={async () => {
                   try {
                     if (
                       state.plan?.id === plan.id &&
@@ -951,7 +955,10 @@ export function ManifestLibrary({
                       state.status === "paused"
                     )
                       manifestPlayer.resume();
-                    else manifestPlayer.start(plan);
+                    else {
+                      await verifyPractice(plan);
+                      manifestPlayer.start(plan);
+                    }
                   } catch (e) {
                     setMessage((e as Error).message);
                   }

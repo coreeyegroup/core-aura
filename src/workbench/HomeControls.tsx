@@ -10,6 +10,7 @@ import { nextOccurrence } from "../manifestation/model";
 import { ItemRef, ModuleId, preferences } from "./preferences";
 import { playlistStore } from "../playlists/store";
 import { durationLabel, PlaylistRef, resolveItems } from "../playlists/model";
+import { playbackReadiness, usePlaybackInventory, type Readiness } from "../playlists/readiness";
 import { queuePlayer, startQueue } from "../playlists/runtime";
 
 type Props = {
@@ -83,6 +84,7 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
   const { data: lists, error: listError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
   const { value: prefs, error } = useSyncExternalStore(preferences.subscribe, preferences.snapshot);
+  const { inventory, online } = usePlaybackInventory();
   const queue = useSyncExternalStore(queuePlayer.subscribe, queuePlayer.snapshot);
   const [practiceId, setPracticeId] = useState("");
   const [soundId, setSoundId] = useState("");
@@ -103,7 +105,14 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
     ? data.plans.find((plan) => plan.id === ref.id)
     : sessions.find((session) => session.id === ref.id);
   const playlistEntries = playlist?.items.map(itemFor);
-  const missingItems = playlistEntries?.some((item) => !item) ?? false;
+  function inspect(refs: PlaylistRef[]): Readiness {
+    try {
+      return playbackReadiness(resolveItems(refs, data.plans, sessions, tracks), inventory);
+    } catch (error) {
+      return { status: "repair", message: (error as Error).message };
+    }
+  }
+  const readiness = playlist ? inspect(playlist.items) : undefined;
   const upcoming = data.reminders
     .map((reminder) => ({ reminder, date: nextOccurrence(reminder, now) }))
     .filter((entry) => entry.date)
@@ -111,7 +120,8 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
   const nextPractice = upcoming && data.plans.find((plan) => plan.id === upcoming.reminder.planId);
   const active = queue.status === "playing" || queue.status === "paused";
   const replay = prefs.lastQueue;
-  const replayMissing = replay?.items.some(ref => !itemFor(ref)) ?? false;
+  const replayReadiness = replay ? inspect(replay.items) : undefined;
+  const blocked = (result?: Readiness) => result?.status === "repair" || (!online && result?.status === "connection");
 
   async function attempt(action: () => unknown) {
     setMessage("");
@@ -233,12 +243,12 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
                 <select aria-label="Home playlist" value={playlist.id} onChange={(event) => setPlaylistId(event.target.value)}>
                   {lists.playlists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
-                <button className="primary" disabled={missingItems} aria-label="Play selected playlist"
+                <button className="primary" disabled={blocked(readiness)} aria-label="Play selected playlist"
                   onClick={() => void play(playlist.items, playlist.name)}>
                   <Play size={16} aria-hidden="true" /> Play
                 </button>
               </div>
-              {missingItems && <p className="home-playlist-warning">Remove or replace unavailable items in Library.</p>}
+              {readiness && <p className={readiness.status === "ready" ? "content-note" : "home-playlist-warning"}>{readiness.message}</p>}
               <div className="home-playlist-footer">
                 <details className="home-playlist-preview">
                   <summary>View playlist</summary>
@@ -260,10 +270,10 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
       {!active && replay && (
         <section className="home-continue" aria-label="Continue listening">
           <div><small>Last played</small><strong>{replay.name}</strong>
-            {replayMissing && <small>A source is missing. Open Library to choose a replacement.</small>}
+            {replayReadiness && <small>{replayReadiness.message}</small>}
           </div>
-          {replayMissing ? <button className="text-button" onClick={() => onOpen("library")}>Open Library</button>
-            : <button className="text-button" onClick={() => void play(replay.items, replay.name)}>
+          {replayReadiness?.status === "repair" ? <button className="text-button" onClick={() => onOpen("library")}>Open Library</button>
+            : <button className="text-button" disabled={blocked(replayReadiness)} onClick={() => void play(replay.items, replay.name)}>
               <Play size={16} aria-hidden="true" /> Play again
             </button>}
         </section>

@@ -22,7 +22,7 @@ let overlay: AbortController | undefined;
 let pending:
   | { utterance: SpeechSynthesisUtterance; cancel: () => void }
   | undefined;
-function chooseDeviceVoice<T extends Voice>(voices: T[], requested: string, offline: boolean): T | undefined {
+export function chooseDeviceVoice<T extends Voice>(voices: T[], requested: string, offline: boolean): T | undefined {
   const selected = voices.find(voice => voice.voiceURI === requested);
   if (!offline) return selected;
   if (selected?.localService) return selected;

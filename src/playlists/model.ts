@@ -53,7 +53,8 @@ export function resolveItems(refs: PlaylistRef[], plans: Plan[], sessions: Sessi
         if (ref.kind === "practice") {
             const plan = plans.find(plan => plan.id === ref.id);
             if (!plan) throw Error("A practice is unavailable. Edit the playlist to replace it.");
-            checkAudio(plan.name, [plan.accompaniment?.audio?.id], "Manifest");
+            checkAudio(plan.name, [plan.accompaniment?.audio?.id,
+                ...(plan.backgroundMix?.channels.map(channel => channel.accompaniment?.audio?.id) ?? [])], "Manifest");
             return { kind: "practice", id: ref.id, name: plan.name, plan: parsePlan(plan) };
         }
         if (ref.kind === "track") {

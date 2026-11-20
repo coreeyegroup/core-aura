@@ -1475,8 +1475,9 @@ export default function App() {
 
                     <div className="saved-actions">
                       <button aria-label={"Test play " + row.name} onClick={() => {
-                        void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions, localTracks), row.name)
-                          .catch(error => setMessage(error.message));
+                        void Promise.resolve().then(() =>
+                          startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions, localTracks), row.name)
+                        ).catch(error => setMessage(error.message));
                       }}>Test play</button>
                       {row.kind === "nature" ? <button onClick={() => {
                         if (!prepareSound(row.channels.map(channel => channel.id), false, true)) return;

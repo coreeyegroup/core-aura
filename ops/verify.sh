@@ -38,5 +38,11 @@ if (headers.get("content-type","").split(";")[0] != "application/vnd.android.pac
     or headers.get("content-length") != str(m.get("size"))):
     sys.exit("Android download response does not match the declared APK type and size")
 ' "$manifest" <<< "$headers"
-  echo "Verified Android $expected channel and APK availability"
+  checksum=$(curl -fsS --max-time 180 "$url" | sha256sum)
+  declared=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["sha256"])' <<< "$manifest")
+  if [[ ${checksum%% *} != "$declared" ]]; then
+    echo "Android APK checksum does not match the release channel." >&2
+    exit 1
+  fi
+  echo "Verified Android $expected channel and APK SHA-256"
 fi

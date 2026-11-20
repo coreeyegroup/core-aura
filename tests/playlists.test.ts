@@ -1,5 +1,6 @@
 import { it, expect, vi, afterEach } from "vitest";
 import { parsePlaylists, resolveItems } from "../src/playlists/model";
+import { playbackReadiness } from "../src/playlists/readiness";
 import { QueuePlayer } from "../src/playlists/player";
 import { newPlan } from "../src/manifestation/model";
 import { channel } from "../src/model";
@@ -161,4 +162,26 @@ it("identifies missing audio layers before starting a practice or mix from a que
     const track = { id, title: "Rain", filename: "Rain.wav", duration: 30, bytes: 1000,
         createdAt: "2026-11-20T00:00:00Z", volume: .5, muted: false, loop: false };
     expect(resolveItems(refs, [layered], [layeredMix], [track])).toHaveLength(2);
+});
+
+it("distinguishes local recordings, silent reading and same-language device speech", () => {
+    const line = { id: "line", text: "Stay present.", recordingId: "clip", recordedText: "Stay present.", audioAffirmation: true as const };
+    const voice = { name: "Voice", lang: "fr-FR", voiceURI: "device-fr", localService: true };
+    const english = { ...voice, lang: "en-US" };
+    const spoken = { ...practice, mode: "speech" as const, voice: "core:fr-fr", lines: [line, { id: "text", text: "Texte" }] };
+    const items = resolveItems([refs[0]], [spoken], []);
+    const clip = { id: "clip", text: "Clip title", kind: "affirmation" as const };
+    expect(playbackReadiness(items, {}).status).toBe("checking");
+    expect(playbackReadiness(items, { clips: new Map(), voices: [voice] }).status).toBe("repair");
+    const clips = new Map([[clip.id, clip]]);
+    expect(playbackReadiness(items, { clips, voices: [english] }).status).toBe("connection");
+    expect(playbackReadiness(items, { clips, voices: [voice] }).status).toBe("ready");
+    expect(playbackReadiness(resolveItems([refs[0]], [practice], []), {}).status).toBe("ready");
+});
+
+it("checks imported audio inside an attached practice background mix", () => {
+    const id = "track:" + "b".repeat(64);
+    const backgroundMix = { name: "Rain bed", master: .5, volume: .3,
+        channels: [{ ...session.channels[0], accompaniment: { audio: { id, volume: .2, loop: true } } }] };
+    expect(() => resolveItems([refs[0]], [{ ...practice, backgroundMix }], [])).toThrow(/Quiet morning.*missing audio file/);
 });

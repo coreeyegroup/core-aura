@@ -497,6 +497,45 @@ function testAudio(name) {
     const recovered = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")).plans);
     const fallback = recovered.flatMap(plan => plan.lines).find(line => line.text === "A calmer breath");
     assert.ok(fallback && !fallback.audioAffirmation && !fallback.recordingId);
+    await page.evaluate(() => {
+      const manifest = JSON.parse(localStorage.getItem("core-aura.manifestation.v1"));
+      const playlists = JSON.parse(localStorage.getItem("core-aura.playlists.v1"));
+      const voice = { ...manifest.draft, id: "offline-voice", name: "Voice check",
+        mode: "speech", voice: "core:zz", lines: [{ id: "local-word", text: "A test phrase." }],
+        background: null, backgroundMix: null, accompaniment: undefined };
+      manifest.plans.push(voice, { ...voice, id: "offline-missing-clip", name: "Recording check",
+        lines: [{ id: "local-clip", text: "A test phrase.", recordingId: "missing-fixture-clip",
+          recordedText: "A test phrase.", audioAffirmation: true }] });
+      playlists.playlists.push({ id: "voice-check", name: "Voice check routine", items: [{ kind: "practice", id: voice.id }] },
+        { id: "clip-check", name: "Recording check routine", items: [{ kind: "practice", id: "offline-missing-clip" }] });
+      localStorage.setItem("core-aura.manifestation.v1", JSON.stringify(manifest));
+      localStorage.setItem("core-aura.playlists.v1", JSON.stringify(playlists));
+    });
+    await context.setOffline(true);
+    await page.goto(origin + "/#home");
+    await page.reload();
+    const offlineHome = page.getByRole("region", { name: "Home playlists" });
+    const offlinePicker = offlineHome.getByRole("combobox", { name: "Home playlist" });
+    const offlinePlay = offlineHome.getByRole("button", { name: "Play selected playlist" });
+    await offlinePicker.selectOption("voice-check");
+    await offlineHome.getByText(/Voice check.*installed offline voice/).waitFor();
+    assert.equal(await offlinePlay.isDisabled(), true);
+    await offlinePicker.selectOption("clip-check");
+    await offlineHome.getByText(/Recording check.*unavailable recording/).waitFor();
+    assert.equal(await offlinePlay.isDisabled(), true);
+    await offlinePicker.selectOption("queue");
+    await offlineHome.getByText("Ready offline", { exact: true }).waitFor();
+    await offlinePlay.click();
+    await player.getByText("Saved mix", { exact: true }).waitFor();
+    await player.getByRole("button", { name: "Stop playlist" }).click();
+    await page.goto(origin + "/#library/playlists");
+    const clipRoutine = page.getByRole("article", { name: "Recording check routine playlist" });
+    await clipRoutine.getByText(/unavailable recording/).waitFor();
+    assert.equal(await clipRoutine.getByRole("button", { name: "Play playlist Recording check routine" }).isDisabled(), true);
+    await context.setOffline(false);
+    const voiceRoutine = page.getByRole("article", { name: "Voice check routine playlist" });
+    await voiceRoutine.getByRole("button", { name: "Play playlist Voice check routine" }).waitFor();
+    await page.waitForFunction(() => !document.querySelector('[aria-label="Play playlist Voice check routine"]').disabled);
     assert.deepEqual(errors, []);
     console.log("Verified ten Library collections, isolated sound testing, separate mix editing, six themes, custom colour persistence, keyboard focus, accessibility and saved data.");
   } finally {

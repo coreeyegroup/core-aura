@@ -21,20 +21,23 @@ function open(): Promise<IDBDatabase> {
       reject(Error("Close other Core-aura windows and try again."));
   });
 }
-export async function recordings(kind: "voice" | "affirmation" = "voice"): Promise<PersonalRecording[]> {
+export async function allRecordings(): Promise<PersonalRecording[]> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("recordings", "readonly"),
       r = tx.objectStore("recordings").getAll();
     tx.oncomplete = () => {
       db.close();
-      resolve(r.result.filter((clip: PersonalRecording) => (clip.kind ?? "voice") === kind));
+      resolve(r.result);
     };
     tx.onerror = () => {
       db.close();
       reject(Error("Recordings could not be read."));
     };
   });
+}
+export async function recordings(kind: "voice" | "affirmation" = "voice") {
+  return (await allRecordings()).filter(clip => (clip.kind ?? "voice") === kind);
 }
 export async function recording(id: string): Promise<PersonalRecording> {
   const db = await open();

@@ -3,12 +3,17 @@ import { engine } from "../audio/engine";
 import { onOtherAudio } from "../audio/activity";
 import { manifestPlayer } from "../manifestation/player";
 import { QueuePlayer } from "./player";
+import { verifyPracticeAudio } from "./readiness";
 import { PlayItem } from "./model";
 export const queuePlayer = new QueuePlayer(engine, manifestPlayer, (item) => {
     if (item.kind !== "track") remember({ kind: item.kind, id: item.id });
 });
 onOtherAudio(() => queuePlayer.interrupt());
+let requestId = 0;
 export async function startQueue(items: PlayItem[], name: string, saveReplay = true) {
+    const id = ++requestId;
+    await verifyPracticeAudio(items);
+    if (id !== requestId) return false;
     const busy = ["playing", "paused"].includes(queuePlayer.snapshot().status) || ["playing", "paused"].includes(manifestPlayer.snapshot().status) || engine.snapshot().some(v => v.status !== "stopping");
     if (busy && !confirm("Replace current playback? This stops the active audio. Draft settings will be kept."))
         return false;
