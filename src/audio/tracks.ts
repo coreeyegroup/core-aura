@@ -38,6 +38,12 @@ export class TrackPlayer {
         this.master = value;
         this.running.forEach(r => this.apply(r));
     }
+    async play(id: string, load: () => Promise<Blob>, level: TrackLevel) {
+        if (this.running.has(id)) {
+            this.patch(id, level);
+            await this.resume(id);
+        } else await this.toggle(id, load, level);
+    }
     async toggle(id: string, load: () => Promise<Blob>, level: TrackLevel) {
         const r = this.running.get(id);
         if (r && !r.audio.paused) {
@@ -50,8 +56,11 @@ export class TrackPlayer {
         }
         if (this.pending.has(id))
             return;
-        if (this.running.size + this.pending.size >= 3)
-            throw Error("Up to three imported tracks can play together. Stop another track first.");
+        const linked = id.startsWith("track:linked:");
+        const count = [...this.running.keys(), ...this.pending.keys()]
+            .filter(key => key.startsWith("track:linked:") === linked).length;
+        if (count >= (linked ? 8 : 3))
+            throw Error(linked ? "Too many audio layers are playing." : "Up to three imported tracks can play together. Stop another track first.");
         const token = Symbol(id);
         this.pending.set(id, token);
         try {

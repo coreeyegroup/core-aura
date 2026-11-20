@@ -1,4 +1,5 @@
-import { Channel } from "../model";
+import { Channel, generatedAccompaniment } from "../model";
+import { trackBlob } from "../tracks/storage";
 import { TrackPlayer, TrackLevel } from "./tracks";
 import { signalOtherAudio } from "./activity";
 export type VoiceState = {
@@ -36,6 +37,43 @@ export class AudioEngine {
   patchSoundtrack(id: string, level: TrackLevel) { this.tracks.patch(id,level); }
   seekSoundtrack(id: string, seconds: number) { this.tracks.seek(id,seconds); }
   private voiceStates: VoiceState[] = [];
+  private linked = new Map<string, { seen: boolean; parts: string[]; file?: string; paused: boolean }>();
+
+  private stopLinked(id: string) {
+    const linked = this.linked.get(id);
+    if (!linked) return;
+    this.linked.delete(id);
+    linked.parts.forEach(part => this.stop(part));
+    if (linked.file) this.tracks.stop(linked.file);
+  }
+
+  private async playLinked(parent: Channel) {
+    const parts = generatedAccompaniment(parent), file = parent.accompaniment?.audio;
+    if (!parts.length && !file) return;
+    const linked = this.linked.get(parent.id) ?? {
+      seen: false, paused: false, parts: parts.map(part => part.id),
+      file: file ? "track:linked:" + parent.id : undefined,
+    };
+    linked.paused = false;
+    this.linked.set(parent.id, linked);
+    try {
+      await Promise.all([
+        ...parts.map(part => this.play(part, { preview: true })),
+        ...(file && linked.file ? [this.tracks.play(linked.file, () => trackBlob(file.id),
+          { ...file, muted: parent.muted })] : []),
+      ]);
+      if (this.linked.get(parent.id) === linked && linked.paused)
+        linked.parts.forEach(part => this.pause(part));
+      if (this.linked.get(parent.id) === linked && linked.paused && linked.file)
+        this.tracks.pause(linked.file);
+    } catch (e) {
+      if (this.linked.get(parent.id) !== linked) return;
+      this.stopLinked(parent.id);
+      this.stop(parent.id);
+      throw e;
+    }
+  }
+
   private refresh() {
     const r = this.recording;
     this.states = [
@@ -52,7 +90,7 @@ export class AudioEngine {
             },
           ]
         : []),
-    ];
+    ].filter(state => !state.id.startsWith("linked:") && !state.id.startsWith("track:linked:"));
     this.notify();
   }
   private stopRecording() {
@@ -206,6 +244,10 @@ export class AudioEngine {
         this.analyser = analyser;
         node.port.onmessage = ({ data }) => {
           this.voiceStates = data;
+          for (const [id, linked] of this.linked) {
+            if (this.voiceStates.some(state => state.id === id)) linked.seen = true;
+            else if (linked.seen) this.stopLinked(id);
+          }
           this.refresh();
         };
         this.node = node;
@@ -231,7 +273,7 @@ export class AudioEngine {
     )
       return;
     this.stopRecording();
-    const state = this.states.find((s) => s.id === channel.id);
+    const state = this.voiceStates.find((s) => s.id === channel.id);
     if (state && state.status !== "stopping") {
       this.node!.port.postMessage({ type: "resume", id: channel.id });
       this.voiceStates = this.voiceStates.map(s=>s.id===channel.id ? {...s,status:"playing"} : s);
@@ -244,6 +286,7 @@ export class AudioEngine {
       ];
     }
     this.refresh();
+    if (channel.accompaniment) await this.playLinked(channel);
   }
   async resume(id: string) {
     const token=this.generation, voice=this.voiceGeneration.get(id)||0;
@@ -253,6 +296,14 @@ export class AudioEngine {
     if(this.recording?.id===id) {this.startRecording();return;}
     this.node!.port.postMessage({type:"resume",id});
     this.voiceStates=this.voiceStates.map(s=>s.id===id?{...s,status:"playing"}:s);this.refresh();
+    const linked = this.linked.get(id);
+    if (linked) {
+      linked.paused = false;
+      for (const part of linked.parts) {
+        if (this.voiceStates.some(state => state.id === part)) this.node!.port.postMessage({ type: "resume", id: part });
+      }
+      if (linked.file) await this.tracks.resume(linked.file);
+    }
   }
   async toggle(channels: Channel[]) {
     if (
@@ -266,6 +317,12 @@ export class AudioEngine {
     }
   }
   pause(id: string) {
+    const linked = this.linked.get(id);
+    if (linked) {
+      linked.paused = true;
+      linked.parts.forEach(part => this.pause(part));
+      if (linked.file) this.tracks.pause(linked.file);
+    }
     if (id.startsWith("track:")) { this.tracks.pause(id); return; }
     const r = this.recording;
     if (r?.id === id && r.source) {
@@ -283,6 +340,7 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "pause", id });
   }
   stop(id: string) {
+    this.stopLinked(id);
     if (id.startsWith("track:")) { this.tracks.stop(id); return; }
     this.voiceGeneration.set(id, (this.voiceGeneration.get(id) || 0) + 1);
     if (this.recording?.id === id) {
@@ -296,6 +354,7 @@ export class AudioEngine {
   stopAll() {
     signalOtherAudio();
     this.tracks.stopAll();
+    this.linked.clear();
     this.generation++;
     this.voiceGeneration.clear();
     this.stopRecording();
@@ -304,6 +363,11 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "clear" });
   }
   patch(channel: Channel) {
+    if (channel.accompaniment) {
+      generatedAccompaniment(channel).forEach(part => this.patch(part));
+      const audio = channel.accompaniment.audio;
+      if (audio) this.tracks.patch("track:linked:" + channel.id, { ...audio, muted: channel.muted });
+    }
     this.node?.port.postMessage({
       type: "patch",
       id: channel.id,

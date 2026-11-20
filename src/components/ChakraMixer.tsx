@@ -1,13 +1,16 @@
 import {prepareSound} from "../workbench/actions";
 import {SequenceSetup} from "../workbench/SequenceControls";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Volume2, VolumeX, SlidersHorizontal } from "lucide-react";
 import { Channel, chakras, chakraSounds, Sound, sounds } from "../model";
 import { engine, VoiceState } from "../audio/engine";
+import { LibraryLayers, FrequencyField, rawSounds } from "./LibraryLayers";
+import type { Track } from "../tracks/storage";
 import { Transport } from "./Controls";
 
 const clock = (n: number) => Math.floor(Math.max(0,n)/60)+":"+String(Math.floor(Math.max(0,n)%60)).padStart(2,"0");
-export function ChakraMixer({ channels, states, selected, target, seconds, master, onSelect, onTarget, onSeconds, onMaster, onChange, onError }: {
+export function ChakraMixer({ channels, states, selected, target, seconds, master, tracks = [], focusId, onSelect, onTarget, onSeconds, onMaster, onChange, onError }: {
+  tracks?: Track[]; focusId?: string;
   channels: Channel[]; states: VoiceState[]; selected: string[]; target: "all"|"selected"; seconds: number; master: number;
   onSelect: (ids: string[])=>void; onTarget: (mode:"all"|"selected")=>void;
   onSeconds:(value:number)=>void; onMaster:(value:number)=>void; onChange:(value:Channel)=>void; onError:(message:string)=>void;
@@ -16,6 +19,19 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
   const active = states.filter(s=>channels.some(c=>c.id===s.id));
   const playing = active.filter(s=>s.status==="playing").length;
   const changeSelection = (ids:string[]) => { onTarget("selected"); onSelect(ids); };
+  useEffect(() => {
+    if (!focusId) return;
+    const row = document.getElementById("chakra-editor-" + focusId);
+    const options = row?.querySelector<HTMLDetailsElement>(".chakra-row-menu");
+    if (options) {
+      options.open = true;
+      options.querySelector("summary")?.focus();
+    }
+  }, [focusId]);
+  function chooseSound(value: Channel, sound: Sound, defaultHz: number) {
+    const hz = Math.min(sounds[sound].max, Math.max(sounds[sound].min, value.hz));
+    onChange({ ...value, sound, hz, frequencyOverride: hz !== defaultHz });
+  }
   async function solo(value:Channel) {
     if(!prepareSound([value.id]))return;
     setSoloBusy(true);
@@ -42,7 +58,7 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
       <summary><SlidersHorizontal size={16}/> Mix tools</summary>
       <div className="chakra-tools-grid">
         <label>Sound for all<select aria-label="Sound for all chakras" value={allSound} disabled={active.length>0} onChange={e=>setAllSound(e.target.value as Sound)}>{chakraSounds.map(s=><option key={s} value={s}>{sounds[s].name}</option>)}</select></label>
-        <button disabled={active.length>0} onClick={()=>channels.forEach(c=>onChange({...c,sound:allSound}))}>Apply sound</button>
+        <button disabled={active.length>0} onClick={()=>channels.forEach(c=>chooseSound(c,allSound,chakras.find(k=>k.id===c.id)!.hz))}>Apply sound</button>
         <button onClick={()=>channels.forEach(c=>onChange({...c,volume:0.25,muted:false}))}>Reset levels</button>
         <button onClick={()=>{ channels.forEach(c=>engine.stop(c.id)); changeSelection([]); }}>Clear selection</button>
       </div>
@@ -53,16 +69,26 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
         const value=channels.find(row=>row.id===c.id)!;
         const state=states.find(s=>s.id===c.id);
         const status=state ? state.status+" · "+clock(Math.max(0,seconds-state.time))+" left" : "Ready";
-        return <article key={c.id} aria-label={c.name+" chakra"} className={"chakra-row "+(state?"active":"")} style={{"--chakra":c.color} as CSSProperties}>
+        return <article id={"chakra-editor-" + c.id} key={c.id} aria-label={c.name+" chakra"} className={"chakra-row "+(state?"active":"")} style={{"--chakra":c.color} as CSSProperties}>
           <div className="chakra-console-head">
-            <label className="chakra-choice"><input type="checkbox" aria-label={"Select "+c.name} checked={selected.includes(c.id)} onChange={e=>changeSelection(e.target.checked?[...selected,c.id]:selected.filter(id=>id!==c.id))}/><span><strong><span className="chakra-number">{index+1}</span> {c.name}</strong><small>{c.hz} Hz · {value.sound==="sine"?"Pure tone":value.sound==="triangle"||value.sound==="flute"?"Harmonic":"Resonance"}</small><small className="chakra-row-state">{value.muted?"Muted":value.volume===0?"Level is zero":status}</small></span></label>
+            <label className="chakra-choice"><input type="checkbox" aria-label={"Select "+c.name} checked={selected.includes(c.id)} onChange={e=>changeSelection(e.target.checked?[...selected,c.id]:selected.filter(id=>id!==c.id))}/><span><strong><span className="chakra-number">{index+1}</span> {c.name}</strong><small>{value.hz} Hz · {sounds[value.sound].name}</small><small className="chakra-row-state">{value.muted?"Muted":value.volume===0?"Level is zero":status}</small></span></label>
             <Transport compact channels={[{...value,seconds}]} states={states} onError={onError}/>
           </div>
           <div className="chakra-console-controls">
-            <label className="chakra-sound"><span className="sr-only">{c.name} sound type</span><select aria-label={c.name+" sound type"} value={value.sound} disabled={Boolean(state)} onChange={e=>onChange({...value,sound:e.target.value as Sound})}>{chakraSounds.map(s=><option key={s} value={s}>{sounds[s].name}</option>)}</select></label>
+            <label className="chakra-sound"><span className="sr-only">{c.name} sound type</span><select aria-label={c.name+" sound type"} value={value.sound} disabled={Boolean(state)} onChange={e=>chooseSound(value,e.target.value as Sound,c.hz)}>{rawSounds.map(s=><option key={s} value={s}>{sounds[s].name}</option>)}</select></label>
             <label className="chakra-level"><span className="sr-only">{c.name} volume</span><input aria-label={c.name+" volume"} type="range" min="0" max="100" value={Math.round(value.volume*100)} onChange={e=>onChange({...value,volume:Number(e.target.value)/100})}/><output>{Math.round(value.volume*100)}%</output></label>
             <button className="icon-button" aria-label={(value.muted?"Unmute ":"Mute ")+c.name} aria-pressed={value.muted} onClick={()=>onChange({...value,muted:!value.muted})}>{value.muted?<VolumeX size={18}/>:<Volume2 size={18}/>}</button>
-            <details className="chakra-row-menu"><summary aria-label={c.name+" options"}><SlidersHorizontal size={18}/></summary><div><button disabled={soloBusy} aria-label={"Solo "+c.name} onClick={()=>void solo(value)}>Solo {c.name}</button><p>{c.focus} · {c.prompt}</p></div></details>
+            <details className="chakra-row-menu">
+              <summary aria-label={c.name+" options"}><SlidersHorizontal size={18} aria-hidden="true" /></summary>
+              <div>
+                <FrequencyField label={c.name + " frequency (Hz)"} sound={value.sound} value={value.hz}
+                  disabled={Boolean(state)} onChange={hz => onChange({ ...value, hz, frequencyOverride: hz !== c.hz })} />
+                <button disabled={Boolean(state)} onClick={() => onChange({ ...value, sound: "sine", hz: c.hz, frequencyOverride: false })}>Reset frequency</button>
+                <button disabled={soloBusy} aria-label={"Solo " + c.name} onClick={() => void solo(value)}>Solo {c.name}</button>
+                <LibraryLayers prefix={c.name} value={value.accompaniment} tracks={tracks} disabled={Boolean(state)}
+                  onChange={accompaniment => onChange({ ...value, accompaniment })} />
+              </div>
+            </details>
           </div>
         </article>;
       })}

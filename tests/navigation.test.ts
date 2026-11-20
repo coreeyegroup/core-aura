@@ -6,11 +6,17 @@ describe("workspace routes", () => {
       { tab: "manifest", manifestSection: "schedule" },
       {
         tab: "library",
+        libraryView: "manifestation",
         librarySection: "saved",
         category: "Health & wealth / ಕನ್ನಡ",
       },
-      { tab: "library", librarySection: "recordings" },
+      { tab: "library", libraryView: "manifestation", librarySection: "recordings" },
       { tab: "library", libraryView: "audio" },
+      { tab: "library", libraryView: "mixes" },
+      { tab: "library", libraryView: "sounds" },
+      { tab: "library", libraryView: "packs" },
+      { tab: "library", libraryView: "backgrounds" },
+      { tab: "library", librarySection: "playlists" },
       { tab: "explore", exploreView: "packs" },
     ] as const) {
       const route = { ...defaultRoute, ...patch };
@@ -24,7 +30,9 @@ describe("workspace routes", () => {
     expect(
       parseRoute("#library", { ...defaultRoute, libraryView: "audio" })
         .libraryView,
-    ).toBe("audio");
+    ).toBe("overview");
+    expect(parseRoute("#library/affirmations").libraryView).toBe("manifestation");
+    expect(parseRoute("#library/recordings").librarySection).toBe("recordings");
     expect(
       parseRoute("#home", { ...defaultRoute, category: "Wealth" }).category,
     ).toBe("Wealth");

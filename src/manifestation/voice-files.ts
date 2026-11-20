@@ -1,3 +1,4 @@
+import { validateTrackFile } from "../tracks/storage";
 import { PersonalRecording } from "./recordings";
 const maxBytes = 5 * 1024 * 1024,
   maxSeconds = 65,
@@ -111,6 +112,26 @@ export function encodeVoice(
     );
   }
   return new Blob([out], { type: "audio/wav" });
+}
+export async function importAffirmationAudio(file: File, text: string): Promise<PersonalRecording> {
+  validateTrackFile(file);
+  if (file.size > maxBytes) throw Error("Choose an audio file under 5 MB.");
+  let audio: Awaited<ReturnType<typeof canonical>>;
+  try {
+    audio = await canonical(await file.arrayBuffer());
+  } catch {
+    throw Error("Use playable audio up to 60 seconds in a format supported by this device.");
+  }
+  if (audio.seconds < 0.2 || audio.seconds > 60)
+    throw Error("Choose an audio clip between 0.2 and 60 seconds.");
+  return {
+    ...audio,
+    id: crypto.randomUUID(),
+    kind: "affirmation",
+    text,
+    mime: "audio/wav",
+    createdAt: new Date().toISOString(),
+  };
 }
 async function canonical(buffer: ArrayBuffer) {
   const context = new OfflineAudioContext(1, 1, rate),

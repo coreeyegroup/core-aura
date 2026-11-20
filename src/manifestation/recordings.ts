@@ -1,6 +1,8 @@
 export type PersonalRecording = {
   id: string;
   text: string;
+  title?: string;
+  kind?: "affirmation";
   mime: string;
   seconds: number;
   createdAt: string;
@@ -19,7 +21,7 @@ function open(): Promise<IDBDatabase> {
       reject(Error("Close other Core-aura windows and try again."));
   });
 }
-export async function recordings(): Promise<PersonalRecording[]> {
+export async function allRecordings(): Promise<PersonalRecording[]> {
   const db = await open();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("recordings", "readonly"),
@@ -33,6 +35,9 @@ export async function recordings(): Promise<PersonalRecording[]> {
       reject(Error("Recordings could not be read."));
     };
   });
+}
+export async function recordings(kind: "voice" | "affirmation" = "voice") {
+  return (await allRecordings()).filter(clip => (clip.kind ?? "voice") === kind);
 }
 export async function recording(id: string): Promise<PersonalRecording> {
   const db = await open();
@@ -100,6 +105,22 @@ export async function saveRecording(value: PersonalRecording) {
     };
   });
 }
+export async function renameRecording(id: string, title: string) {
+  const name = title.trim();
+  if (!name || name.length > 80) throw Error("Use a recording name of 1–80 characters.");
+  const db = await open();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction("recordings", "readwrite");
+    const store = tx.objectStore("recordings");
+    const request = store.get(id);
+    request.onsuccess = () => {
+      if (request.result) store.put({ ...request.result, title: name });
+      else tx.abort();
+    };
+    tx.oncomplete = () => { db.close(); changed(); resolve(); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(Error("Recording could not be renamed.")); };
+  });
+}
 export async function deleteRecording(id: string) {
   const db = await open();
   return new Promise<void>((resolve, reject) => {
@@ -122,6 +143,6 @@ export function withoutRecordings<
   return {
     ...plan,
     useRecordings: false,
-    lines: plan.lines.map(({ recordingId, recordedText, ...line }) => line),
+    lines: plan.lines.map(({ recordingId, recordedText, audioAffirmation, ...line }) => line),
   };
 }

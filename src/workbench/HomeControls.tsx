@@ -1,58 +1,323 @@
-import {SequenceSetup,SequenceTransport} from "./SequenceControls";
-import {chakraSequence} from "./sequence";
-import {ReactNode,useState,useSyncExternalStore} from "react";
-import {Channel,Session,Sound,sounds,chakras,chakraSounds} from "../model";
-import {engine,VoiceState} from "../audio/engine";
-import {manifestPlayer} from "../manifestation/player";
-import {manifestationStore as store} from "../manifestation/store";
-import {draftChanged,confirmDraftReplacement,practiceActive} from "../manifestation/flow";
-import {Plan,nextOccurrence} from "../manifestation/model";
-import {VoicePanel} from "../manifestation/VoicePanel";
-import {BackgroundControls} from "../manifestation/BackgroundControls";
-import {Transport} from "../components/Controls";
-import {preferences,ModuleId,remember,togglePin} from "./preferences";
-import {NumberInput} from "./NumberInput";
-import {Presets} from "./Presets";
-import {HistoryPanel} from "./HistoryPanel";
-import {isNature} from "../nature/catalog";
-import {syncPhoneReminders} from "../manifestation/reminders";
-type Props={sessions:Session[];layers:Channel[];states:VoiceState[];soundSeconds:number;chakraSeconds:number;master:number;chakraChannels:Channel[];selected:string[];target:"all"|"selected";onLayer:(c:Channel)=>void;onSound:(s:Sound)=>void;onSession:(s:Session)=>void;onSoundSeconds:(s:number)=>void;onChakraSeconds:(s:number)=>void;onMaster:(v:number)=>void;onSelected:(s:string[])=>void;onTarget:(t:"all"|"selected")=>void;onChakra:(c:Channel)=>void;onOpen:(page:"manifest"|"studio"|"chakras"|"schedule"|"nature"|"library")=>void;onSelectPractice:(id:string)=>void;onPractice:(id:string)=>unknown;tools:ReactNode;};
-export function HomeControls(props:Props){
- const {sessions,layers,states,master,chakraChannels,selected,target}=props,{data}=useSyncExternalStore(store.subscribe,store.snapshot),practice=useSyncExternalStore(manifestPlayer.subscribe,manifestPlayer.snapshot),{value:prefs,error}=useSyncExternalStore(preferences.subscribe,preferences.snapshot);
- const sequence=useSyncExternalStore(chakraSequence.subscribe,chakraSequence.snapshot);
- const active=practiceActive(practice),p=active&&practice.plan?practice.plan:data.draft,[message,setMessage]=useState(""),[now,setNow]=useState(()=>new Date());
- const attempt=(f:()=>unknown)=>{try{f();setMessage("");}catch(e){setMessage((e as Error).message);}};
- const change=(patch:Partial<Plan>)=>attempt(()=>store.draft({...p,...patch}));
- const base=layers[0],soundActive=states.some(s=>layers.some(c=>c.id===s.id)),chakraActive=states.some(s=>chakraChannels.some(c=>c.id===s.id));
- const currentChakras=chakraChannels.filter(c=>target==="all"||selected.includes(c.id)).map(c=>({...c,seconds:props.chakraSeconds}));
- const title:Record<ModuleId,string>={manifest:"Manifestation",sound:"Sound",chakra:"Chakra",schedule:"Next schedule",pinned:"Pinned & recent",tools:"Additional tools"};
- const upcoming=data.reminders.map(r=>({r,date:nextOccurrence(r,now)})).filter(x=>x.date).sort((a,b)=>+a.date!-+b.date!)[0];
- const modules:Record<ModuleId,ReactNode>={
- manifest:<>
-  <div className="home-module-toolbar"><select aria-label="Home practice" disabled={active} value={p.id} onChange={e=>props.onSelectPractice(e.target.value)}>{!data.plans.some(r=>r.id===p.id)&&<option value={p.id}>{p.name} · Draft</option>}{data.plans.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select><span className="status-tag">{active?practice.status:draftChanged(p,data.plans)?"Modified":"Saved"}</span><button onClick={()=>props.onOpen("manifest")}>Open editor</button></div>
-  <p className="home-sentence">{p.lines[(active?practice.step:0)%Math.max(1,p.lines.length)]?.text||"Choose affirmations or write a sentence to begin."}</p>
-  <div className="home-fields"><label>Repeats<NumberInput label="Home repetitions" value={p.repeats} min={1} max={108} step={1} disabled={active} onChange={repeats=>change({repeats:Math.round(repeats)})}/></label><label>Timer<select aria-label="Home practice duration" disabled={active} value={p.seconds} onChange={e=>change({seconds:Number(e.target.value)})}>{[...new Set([p.seconds,60,300,600,1800,3600])].sort((a,b)=>a-b).map(n=><option key={n} value={n}>{n/60} min</option>)}</select></label><label>Mode<select aria-label="Home practice mode" disabled={active} value={p.mode} onChange={e=>change({mode:e.target.value as Plan["mode"]})}><option value="speech">Spoken</option><option value="read">Reading</option></select></label></div>
-  <div className="home-actions"><button className="primary" disabled={!p.lines.length} onClick={()=>attempt(()=>{if(active){props.onOpen("manifest");return;}manifestPlayer.start(p);remember({kind:"practice",id:p.id});})}>{active?"Open active player":"Start practice"}</button><button disabled={active||!p.lines.length} onClick={()=>attempt(()=>store.save())}>Save practice</button><button disabled={active} onClick={()=>attempt(()=>{if(confirmDraftReplacement(data.draft,data.plans))store.fresh();})}>New</button></div>
-  <VoicePanel/>
-  <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>active?attempt(()=>manifestPlayer.updateBackground(patch)):change(patch)}/>
-  {active&&<div className="fields"><label className="range-label">Voice · next sentence <output>{Math.round(p.volume*100)}%</output><input aria-label="Home live voice level" type="range" min="0" max="100" value={p.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><button onClick={()=>attempt(()=>{if(data.draft.id!==p.id&&!confirmDraftReplacement(data.draft,data.plans))return;store.draft(structuredClone(p));store.save();})}>Save live settings</button></div>}
-  <Presets onOpen={()=>props.onOpen("manifest")}/>
- </>,
- sound:<>
-  <div className="home-module-toolbar"><label>Sound / mix<select aria-label="Home sound" disabled={soundActive} value="workspace" onChange={e=>{const value=e.target.value;if(value.startsWith("session:")){const s=sessions.find(s=>s.id===value.slice(8));if(s)props.onSession(s);}else props.onSound(value as Sound);}}><option value="workspace">{layers.length===1?sounds[base.sound].name:layers.length+" layers"} · Current workspace</option><optgroup label="Saved generated mixes">{sessions.map(s=><option key={s.id} value={"session:"+s.id}>{s.name} · {s.channels.length} layers</option>)}</optgroup><optgroup label="Generated sounds">{Object.entries(sounds).map(([id,s])=><option key={id} value={id}>{s.name}</option>)}</optgroup></select></label><button onClick={()=>props.onOpen("studio")}>Open mixer</button><button onClick={()=>props.onOpen("nature")}>Nature</button></div>
-  <div className="home-fields"><label>{isNature(base.sound)?"Filter centre Hz":"Frequency Hz"}<NumberInput label="Home sound frequency" value={base.hz} min={sounds[base.sound].min} max={sounds[base.sound].max} disabled={isNature(base.sound)&&!base.focus} onChange={hz=>props.onLayer({...base,hz})}/></label><label>Timer<select aria-label="Home sound duration" disabled={soundActive} value={props.soundSeconds} onChange={e=>props.onSoundSeconds(Number(e.target.value))}>{[...new Set([props.soundSeconds,60,300,600,1800,3600])].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n/60} min</option>)}</select></label><label className="range-label">Layer level <output>{Math.round(base.volume*100)}%</output><input aria-label="Home sound level" type="range" min="0" max="100" value={base.volume*100} onChange={e=>props.onLayer({...base,volume:Number(e.target.value)/100})}/></label></div>
-  {isNature(base.sound)&&<label className="check"><input type="checkbox" checked={base.focus??false} onChange={e=>props.onLayer({...base,focus:e.target.checked})}/> Frequency focus · filter band, not a single tone</label>}
-  {soundActive?<button className="wide" onClick={()=>props.onOpen("studio")}>Open active sound player · {states.filter(s=>layers.some(c=>c.id===s.id)&&s.status==="playing").length} playing</button>:<Transport channels={layers.map(c=>({...c,seconds:props.soundSeconds}))} states={states} onError={setMessage}/>}
- </>,
- chakra:<>
-  <div className="home-chakra-choices">{chakras.map(c=><button key={c.id} aria-label={"Home select "+c.name} aria-pressed={target==="all"||selected.includes(c.id)} onClick={()=>{props.onTarget("selected");const current=target==="all"?chakras.map(c=>c.id):selected;props.onSelected(current.includes(c.id)?current.filter(id=>id!==c.id):[...current,c.id]);}}><strong>{c.name}</strong><small>{c.hz} Hz</small></button>)}</div>
-  <div className="home-fields"><label>Sound<select aria-label="Home chakra sound" disabled={chakraActive} value={chakraChannels[0].sound} onChange={e=>chakraChannels.forEach(c=>props.onChakra({...c,sound:e.target.value as Sound}))}>{chakraSounds.map(s=><option key={s} value={s}>{sounds[s].name}</option>)}</select></label><label>Timer<select aria-label="Home chakra duration" disabled={chakraActive} value={props.chakraSeconds} onChange={e=>props.onChakraSeconds(Number(e.target.value))}>{[...new Set([props.chakraSeconds,60,300,600,1800,3600])].sort((a,b)=>a-b).map(n=><option value={n} key={n}>{n/60} min</option>)}</select></label><button aria-pressed={target==="all"} onClick={()=>props.onTarget(target==="all"?"selected":"all")}>All seven</button></div>
-  <p className="content-note">{currentChakras.length} selected · {states.filter(s=>chakraChannels.some(c=>c.id===s.id)&&s.status==="playing").length} playing · selection applies on next Start.</p>
-  {chakraActive||["playing","paused"].includes(sequence.status)?<p className="content-note">Use the active player for Pause / Resume / Stop.</p>:<Transport channels={currentChakras} stopChannels={chakraChannels} exclusive states={states} onError={setMessage}/>}<SequenceSetup channels={currentChakras} showTransport={false}/><button className="wide" onClick={()=>props.onOpen("chakras")}>Open Chakra mixer</button>
- </>,
- schedule:<>{upcoming?<><div className="workbench-row"><span><strong>{data.plans.find(p=>p.id===upcoming.r.planId)?.name}</strong><small>{upcoming.date!.toLocaleString()} · {upcoming.r.time}</small></span><button onClick={()=>attempt(()=>{const p=data.plans.find(p=>p.id===upcoming.r.planId);if(p)manifestPlayer.start(p);})}>Play now</button><button onClick={()=>attempt(()=>{store.reminders(data.reminders.map(r=>r.id===upcoming.r.id?{...r,enabled:false}:r));void syncPhoneReminders().then(setMessage).catch(e=>setMessage(e.message));})}>Disable</button></div></>:<p className="content-note">No upcoming enabled schedules.</p>}<button className="wide" onClick={()=>props.onOpen("schedule")}>Add / edit schedules</button></>,
- pinned:<>{prefs.pins.length===0&&<p className="content-note">Pin practices and generated mixes from Library.</p>}{[{name:"Pinned",rows:prefs.pins},{name:"Recent",rows:prefs.recent}].map(group=><div key={group.name}><h3>{group.name}</h3>{group.rows.slice(0,8).map(ref=>{const item=ref.kind==="practice"?data.plans.find(p=>p.id===ref.id):sessions.find(s=>s.id===ref.id);return <div className="workbench-row" key={ref.kind+ref.id}><span><strong>{item?.name??"Unavailable item"}</strong><small>{ref.kind}</small></span>{item&&<button onClick={()=>ref.kind==="practice"?props.onPractice(ref.id):(()=>{props.onSession(item as Session);props.onOpen((item as Session).kind==="chakras"?"chakras":"studio");})()}>Open</button>}{group.name==="Pinned"?<button onClick={()=>attempt(()=>togglePin(ref))}>Unpin</button>:<button onClick={()=>attempt(()=>preferences.update({recent:prefs.recent.filter(r=>r.id!==ref.id||r.kind!==ref.kind)}))}>Remove</button>}</div>;})}</div>)}</>,
- tools:props.tools,
- };
- return <><div className="home-output"><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Home sound output" type="range" min="0" max="100" value={master*100} onChange={e=>props.onMaster(Number(e.target.value)/100)}/></label><small>Shared sound output · voice is separate</small></div>{prefs.order.map(id=><details key={id} className="workbench-panel home-working-module" data-module={id} open={!prefs.collapsed.includes(id)} onToggle={e=>{const closed=!(e.currentTarget as HTMLDetailsElement).open;if(closed===prefs.collapsed.includes(id))return;attempt(()=>preferences.update({collapsed:closed?[...prefs.collapsed,id]:prefs.collapsed.filter(v=>v!==id)}));}}><summary>{title[id]}</summary>{modules[id]}</details>)}<HistoryPanel onPractice={props.onPractice}/>{(message||error)&&<p role="status">{message||error}</p>}</>;
+import type { Track } from "../tracks/storage";
+import { ReactNode, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  ArrowDownRight, ArrowRight, AudioLines, BookOpen, Clock3, Download,
+  Flower2, Heart, ListMusic, Play, Plus,
+} from "lucide-react";
+import { Session, sessionDuration } from "../model";
+import { manifestationStore as store } from "../manifestation/store";
+import { nextOccurrence } from "../manifestation/model";
+import { ItemRef, ModuleId, preferences } from "./preferences";
+import { playlistStore } from "../playlists/store";
+import { durationLabel, PlaylistRef, resolveItems } from "../playlists/model";
+import { playbackReadiness, usePlaybackInventory, type Readiness } from "../playlists/readiness";
+import { queuePlayer, startQueue } from "../playlists/runtime";
+
+type Props = {
+  sessions: Session[];
+  tracks: Track[];
+  onPractice: (id: string) => unknown;
+  onSession: (session: Session) => void;
+  onOpen: (page: "manifest" | "studio" | "chakras" | "schedule" | "library") => void;
+  tools: ReactNode;
+  onDownloads: () => void;
+};
+
+const sections = {
+  manifest: { title: "Manifestation", icon: BookOpen },
+  sound: { title: "Sound mixes", icon: AudioLines },
+  chakra: { title: "Chakra sessions", icon: Flower2 },
+  schedule: { title: "Next session", icon: Clock3 },
+  pinned: { title: "Favorites & recent", icon: Heart },
+  tools: { title: "Practice tools", icon: ArrowDownRight },
+};
+
+type SavedChoice = {
+  id: string;
+  name: string;
+  detail: string;
+};
+
+function SavedPicker({ id, name, choices, selectedId, onSelect, onPlay, onEdit }: {
+  id: string;
+  name: string;
+  choices: SavedChoice[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+  onPlay: (choice: SavedChoice) => void;
+  onEdit: (choice?: SavedChoice) => void;
+}) {
+  const choice = choices.find((item) => item.id === selectedId) ?? choices[0];
+  if (!choice) {
+    return (
+      <div className="home-section-meta home-empty">
+        <small>Nothing saved yet</small>
+        <button className="text-button" onClick={() => onEdit()}>
+          <Plus size={15} aria-hidden="true" /> Create
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="home-select-play">
+        <select id={"home-" + id} aria-label={"Home " + name} value={choice.id}
+          onChange={(event) => onSelect(event.target.value)}>
+          {choices.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <button className="primary" aria-label={"Play selected " + name}
+          onClick={() => onPlay(choice)}>
+          <Play size={15} aria-hidden="true" /> Play
+        </button>
+      </div>
+      <div className="home-section-meta">
+        <small>{choice.detail}</small>
+        <button className="text-button" onClick={() => onEdit(choice)}>
+          Open section <ArrowRight size={14} aria-hidden="true" />
+        </button>
+      </div>
+    </>
+  );
+}
+
+export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools, onDownloads }: Props) {
+  const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
+  const { data: lists, error: listError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
+  const { value: prefs, error } = useSyncExternalStore(preferences.subscribe, preferences.snapshot);
+  const { inventory, online } = usePlaybackInventory();
+  const queue = useSyncExternalStore(queuePlayer.subscribe, queuePlayer.snapshot);
+  const [practiceId, setPracticeId] = useState("");
+  const [soundId, setSoundId] = useState("");
+  const [chakraId, setChakraId] = useState("");
+  const [playlistId, setPlaylistId] = useState("");
+  const [message, setMessage] = useState("");
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const playlist = lists.playlists.find((item) => item.id === playlistId) ?? lists.playlists[0];
+  const itemFor = (ref: PlaylistRef) => ref.kind === "track"
+    ? tracks.find(track => track.id === ref.id)
+    : ref.kind === "practice"
+    ? data.plans.find((plan) => plan.id === ref.id)
+    : sessions.find((session) => session.id === ref.id);
+  const playlistEntries = playlist?.items.map(itemFor);
+  function inspect(refs: PlaylistRef[]): Readiness {
+    try {
+      return playbackReadiness(resolveItems(refs, data.plans, sessions, tracks), inventory);
+    } catch (error) {
+      return { status: "repair", message: (error as Error).message };
+    }
+  }
+  const readiness = playlist ? inspect(playlist.items) : undefined;
+  const duration = playlistEntries?.reduce((total, entry) => {
+    if (!entry) return total;
+    if ("duration" in entry) return total + entry.duration;
+    if ("channels" in entry) return total + sessionDuration(entry);
+    return total + entry.seconds;
+  }, 0) ?? 0;
+  const upcoming = data.reminders
+    .map((reminder) => ({ reminder, date: nextOccurrence(reminder, now) }))
+    .filter((entry) => entry.date)
+    .sort((a, b) => +a.date! - +b.date!)[0];
+  const nextPractice = upcoming && data.plans.find((plan) => plan.id === upcoming.reminder.planId);
+  const active = queue.status === "playing" || queue.status === "paused";
+  const replay = prefs.lastQueue;
+  const replayReadiness = replay ? inspect(replay.items) : undefined;
+  const blocked = (result?: Readiness) => result?.status === "repair" || (!online && result?.status === "connection");
+
+  async function attempt(action: () => unknown) {
+    setMessage("");
+    try {
+      await action();
+    } catch (failure) {
+      setMessage(failure instanceof Error ? failure.message : String(failure));
+    }
+  }
+
+  function play(refs: PlaylistRef[], name: string) {
+    return attempt(() => startQueue(resolveItems(refs, data.plans, sessions, tracks), name));
+  }
+
+  const mixChoices = (kind: "sound" | "chakra") => sessions
+    .filter((session) => (session.kind === "chakras") === (kind === "chakra"))
+    .map((session) => {
+      const count = session.channels.length;
+      const unit = kind === "sound" ? (count === 1 ? "layer" : "layers") : (count === 1 ? "chakra" : "chakras");
+      return { id: session.id, name: session.name, detail: `${count} ${unit} · ${durationLabel(sessionDuration(session))}` };
+    });
+
+  const modules: Record<ModuleId, ReactNode> = {
+    manifest: (
+      <SavedPicker id="manifest" name="manifestation" selectedId={practiceId} onSelect={setPracticeId}
+        choices={data.plans.map((plan) => ({
+          id: plan.id,
+          name: plan.name,
+          detail: `${plan.lines.length} ${plan.lines.length === 1 ? "sentence" : "sentences"} · ${plan.repeats}× · ≤${durationLabel(plan.seconds)}`,
+        }))}
+        onPlay={(choice) => void play([{ kind: "practice", id: choice.id }], choice.name)}
+        onEdit={(choice) => choice ? onPractice(choice.id) : onOpen("manifest")} />
+    ),
+    sound: (
+      <SavedPicker id="sound" name="sound mix" selectedId={soundId} onSelect={setSoundId}
+        choices={mixChoices("sound")}
+        onPlay={(choice) => void play([{ kind: "session", id: choice.id }], choice.name)}
+        onEdit={(choice) => {
+          const session = sessions.find(item => item.id === choice?.id);
+          if (session) onSession(session); else onOpen("studio");
+        }} />
+    ),
+    chakra: (
+      <SavedPicker id="chakra" name="chakra session" selectedId={chakraId} onSelect={setChakraId}
+        choices={mixChoices("chakra")}
+        onPlay={(choice) => void play([{ kind: "session", id: choice.id }], choice.name)}
+        onEdit={(choice) => {
+          const session = sessions.find(item => item.id === choice?.id);
+          if (session) onSession(session); else onOpen("chakras");
+        }} />
+    ),
+    schedule: upcoming ? (
+      <div className="home-list-row">
+        <div>
+          <strong>{nextPractice?.name || "Unavailable practice"}</strong>
+          <small>{upcoming.date!.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" })}</small>
+        </div>
+        <button className="icon-button" aria-label="Play next scheduled practice" disabled={!nextPractice}
+          onClick={() => nextPractice && play([{ kind: "practice", id: nextPractice.id }], nextPractice.name)}>
+          <Play size={16} aria-hidden="true" />
+        </button>
+        <button className="text-button" onClick={() => onOpen("schedule")}>Schedule</button>
+      </div>
+    ) : (
+      <div className="home-section-meta home-empty">
+        <small>No upcoming session</small>
+        <button className="text-button" onClick={() => onOpen("schedule")}>Set schedule</button>
+      </div>
+    ),
+    pinned: (
+      <div className="home-shortcut-groups">
+        {([{ name: "Favorites", key: "pins" }, { name: "Recently played", key: "recent" }] as const).map((group) => (
+          <div className="home-shortcuts" key={group.key}>
+            <h3>{group.name}</h3>
+            {!prefs[group.key].length && <p>No {group.key === "pins" ? "favorites" : "playback history"} yet</p>}
+            {prefs[group.key].slice(0, 4).map((ref) => {
+              const item = itemFor(ref) as Session | typeof data.plans[number] | undefined;
+              return (
+                <div className="home-list-row" key={ref.kind + ref.id}>
+                  <div>
+                    <strong>{item?.name || "Unavailable item"}</strong>
+                    <small>{ref.kind === "practice" ? "Manifestation" : (item as Session)?.kind === "chakras" ? "Chakra" : "Sound"}</small>
+                  </div>
+                  {item ? (
+                    <button className="icon-button" aria-label={"Play " + group.name.toLowerCase() + " " + item.name}
+                      onClick={() => void play([ref], item.name)}>
+                      <Play size={16} aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <button className="text-button" onClick={() => void attempt(() => preferences.update({
+                      [group.key]: prefs[group.key].filter((row) => row.id !== ref.id || row.kind !== ref.kind),
+                    }))}>Remove</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    ),
+    tools,
+  };
+
+  return (
+    <div className="home-listening">
+      <section className="home-playlists" aria-label="Home playlists">
+        <div className="home-playlist-intro">
+          <div>
+            <div className="home-playlist-label"><ListMusic size={15} aria-hidden="true" /> {playlist ? "Selected playlist" : "Playlists"}</div>
+            <h2>{playlist?.name ?? "Make time to listen"}</h2>
+            <p>{playlist ? `${playlist.items.length} ${playlist.items.length === 1 ? "item" : "items"} · ${durationLabel(duration)}`
+              : "Save practices and sounds together in a playlist."}</p>
+            {readiness && <p className="home-playlist-readiness" aria-live="polite">{readiness.message}</p>}
+          </div>
+        </div>
+        {playlist ? (
+          <div className="home-select-play home-hero-controls">
+            <button className="primary" disabled={blocked(readiness)} aria-label="Play selected playlist"
+              onClick={() => void play(playlist.items, playlist.name)}>
+              <Play size={16} aria-hidden="true" /> Play playlist
+            </button>
+            <select aria-label="Home playlist" value={playlist.id} onChange={(event) => setPlaylistId(event.target.value)}>
+              {lists.playlists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </div>
+        ) : (
+          <button className="primary home-create-playlist" onClick={() => onOpen("library")}>
+            Open playlist library <ArrowRight size={16} aria-hidden="true" />
+          </button>
+        )}
+      </section>
+
+      {!active && replay && (
+        <section className="home-continue" aria-label="Continue listening">
+          <div><small>Last played</small><strong>{replay.name}</strong>
+            {replayReadiness && <small>{replayReadiness.message}</small>}
+          </div>
+          {replayReadiness?.status === "repair" ? <button className="text-button" onClick={() => onOpen("library")}>Open Library</button>
+            : <button className="text-button" disabled={blocked(replayReadiness)} onClick={() => void play(replay.items, replay.name)}>
+              <Play size={16} aria-hidden="true" /> Play again
+            </button>}
+        </section>
+      )}
+
+      <section className="home-saved" aria-labelledby="home-saved-title">
+        <h2 id="home-saved-title">Saved sessions</h2>
+        {prefs.order.map((id) => {
+          const { icon: Icon, title } = sections[id];
+          const collapsed = prefs.collapsed.includes(id);
+          return (
+            <details key={id} className="home-working-module home-play-section" data-module={id}
+              open={!collapsed} onToggle={(event) => {
+                const closed = !event.currentTarget.open;
+                if (closed !== collapsed) {
+                  void attempt(() => preferences.update({
+                    collapsed: closed ? [...prefs.collapsed, id] : prefs.collapsed.filter((entry) => entry !== id),
+                  }));
+                }
+              }}>
+              <summary>
+                <span className="home-module-icon"><Icon size={17} aria-hidden="true" /></span>
+                <span>{title}</span>
+              </summary>
+              <div className="home-module-content">{modules[id]}</div>
+            </details>
+          );
+        })}
+      </section>
+      {playlist && (
+        <section className="home-queue-card" aria-label="In this playlist">
+          <h2>In this playlist</h2>
+          <ol>
+            {playlistEntries?.map((item, index) => <li key={index}>
+              <strong>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</strong>
+              <small>{!item ? "Replace in Library" : "title" in item ? "Audio file" : "channels" in item
+                ? item.kind === "chakras" ? "Chakra session" : "Sound mix" : "Manifestation"}</small>
+            </li>)}
+          </ol>
+          <button className="text-button" onClick={() => onOpen("library")}>
+            Manage playlists <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        </section>
+      )}
+
+      <section className="home-offline-card" aria-label="Offline library">
+        <h2>Offline library</h2>
+        <button className="text-button" onClick={onDownloads}><Download size={16} aria-hidden="true" /> View downloads</button>
+      </section>
+      {(message || error || listError) && <p className="notice" role="status">{message || error || listError}</p>}
+    </div>
+  );
 }

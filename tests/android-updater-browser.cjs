@@ -27,8 +27,11 @@ const {chromium}=require("playwright"),assert=require("node:assert/strict"),fs=r
  await button.click();await p.waitForFunction(()=>window.__installCalls===2);await p.evaluate(()=>window.__updateProgress({phase:"permission",busy:true,received:8000000,total:8000000}));await p.getByText("Allow updates from Core-aura in Android, then return here to continue.",{exact:true}).waitFor();
  await p.evaluate(()=>window.__updateProgress({phase:"installing",busy:true,received:8000000,total:8000000}));assert.equal(await p.getByRole("button",{name:"Cancel update",exact:true}).count(),0);
  await p.evaluate(()=>window.__updateProgress({phase:"confirming",busy:true,received:8000000,total:8000000}));await p.getByText("Confirm Update in Android to finish.",{exact:true}).waitFor();assert.equal(await p.getByRole("button",{name:"Cancel update",exact:true}).count(),0);
+ await p.evaluate(()=>window.__finishUpdate({status:"closed"}));
+ await p.getByRole("button",{name:"Open official Android download",exact:true}).waitFor();
+ await button.click();await p.waitForFunction(()=>window.__installCalls===3);
  await p.evaluate(()=>{window.__installedCode=23;window.__finishUpdate({status:"installed"});});await p.getByText("Installed: 0.23.0 · build 23",{exact:true}).waitFor();
- await button.click();await p.getByText("You have the latest Android app.",{exact:true}).waitFor();assert.equal(await p.evaluate(()=>window.__installCalls),2);assert.equal(await p.evaluate(()=>window.__openDownloads),0);assert.equal(popups,0);
+ await button.click();await p.getByText("You have the latest Android app. Installed and available: 0.23.0.",{exact:true}).waitFor();assert.equal(await p.evaluate(()=>window.__installCalls),3);assert.equal(await p.evaluate(()=>window.__openDownloads),0);assert.equal(popups,0);
  for(const width of [320,393]){await p.setViewportSize({width,height:852});await p.locator(".android-updates").scrollIntoViewIfNeeded();assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));fs.mkdirSync("mobile-verification",{recursive:true});await p.screenshot({path:"mobile-verification/android-native-updater-"+width+".png"});}
  assert.deepEqual(errors,[]);await c.close();console.log("Mocked native UI: one Update latest action, private installer invocation, progress across Settings, cancellation, permission/installer phases, current version and no browser download passed.");
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

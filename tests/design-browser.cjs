@@ -138,7 +138,7 @@ const { chromium } = require("playwright"),
       await p.evaluate(
         () => document.querySelector('meta[name="theme-color"]').content,
       ),
-      "#f5f6f8",
+      "#f4f6f8",
     );
     await p.setViewportSize({ width: 1366, height: 900 });
     await navigate(p, "Studio");
@@ -154,6 +154,7 @@ const { chromium } = require("playwright"),
       .getByRole("button", { name: "Manifest", exact: true })
       .last()
       .click();
+    await p.getByRole("button", { name: "Practice", exact: true }).click();
     await p.screenshot({
       path: "mobile-verification/design-desktop-manifest.png",
     });

@@ -22,6 +22,19 @@ let overlay: AbortController | undefined;
 let pending:
   | { utterance: SpeechSynthesisUtterance; cancel: () => void }
   | undefined;
+export function chooseDeviceVoice<T extends Voice>(voices: T[], requested: string, offline: boolean): T | undefined {
+  const selected = voices.find(voice => voice.voiceURI === requested);
+  if (!offline) return selected;
+  if (selected?.localService) return selected;
+  const language = (selected?.lang ?? (requested.startsWith("core:") ? requested.slice(5) : "en-US"))
+    .toLowerCase().split("+")[0];
+  const primary = language.split("-")[0];
+  const local = voices.filter(voice => voice.localService);
+  const fallback = local.find(voice => voice.lang.toLowerCase() === language)
+    ?? local.find(voice => voice.lang.toLowerCase().split("-")[0] === primary);
+  if (!fallback) throw Error("No offline voice is installed for this language. Download one in device settings, use an audio affirmation, or choose silent reading.");
+  return fallback;
+}
 export const speech: SpeechDriver = {
   async voices() {
     if (Capacitor.isNativePlatform())
@@ -42,14 +55,17 @@ export const speech: SpeechDriver = {
       speechSynthesis.cancel();
   },
   async speakLine(line, plan) {
-    if (plan.useRecordings && line.recordingId) {
+    if ((line.audioAffirmation || plan.useRecordings) && line.recordingId) {
       overlay?.abort();
       const controller = new AbortController();
       overlay = controller;
       try {
         const clip = await recording(line.recordingId);
-        if (clip.text !== line.text)
+        if (line.audioAffirmation) {
+          if (clip.kind !== "affirmation") throw Error("This audio affirmation is unavailable.");
+        } else if (clip.text !== line.text) {
           throw Error("Record this sentence again: its words changed.");
+        }
         await engine.playOverlay(
           () => clip.blob.arrayBuffer(),
           plan.volume,
@@ -62,7 +78,8 @@ export const speech: SpeechDriver = {
   },
   async speak(text, plan) {
     const token = generation;
-    if (plan.voice.startsWith("core:")) {
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    if (!offline && plan.voice.startsWith("core:")) {
       overlay?.abort();
       const controller = new AbortController();
       overlay = controller;
@@ -82,7 +99,8 @@ export const speech: SpeechDriver = {
       if (token !== generation) return;
       const voices = (await TextToSpeech.getSupportedVoices()).voices;
       if (token !== generation) return;
-      const index = voices.findIndex((v) => v.voiceURI === plan.voice);
+      const selected = chooseDeviceVoice(voices, plan.voice, offline);
+      const index = selected ? voices.indexOf(selected) : -1;
       await TextToSpeech.speak({
         text,
         lang: index >= 0 ? voices[index].lang : "en-US",
@@ -99,9 +117,7 @@ export const speech: SpeechDriver = {
       );
     return new Promise<void>((resolve, reject) => {
       const utterance = new SpeechSynthesisUtterance(text);
-      const voice = speechSynthesis
-        .getVoices()
-        .find((v) => v.voiceURI === plan.voice);
+      const voice = chooseDeviceVoice(speechSynthesis.getVoices(), plan.voice, offline);
       if (voice) {
         utterance.voice = voice;
         utterance.lang = voice.lang;

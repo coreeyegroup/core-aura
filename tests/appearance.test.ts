@@ -22,12 +22,12 @@ describe("appearance preferences", () => {
     });
     vi.stubGlobal("localStorage", {
       getItem: () =>
-        JSON.stringify({ textSize: 900, density: "broken", theme: "contrast" }),
+        JSON.stringify({ textSize: 900, density: "broken", theme: "yellow" }),
     });
     expect(readAppearance()).toEqual({
       textSize: 140,
       density: "compact",
-      theme: "contrast",
+      theme: "yellow",
     });
   });
   it("applies system colors and chrome metadata even when persistence fails", () => {
@@ -48,13 +48,23 @@ describe("appearance preferences", () => {
       saveAppearance({ textSize: 100, density: "compact", theme: "system" }),
     ).toBe(false);
     expect(root.dataset.resolvedTheme).toBe("dark");
-    expect(meta.content).toBe("#14161c");
+    expect(meta.content).toBe("#17231d");
     applyAppearance({
       textSize: 125,
       density: "comfortable",
-      theme: "contrast",
+      theme: "yellow",
     });
     expect(root.dataset.textSize).toBe("large");
-    expect(meta.content).toBe("#000000");
+    expect(meta.content).toBe("#fff8dc");
+    applyAppearance({
+      textSize: 100,
+      density: "compact",
+      theme: "custom",
+      customColor: "#ffffff",
+    });
+    expect(meta.content).toBe("#ffffff");
+    expect(set).toHaveBeenCalledWith("--theme-accent", "#6e6e6e");
+    applyAppearance({ textSize: 100, density: "compact", theme: "light" });
+    expect(set).toHaveBeenCalledWith("--theme-accent", "");
   });
 });

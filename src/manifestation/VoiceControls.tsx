@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { engine } from "../audio/engine";
 import { Capacitor } from "@capacitor/core";
-import { Play, Square } from "lucide-react";
+import { Play, Square, Upload } from "lucide-react";
 import { deliverFile } from "../files/deliver";
-import { importVoice, exportVoice } from "./voice-files";
+import { importAffirmationAudio, importVoice, exportVoice } from "./voice-files";
+import { speech, type Voice } from "./speech";
+import { coreVoices } from "./server-voice";
 import { Line } from "./model";
 import { manifestPlayer } from "./player";
 import { manifestationStore as store } from "./store";
@@ -13,17 +15,24 @@ import {
   saveRecording,
   recordings,
   deleteRecording,
+  renameRecording,
 } from "./recordings";
 export function PreviewButton({
   line,
   id,
   recorded = false,
   label,
+  voice,
+  catalog = false,
+  iconOnly = false,
 }: {
   line: Line;
   id: string;
   recorded?: boolean;
   label?: string;
+  voice?: string;
+  catalog?: boolean;
+  iconOnly?: boolean;
 }) {
   const state = useSyncExternalStore(
       manifestPlayer.subscribe,
@@ -36,12 +45,13 @@ export function PreviewButton({
   return (
     <>
       <button
-        className="preview-button"
+        className={iconOnly ? "icon-button preview-button" : "preview-button"}
+        title={iconOnly ? playing ? "Stop test" : "Test play" : undefined}
         disabled={!line.text.trim()}
         aria-label={
           label
             ? playing
-              ? "Stop voice test"
+              ? label.replace(/^Test play/, "Stop test")
               : label
             : `${playing ? "Stop preview" : "Play preview"}: ${line.text}`
         }
@@ -59,8 +69,10 @@ export function PreviewButton({
                 seconds: 60,
                 gap: 0,
                 mode: "speech",
+                voice: voice ?? store.snapshot().data.draft.voice,
                 background: null,
                 backgroundMix: null,
+                accompaniment: undefined,
                 useRecordings: recorded,
               });
           } catch (e) {
@@ -73,12 +85,12 @@ export function PreviewButton({
         ) : (
           <Play size={16} aria-hidden="true" />
         )}
-        <span>{playing ? "Stop" : label ? "Test voice" : "Play"}</span>
+        {!iconOnly && <span>{playing ? "Stop" : catalog ? "Test play" : label ? "Test voice" : "Play"}</span>}
       </button>
       {(error || (state.plan?.id === `preview-${id}` && state.error)) && (
         <span className="preview-error" role="status">
           <span>{error || state.error}</span>
-          <button
+          {!catalog && <button
             onClick={(event) => {
               const panel = event.currentTarget
                 .closest(".manifest-workspace")
@@ -90,7 +102,7 @@ export function PreviewButton({
             }}
           >
             Voice settings
-          </button>
+          </button>}
         </span>
       )}
     </>
@@ -100,10 +112,16 @@ export function RecordSentence({
   line,
   onSave,
   onClose,
+  closeLabel = "Cancel",
+  saveLabel = "Use recording",
+  audioAffirmation = false,
 }: {
   line: Line;
   onSave: (clip: PersonalRecording) => void;
   onClose: () => void;
+  closeLabel?: string;
+  saveLabel?: string;
+  audioAffirmation?: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null),
     session = useRef<Capture | undefined>(undefined),
@@ -118,9 +136,11 @@ export function RecordSentence({
     [clip, setClip] = useState<PersonalRecording>(),
     [url, setUrl] = useState(""),
     [error, setError] = useState("");
+  const [name, setName] = useState(line.text);
   const [saved, setSaved] = useState<PersonalRecording[]>([]);
   currentPhase.current = phase;
   useEffect(() => {
+    if (audioAffirmation) return;
     void recordings()
       .then((rows) => {
         if (alive.current) setSaved(rows.filter((c) => c.text === line.text));
@@ -177,14 +197,15 @@ export function RecordSentence({
       if (!alive.current) return;
       const value = {
         id: crypto.randomUUID(),
-        text: line.text,
+        text: audioAffirmation ? name.trim() : line.text,
+        ...(audioAffirmation ? { kind: "affirmation" as const } : {}),
         mime: blob.type,
         seconds: audio.duration,
         createdAt: new Date().toISOString(),
         blob,
       };
       if (value.seconds > 65 || value.seconds < 0.2)
-        throw Error("Record between 1 and 60 seconds.");
+        throw Error("Record between 0.2 and 60 seconds.");
       setClip(value);
       setPhase("ready");
     } catch (e) {
@@ -198,12 +219,17 @@ export function RecordSentence({
     <dialog
       ref={dialog}
       className="voice-dialog"
-      onCancel={onClose}
+      onCancel={event => {
+        event.preventDefault();
+        if (phase !== "saving") onClose();
+      }}
       aria-labelledby="record-heading"
     >
-      <h2 id="record-heading">Record your sentence</h2>
-      <p>{line.text}</p>
-      <input
+      <h2 id="record-heading">{audioAffirmation ? "Record audio affirmation" : "Record your sentence"}</h2>
+      {audioAffirmation ? <label>Affirmation name
+        <input autoFocus disabled={phase !== "idle"} maxLength={80} value={name} onChange={event => setName(event.target.value)} />
+      </label> : <p>{line.text}</p>}
+      {!audioAffirmation && <input
         className="sr-only"
         type="file"
         accept="audio/wav,audio/x-wav,.wav"
@@ -231,7 +257,7 @@ export function RecordSentence({
               }
             });
         }}
-      />
+      />}
       {phase === "idle" && saved.length > 0 && (
         <label>
           Saved voice for these words
@@ -269,6 +295,8 @@ export function RecordSentence({
             ? "Recording… microphone is on."
             : phase === "processing"
               ? "Preparing preview…"
+              : phase === "saving"
+              ? "Saving recording…"
               : error}
       </p>
       {url && phase === "ready" && (
@@ -285,16 +313,15 @@ export function RecordSentence({
       )}
       {phase === "ready" && (
         <p className="content-note">
-          Listen and confirm that the recording matches the sentence above
-          before using it.
+          {audioAffirmation ? "Listen to your recording before saving." : "Listen and confirm that the recording matches the sentence above before using it."}
         </p>
       )}
       <div className="admin-actions">
-        {phase === "idle" && (
+        {phase === "idle" && !audioAffirmation && (
           <button onClick={() => fileInput.current?.click()}>Import WAV</button>
         )}
         {["idle", "ready"].includes(phase) && (
-          <button onClick={() => void start()}>
+          <button disabled={audioAffirmation && !name.trim()} onClick={() => void start()}>
             {clip ? "Record again" : "Start recording"}
           </button>
         )}
@@ -320,26 +347,96 @@ export function RecordSentence({
                 });
             }}
           >
-            Use recording
+            {saveLabel}
           </button>
         )}
         <button disabled={phase === "saving"} onClick={onClose}>
-          Cancel
+          {closeLabel}
         </button>
       </div>
     </dialog>
   );
 }
+export function DefaultVoiceList() {
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      const [device, core] = await Promise.all([speech.voices().catch(() => []), coreVoices()]);
+      if (!alive) return;
+      setVoices([...new Map([...device, ...core].map(voice => [voice.voiceURI, voice])).values()]);
+      setLoading(false);
+    };
+    load();
+    window.speechSynthesis?.addEventListener("voiceschanged", load);
+    return () => { alive = false; window.speechSynthesis?.removeEventListener("voiceschanged", load); };
+  }, []);
+
+  const available = [{ name: "Device default", lang: "System language", voiceURI: "", localService: true },
+    ...voices.filter(voice => voice.voiceURI)];
+  return (
+    <section aria-label="Default voices" className="library-starters">
+      <h2>Default voices</h2>
+      {loading && <p role="status">Checking available voices…</p>}
+      {available.map((voice, index) => (
+        <article className="library-starter" key={voice.voiceURI}>
+          <div><h3>{voice.name}</h3><small>{voice.lang}</small></div>
+          <PreviewButton line={{ id: "voice-sample", text: "I can return to a moment of calm." }}
+            id={"default-voice-" + index} voice={voice.voiceURI} label={"Test play " + voice.name} catalog />
+        </article>
+      ))}
+    </section>
+  );
+}
+
+export function ImportRecording({ file, onCancel, onSave, audioAffirmation = false }: {
+  file: File; onCancel: () => void; onSave: () => void; audioAffirmation?: boolean;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [text, setText] = useState(audioAffirmation ? file.name.replace(/\.[^.]+$/, "").slice(0, 80) : "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => { dialog.current?.showModal(); }, []);
+  return <dialog className="voice-dialog" ref={dialog} aria-labelledby="import-voice-title" onCancel={event => {
+    event.preventDefault();
+    if (!saving) onCancel();
+  }}>
+    <form onSubmit={event => {
+      event.preventDefault();
+      if (saving || !text.trim()) return;
+      setSaving(true);
+      setError("");
+      const load = audioAffirmation ? importAffirmationAudio : importVoice;
+      void load(file, text.trim()).then(saveRecording).then(onSave).catch(error => {
+        setError(error.message);
+        setSaving(false);
+      });
+    }}>
+      <h2 id="import-voice-title">{audioAffirmation ? "Import audio affirmation" : "Import voice WAV"}</h2>
+      <p>{file.name}</p>
+      <label>{audioAffirmation ? "Affirmation name" : "Words in the recording"}<input required autoFocus disabled={saving} maxLength={audioAffirmation ? 80 : 300} value={text} onChange={event => setText(event.target.value)} /></label>
+      {error && <p role="alert">{error}</p>}
+      <div className="catalog-footer">
+        <button type="button" disabled={saving} onClick={onCancel}>{audioAffirmation ? "Back to affirmations" : "Back to voices"}</button>
+        <button className="primary" disabled={saving || !text.trim()}>Save to Library</button>
+      </div>
+    </form>
+  </dialog>;
+}
+
 export function PersonalVoices({
   initiallyOpen = false,
+  allowAttach = true,
 }: {
   initiallyOpen?: boolean;
+  allowAttach?: boolean;
 }) {
-  const panel = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(initiallyOpen);
+  const [importFile, setImportFile] = useState<File>();
+  const importInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     setOpen(initiallyOpen);
-    if (initiallyOpen) panel.current?.scrollIntoView({ block: "start" });
   }, [initiallyOpen]);
   const playback = useSyncExternalStore(
     manifestPlayer.subscribe,
@@ -369,7 +466,6 @@ export function PersonalVoices({
   return (
     <details
       className="personal-voices"
-      ref={panel}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
@@ -381,8 +477,15 @@ export function PersonalVoices({
       </p>
       {clips.map((c) => (
         <article className="saved-card" key={c.id}>
-          <p>{c.text}</p>
+          <div><strong>{c.title || c.text}</strong>{c.title && <p className="content-note">{c.text}</p>}</div>
           <div className="admin-actions">
+            <button disabled={busy} onClick={() => {
+              const title = prompt("Recording name", c.title || "");
+              if (title === null) return;
+              setError("");
+              setBusy(true);
+              void renameRecording(c.id, title).catch(error => setError(error.message)).finally(() => setBusy(false));
+            }}>Edit name</button>
             <PreviewButton
               id={"clip-" + c.id}
               line={{
@@ -392,6 +495,8 @@ export function PersonalVoices({
                 recordedText: c.text,
               }}
               recorded
+              catalog
+              label={"Test play " + (c.title || c.text)}
             />
             <button
               disabled={busy}
@@ -409,7 +514,7 @@ export function PersonalVoices({
             >
               {Capacitor.isNativePlatform() ? "Share WAV" : "Download WAV"}
             </button>
-            <button
+            {allowAttach && <button
               disabled={["playing", "paused"].includes(playback.status)}
               onClick={() => {
                 try {
@@ -439,7 +544,7 @@ export function PersonalVoices({
               }}
             >
               Use in practice
-            </button>
+            </button>}
             <button
               onClick={() => {
                 if (
@@ -464,10 +569,21 @@ export function PersonalVoices({
       ))}
       {!clips.length && (
         <p>
-          No recordings yet. Use Record voice beside a sentence in your
-          practice.
+          No personal voice clips yet. Import a voice WAV file below.
         </p>
       )}
+      <div className="catalog-footer">
+        <button disabled={busy || ["playing", "paused"].includes(playback.status)} onClick={() => importInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import voice WAV</button>
+        <input ref={importInput} className="sr-only" type="file" accept="audio/wav,audio/x-wav,.wav"
+          aria-label="Import voice WAV from device" onChange={event => {
+            setImportFile(event.target.files?.[0]);
+            event.target.value = "";
+          }} />
+      </div>
+      {importFile && <ImportRecording file={importFile} onCancel={() => setImportFile(undefined)} onSave={() => {
+        setImportFile(undefined);
+        setMessage("Recording saved in Library.");
+      }} />}
       {(error || message) && <p role="status">{error || message}</p>}
     </details>
   );

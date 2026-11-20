@@ -1,5 +1,5 @@
 import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
-export const VERSION = "0.26.0";
+export const VERSION = "0.45.0";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -21,6 +21,13 @@ export type Tab =
   | "chakras"
   | "library"
   | "admin";
+export type GeneratedLayer = { sound: Sound; hz: number; volume: number };
+export type Accompaniment = {
+  tone?: GeneratedLayer;
+  ambience?: GeneratedLayer;
+  audio?: { id: string; volume: number; loop: boolean };
+};
+
 export type Channel = {
   id: string;
   sound: Sound;
@@ -33,6 +40,8 @@ export type Channel = {
   focusQ?: number;
   interval?: number;
   fadeSeconds?: number;
+  frequencyOverride?: boolean;
+  accompaniment?: Accompaniment;
 };
 export type Session = {
   schemaVersion: 2;
@@ -43,6 +52,7 @@ export type Session = {
   channels: Channel[];
   master: number;
   createdAt: string;
+  sequenceGap?: number;
 };
 const instrumentSounds: Record<
   Exclude<Sound, AmbienceSound>,
@@ -192,6 +202,28 @@ export function channel(sound: Sound = "sine", hz = 432): Channel {
     seconds: 300,
   };
 }
+export function validAccompaniment(value: unknown): value is Accompaniment {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const mix = value as Accompaniment;
+  const level = (n: number) => Number.isFinite(n) && n >= 0 && n <= 1;
+  const layer = (source: GeneratedLayer | undefined, ambient: boolean) => {
+    if (source === undefined) return true;
+    if (!source || !Object.hasOwn(sounds, source.sound) || isNature(source.sound) !== ambient) return false;
+    const { min, max } = sounds[source.sound];
+    return Number.isFinite(source.hz) && source.hz >= min && source.hz <= max && level(source.volume);
+  };
+  return layer(mix.tone, false) && layer(mix.ambience, true) && (mix.audio === undefined ||
+    !!mix.audio && typeof mix.audio.id === "string" &&
+    /^track:(?:(sounds|backgrounds):)?[a-f0-9]{64}$/.test(mix.audio.id) &&
+    level(mix.audio.volume) && typeof mix.audio.loop === "boolean");
+}
+
+export function generatedAccompaniment(parent: Channel): Channel[] {
+  return [parent.accompaniment?.tone, parent.accompaniment?.ambience].flatMap((source, index) =>
+    source ? [{ ...source, id: "linked:" + parent.id + ":" + index, seconds: parent.seconds,
+      muted: parent.muted, focus: index === 1 }] : []);
+}
+
 export function validChannel(value: unknown): value is Channel {
   if (!value || typeof value !== "object") return false;
   const c = value as Channel;
@@ -207,6 +239,8 @@ export function validChannel(value: unknown): value is Channel {
       c.volume >= 0 &&
       c.volume <= 1 &&
       typeof c.muted === "boolean" &&
+      (c.frequencyOverride === undefined || typeof c.frequencyOverride === "boolean") &&
+      (c.accompaniment === undefined || validAccompaniment(c.accompaniment)) &&
       (c.fadeSeconds===undefined || (Number.isFinite(c.fadeSeconds)&&c.fadeSeconds>=.01&&c.fadeSeconds<=5)) &&
       (c.interval === undefined || (Number.isFinite(c.interval) && c.interval>=.25 && c.interval<=30)) &&
       (c.intensity === undefined || (Number.isFinite(c.intensity) && c.intensity >= 0 && c.intensity <= 1)) &&
@@ -243,12 +277,24 @@ export function parseSession(value: unknown): Session {
     s.kind === "chakras" &&
     s.channels.some(
       (c) =>
-        !chakras.some((k) => k.id === c.id && k.hz === c.hz) ||
-        !chakraSounds.includes(c.sound),
+        !chakras.some((k) => k.id === c.id && (k.hz === c.hz || c.frequencyOverride === true)) ||
+        isNature(c.sound),
     )
   )
     throw Error("This chakra session uses unsupported settings.");
+  if (s.sequenceGap !== undefined && (s.kind !== "chakras" ||
+      !Number.isFinite(s.sequenceGap) || s.sequenceGap < 0 || s.sequenceGap > 30 ||
+      s.channels.some(channel => channel.seconds !== s.channels[0].seconds))) {
+    throw Error("This chakra sequence has invalid timing.");
+  }
   if (s.kind === "nature" && (s.channels.length>8 || s.channels.some(c=>!/^nature:[a-zA-Z0-9-]{1,80}$/.test(c.id))))
     throw Error("This nature mix uses unsupported channel identifiers.");
   return { ...s, channels: s.channels.map((c) => ({ ...c })) };
+}
+
+export function sessionDuration(session: Session) {
+  return session.sequenceGap === undefined
+    ? Math.max(...session.channels.map(channel => channel.seconds))
+    : session.channels.reduce((total, channel) => total + channel.seconds, 0)
+      + (session.channels.length - 1) * session.sequenceGap;
 }

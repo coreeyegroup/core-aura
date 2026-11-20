@@ -36,7 +36,7 @@ jobs:
           trap 'kill "$server" "$backend"' EXIT
           curl --retry 15 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:8090/api/health
           curl --retry 10 --retry-connrefused --retry-delay 1 -fsS http://localhost:8089/health.json
-          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.26.0
+          CORE_AURA_URL=http://localhost:8089 bash ops/verify.sh 0.45.0
           npm run test:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -127,7 +127,8 @@ jobs:
       - run: plutil -lint /tmp/core-aura-ios/Build/Products/Debug-iphonesimulator/App.app/PrivacyInfo.xcprivacy
 
   android-publish:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # The stable website currently deploys from this release branch.
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/v0.27.0-peaceful-home')
     needs: [web, backend, android]
     runs-on: ubuntu-22.04
     permissions:

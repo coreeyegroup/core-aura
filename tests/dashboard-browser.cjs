@@ -1,160 +1,43 @@
-const { chromium } = require("playwright");
-const assert = require("node:assert/strict");
-(async () => {
-  const browser = await chromium.launch({ args: ["--no-sandbox"] });
-  try {
-    const context = await browser.newContext({
-      viewport: { width: 393, height: 852 },
-      isMobile: true,
-      hasTouch: true,
-    });
-    const p = await context.newPage(),
-      errors = [];
-    p.on("pageerror", (e) => errors.push(e.message));
-    await p.addInitScript(() => {
-      if (localStorage.getItem("core-aura.manifestation.v1")) return;
-      const plan = {
-        schemaVersion: 1,
-        id: "dashboard-plan",
-        name: "Morning focus",
-        lines: [
-          { id: "line-1", text: "I focus on the actions within my control." },
-        ],
-        order: "sequence",
-        repeats: 3,
-        gap: 2,
-        readSeconds: 5,
-        mode: "read",
-        voice: "",
-        rate: 1,
-        volume: 0.7,
-        seconds: 600,
-        background: null,
-      };
-      localStorage.setItem(
-        "core-aura.manifestation.v1",
-        JSON.stringify({
-          schemaVersion: 1,
-          draft: plan,
-          plans: [plan],
-          reminders: [
-            {
-              id: "reminder-1",
-              slot: 0,
-              planId: plan.id,
-              time: "07:00",
-              days: [0, 1, 2, 3, 4, 5, 6],
-              enabled: true,
-            },
-          ],
-        }),
-      );
-    });
-    await p.goto("http://localhost:8089");
-    await p.getByRole("heading", { name: "Overview", exact: true }).waitFor();
-    await p.locator('.home-secondary > summary').click();
-    const metrics = await p.locator(".account-metrics dd").allTextContents();
-    assert.deepEqual(metrics, ["1", "1", "0"]);
-    await p
-      .locator(".reminder-ticker")
-      .getByText("07:00", { exact: true })
-      .waitFor();
-    await p.screenshot({ path: "mobile-verification/dashboard-saved-393.png" });
-    await p
-      .getByRole("button", {
-        name: "Play saved practice: Morning focus",
-        exact: true,
-      })
-      .click();
-    await p
-      .getByRole("button", {
-        name: "Pause saved practice: Morning focus",
-        exact: true,
-      })
-      .waitFor();
-    await p.getByRole("button", { name: "Stop practice", exact: true }).click();
-    await p
-      .locator(".intention-grid")
-      .getByRole("button", { name: /Wealth/ })
-      .click();
-    assert.equal(
-      await p.getByLabel("Category", { exact: true }).inputValue(),
-      "Wealth",
-    );
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p
-      .locator(".tool-grid")
-      .getByRole("button", { name: "Schedule", exact: true })
-      .click();
-    await p.getByLabel("Reminder time", { exact: true }).waitFor();
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p
-      .locator(".tool-grid")
-      .getByRole("button", { name: "Recordings", exact: true })
-      .click();
-    assert.equal(await p.locator(".personal-voices").getAttribute("open"), "");
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p
-      .locator(".tool-grid")
-      .getByRole("button", { name: "Sound packs", exact: true })
-      .click();
-    await p
-      .getByRole("heading", { name: "Sound packs", exact: true })
-      .waitFor();
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p.locator(".tone-grid").getByRole("button", { name: /528/ }).click();
-    assert.equal(
-      await p.getByLabel("Frequency (Hz)", { exact: true }).inputValue(),
-      "528",
-    );
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p
-      .locator('[data-module="manifest"]').getByRole("button", { name: "Open editor", exact: true })
-      .click();
-    assert.equal(await p.locator(".sentence-editor[open]").count(), 0);
-    await p.getByLabel("Edit sentence 1", { exact: true }).click();
-    await p
-      .getByLabel("Sentence 1", { exact: true })
-      .fill("I take a clear step forward.");
-    await p.getByLabel("Edit sentence 1", { exact: true }).click();
-    await p
-      .locator(".queue-copy")
-      .getByText("I take a clear step forward.", { exact: true })
-      .waitFor();
-    await p.screenshot({
-      path: "mobile-verification/dashboard-practice-queue-393.png",
-    });
-    await p.getByRole("button", { name: "Home", exact: true }).click();
-    await p.locator('.home-secondary > summary').click();
-    await p.setViewportSize({ width: 1366, height: 900 });
-    await p.screenshot({ path: "mobile-verification/dashboard-desktop.png" });
-    assert.ok(
-      await p
-        .locator(".dashboard")
-        .evaluate(
-          (e) =>
-            getComputedStyle(e).gridTemplateColumns.split(" ").length === 2,
-        ),
-    );
-    const moduleGaps = await p.locator(".dashboard-stack").evaluate((e) => {
-      const rows = [...e.children].map((n) => n.getBoundingClientRect());
-      return rows.slice(1).map((row, i) => row.top - rows[i].bottom);
-    });
-    assert.ok(moduleGaps.every((gap) => gap <= 16));
-    assert.deepEqual(errors, []);
-    await context.close();
-    console.log(
-      "Dashboard real counts, upcoming schedule, category navigation, saved playback, tool shortcuts, tone tuning and compact sentence editing passed.",
-    );
-  } finally {
-    await browser.close();
-  }
-})().catch((e) => {
-  console.error(e);
-  process.exitCode = 1;
-});
+const {chromium}=require('playwright'),assert=require('node:assert/strict'),AxeBuilder=require('@axe-core/playwright').default;
+(async()=>{const browser=await chromium.launch({args:['--no-sandbox']});try{
+ const c=await browser.newContext({viewport:{width:393,height:852},isMobile:true,hasTouch:true}),p=await c.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));
+ await p.addInitScript(()=>{if(localStorage.getItem('core-aura.manifestation.v1'))return;const plan={schemaVersion:1,id:'home-plan',name:'Morning gratitude',lines:[{id:'a',text:'I notice the good in this moment.'}],order:'sequence',repeats:3,gap:2,readSeconds:5,mode:'read',voice:'',rate:1,volume:.7,seconds:60,background:null};localStorage.setItem('core-aura.manifestation.v1',JSON.stringify({schemaVersion:1,draft:{...plan,name:'Keep my unfinished edits'},plans:[plan],reminders:[]}));const mix=(id,name,kind,channels)=>({schemaVersion:2,engineVersion:'2.0',id,name,kind,channels,master:.5,createdAt:new Date().toISOString()});const layer={id:'saved-layer',sound:'bowl',hz:432,volume:.2,muted:false,seconds:60};localStorage.setItem('core-aura.sessions.v2',JSON.stringify([mix('bowl','Quiet bowl','studio',[layer]),mix('root','Root grounding','chakras',[{...layer,id:'root',hz:396,sound:'sine'}])]));});
+ await p.goto('http://localhost:8089/#home');await p.getByRole('heading',{name:'Your practice',exact:true}).waitFor();
+ assert.equal(await p.getByLabel('Home manifestation',{exact:true}).inputValue(),'home-plan');assert.equal(await p.getByLabel('Home sound mix',{exact:true}).inputValue(),'bowl');assert.equal(await p.getByLabel('Home chakra session',{exact:true}).inputValue(),'root');
+ for(const selector of ['Home repetitions','Home sound frequency','Home chakra duration','Home practice mode'])assert.equal(await p.getByLabel(selector,{exact:true}).count(),0);
+ await p.getByRole('button',{name:'Play selected manifestation',exact:true}).click();await p.getByLabel('Playlist player',{exact:true}).getByText('Morning gratitude',{exact:true}).waitFor();assert.equal(await p.evaluate(()=>JSON.parse(localStorage.getItem('core-aura.manifestation.v1')).draft.name),'Keep my unfinished edits');
+ await p.getByRole('button',{name:'Pause playlist',exact:true}).click();await p.getByRole('button',{name:'Resume playlist',exact:true}).waitFor();await p.getByRole('button',{name:'Resume playlist',exact:true}).click();await p.getByRole('button',{name:'Stop playlist',exact:true}).click();
+ await p.getByRole('button',{name:'Play selected sound mix',exact:true}).click();await p.getByLabel('Playlist player',{exact:true}).getByText('Quiet bowl',{exact:true}).waitFor();await p.getByRole('button',{name:'Stop playlist',exact:true}).click();
+ await p.getByRole('button',{name:'Play selected chakra session',exact:true}).click();await p.getByLabel('Playlist player',{exact:true}).getByText('Root grounding',{exact:true}).waitFor();await p.getByRole('button',{name:'Stop playlist',exact:true}).click();
+ for(const theme of ['light','dark','contrast']){await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByLabel('Theme',{exact:true}).selectOption(theme);await p.getByRole('button',{name:'Close settings',exact:true}).click();await p.getByRole('heading',{name:'Your practice',exact:true}).scrollIntoViewIfNeeded();await p.screenshot({path:'mobile-verification/peaceful-home-'+theme+'-393.png'});const audit=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);}
+ await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByLabel('Theme',{exact:true}).selectOption('light');await p.getByRole('button',{name:'Close settings',exact:true}).click();
+ for(const width of [320,393,430]){await p.setViewportSize({width,height:852});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-home-'+width+'.png'});}
+ await p.getByRole('button',{name:'Settings',exact:true}).click();await p.getByRole('slider',{name:'Text size',exact:true}).press('End');await p.getByRole('button',{name:'Close settings',exact:true}).click();await p.setViewportSize({width:320,height:852});assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-home-large-320.png'});await p.getByRole('button',{name:'Play selected manifestation',exact:true}).click();await p.getByRole('button',{name:'Pause playlist',exact:true}).waitFor();assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'mobile-verification/peaceful-player-large-320.png'});const largeAudit=await new AxeBuilder({page:p}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();assert.deepEqual(largeAudit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
+ await p.getByRole('button',{name:'Settings',exact:true}).click();
+ const settings=p.getByRole('dialog',{name:'Settings',exact:true});
+ await settings.getByLabel('Theme',{exact:true}).waitFor();
+ assert.equal(await settings.evaluate(el=>el.contains(document.activeElement)),true);
+ assert.equal(await settings.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+ await settings.getByRole('button',{name:'Close settings',exact:true}).click();
+ await p.getByRole('button',{name:'Stop playlist',exact:true}).click();
+ await p.getByRole('button',{name:'Settings',exact:true}).click();
+ await p.getByRole('button',{name:'Reset display',exact:true}).click();
+ await p.getByRole('button',{name:'Close settings',exact:true}).click();
+ await p.setViewportSize({width:1366,height:900});
+ await p.evaluate(()=>scrollTo(0,0));
+ const tiles=await p.locator('.home-saved > details').evaluateAll(rows=>rows.map(row=>row.getBoundingClientRect().top));
+ assert.equal(new Set(tiles.slice(0,3)).size,1);
+ await p.screenshot({path:'mobile-verification/practice-home-desktop.png'});
+ const empty=await browser.newContext({viewport:{width:320,height:780},isMobile:true,hasTouch:true});
+ const fresh=await empty.newPage();
+ await fresh.goto('http://localhost:8089/#home');
+ const playlistLibrary=fresh.getByRole('button',{name:'Open playlist library',exact:true});
+ await playlistLibrary.focus();
+ assert.equal(await playlistLibrary.evaluate(el=>el===document.activeElement),true);
+ assert.equal(await fresh.getByRole('button',{name:'Create',exact:true}).count(),3);
+ assert.equal(await fresh.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await playlistLibrary.press('Enter');
+ await fresh.getByLabel('Playlist library',{exact:true}).getByRole('button',{name:'New playlist',exact:true}).waitFor();
+ await empty.close();
+ assert.deepEqual(errors,[]);await c.close();console.log('Listening-first Home selectors, direct saved playback, draft preservation, single transport, calm themes, mobile widths, enlarged text and accessibility passed.');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});

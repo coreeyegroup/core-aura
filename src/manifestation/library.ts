@@ -135,6 +135,40 @@ export const affirmationLibrary = {
         : [...rows, { ...item, text: item.text.trim() }],
     });
   },
+  saveText: (id: string, value: string) => {
+    const text = value.trim();
+    if (!text || text.length > 300) throw Error("Enter 1–300 characters.");
+    const data = state.data;
+    if (data.affirmations.some(item => item.id !== id && item.text.toLowerCase() === text.toLowerCase()))
+      throw Error("That affirmation is already in your list.");
+    const previous = data.affirmations.find(item => item.id === id);
+    const categories = data.categories.length ? data.categories : ["General"];
+    commit({
+      ...data, categories,
+      affirmations: previous ? data.affirmations.map(item => item.id === id ? { ...item, text } : item)
+        : [...data.affirmations, { id, text, category: categories[0] }],
+    });
+  },
+  importTexts: (value: unknown) => {
+    const input = value as { schemaVersion?: number; affirmations?: unknown[]; categories?: unknown[] } | null;
+    if (input?.schemaVersion !== 1 || !Array.isArray(input.affirmations) || input.affirmations.length > 1000)
+      throw Error("Choose a valid affirmations JSON file.");
+    const values = Array.isArray(input.categories) ? parseLibrary(input).affirmations.map(item => item.text) : input.affirmations;
+    if (values.some(text => typeof text !== "string" || !text.trim() || text.trim().length > 300))
+      throw Error("Each affirmation must contain 1–300 characters.");
+    const data = state.data;
+    const categories = data.categories.length ? data.categories : ["General"];
+    const affirmations = [...data.affirmations];
+    const seen = new Set(affirmations.map(item => item.text.toLowerCase()));
+    for (const entry of values as string[]) {
+      const text = entry.trim(), key = text.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      affirmations.push({ id: crypto.randomUUID(), text, category: categories[0] });
+    }
+    if (affirmations.length !== data.affirmations.length) commit({ ...data, categories, affirmations });
+    return affirmations.length - data.affirmations.length;
+  },
   remove: (id: string) =>
     commit({
       ...state.data,

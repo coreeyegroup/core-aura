@@ -1,10 +1,14 @@
+import { verifyPractice } from "../playlists/readiness";
+import { confirmSourceDeletion } from "../playlists/store";
 import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
 import {Presets} from "../workbench/Presets";
 import {HistoryPanel} from "../workbench/HistoryPanel";
+import { LibraryLayers } from "../components/LibraryLayers";
+import type { Track } from "../tracks/storage";
 import { BackgroundControls } from "./BackgroundControls";
 import { Session } from "../model";
-import { BookOpen, Pencil } from "lucide-react";
+import { BookOpen, Download, Mic, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -19,6 +23,8 @@ import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
 import {
   Line,
+  hasPracticeContent,
+  practiceLayerLimit,
   nextOccurrence,
   parsePlan,
   Plan,
@@ -28,8 +34,9 @@ import {
 import { manifestPlayer } from "./player";
 import { VoicePanel } from "./VoicePanel";
 import { calendarFile, enableReminders, syncPhoneReminders } from "./reminders";
-import { PreviewButton, RecordSentence, PersonalVoices } from "./VoiceControls";
-import { withoutRecordings } from "./recordings";
+import { PreviewButton, RecordSentence, PersonalVoices, DefaultVoiceList, ImportRecording } from "./VoiceControls";
+import { recordings, withoutRecordings, type PersonalRecording } from "./recordings";
+import { exportVoice } from "./voice-files";
 import { pushStatus, disablePushReminders } from "./push";
 import { deliverFile } from "../files/deliver";
 function download(text: string, name: string, type: string) {
@@ -81,15 +88,25 @@ function NumberField({
   );
 }
 export function Manifestation({
+  queueActive = false,
   onLibrary,
+  onOpenPractice,
+  onPlaylists,
+  onBackgrounds,
   sessions = [],
+  tracks = [],
   initialView = "practice",
   onView,
 }: {
   onLibrary: () => void;
+  onOpenPractice: (id: string) => void;
+  onPlaylists: () => void;
+  onBackgrounds: () => void;
   sessions?: Session[];
+  tracks?: Track[];
+  queueActive?: boolean;
   initialView?: string;
-  onView?: (view: "practice" | "schedule") => void;
+  onView?: (view: "practices" | "practice" | "schedule") => void;
 }) {
   const { data, error } = useSyncExternalStore(store.subscribe, store.snapshot),
     state = useSyncExternalStore(
@@ -108,6 +125,8 @@ export function Manifestation({
     }),
     [message, setMessage] = useState("");
   useEffect(() => setView(initialView), [initialView]);
+  const [practiceSearch, setPracticeSearch] = useState("");
+  const [practiceSort, setPracticeSort] = useState("recent");
   const [recordLine, setRecordLine] = useState<Line>();
   const [selectedLines,setSelectedLines]=useState<string[]>([]);
   const dock = useRef<HTMLElement>(null);
@@ -125,7 +144,7 @@ export function Manifestation({
       observer.disconnect();
       document.documentElement.style.removeProperty("--dock-height");
     };
-  }, []);
+  }, [view, queueActive, state.status]);
   const active = practiceActive(state),
     p = active && state.plan ? state.plan : data.draft;
   function composer(value: string) {
@@ -148,15 +167,29 @@ export function Manifestation({
       return false;
     }
   };
+  const canPlay = hasPracticeContent(p);
+  const additionalLayers = p.additionalLayers ?? [];
   const current =
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
       : null;
-  function start() {
+  function newPractice() {
+    if (!confirmDraftReplacement(data.draft, data.plans)) return;
+    try {
+      store.fresh();
+      setMessage("");
+      setView("practice");
+      onView?.("practice");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+  async function start() {
     try {
       if (active && state.status === "playing") manifestPlayer.pause();
       else if (active && state.status === "paused") manifestPlayer.resume();
-      else manifestPlayer.start(p);
+      else {
+        await verifyPractice(p);
+        manifestPlayer.start(p);
+      }
       setMessage("");
     } catch (e) {
       setMessage((e as Error).message);
@@ -166,9 +199,12 @@ export function Manifestation({
     <section className="manifest-workspace" data-view={view}>
       <div className="section-heading">
         <h1>Manifestation</h1>
-        <button onClick={onLibrary}>Choose affirmations</button>
       </div>
       <div className="segmented" aria-label="Manifestation workspace">
+        <button aria-pressed={view === "practices"} onClick={() => {
+          setView("practices");
+          onView?.("practices");
+        }}>Practices</button>
         <button
           aria-pressed={view === "practice"}
           onClick={() => {
@@ -188,7 +224,24 @@ export function Manifestation({
           Schedule
         </button>
       </div>
-      {view === "practice" ? (
+      {view === "practices" ? <>
+        <div className="home-actions">
+          <button className="primary" disabled={active} onClick={newPractice}>New practice</button>
+          <button onClick={onPlaylists}>Playlists</button>
+        </div>
+        <div className="fields">
+          <label>Search saved practices
+            <input type="search" aria-label="Search library" value={practiceSearch} onChange={event => setPracticeSearch(event.target.value)} />
+          </label>
+          <label>Sort saved practices
+            <select value={practiceSort} onChange={event => setPracticeSort(event.target.value)}>
+              <option value="recent">Recently saved</option><option value="name">Name A–Z</option>
+            </select>
+          </label>
+        </div>
+        <ManifestLibrary section="saved" search={practiceSearch} sort={practiceSort}
+          onPractice={id => id && onOpenPractice(id)} focusOnEntry={false} />
+      </> : view === "practice" ? (
         <>
           {(active ||
             (!isPreview(state) &&
@@ -205,7 +258,7 @@ export function Manifestation({
                 {current && state.status !== "idle"
                   ? state.plan!.lines[current.line].text
                   : p.lines[0]?.text ||
-                    "Select affirmations from the library or add your own sentence."}
+                    "Playing your audio and sound layers."}
               </p>
               {current && state.status !== "idle" && (
                 <p className="content-note">
@@ -217,42 +270,51 @@ export function Manifestation({
               {state.error && <p role="status">{state.error}</p>}
             </div>
           )}
-          <div
-            className="workspace-summary"
-            aria-label="Practice configuration summary"
-          >
-            <div>
-              <small>Sentences</small>
-              <strong>{p.lines.length}/50</strong>
-            </div>
-            <div>
-              <small>Repetitions</small>
-              <strong>{p.repeats} rounds</strong>
-            </div>
-            <div>
-              <small>Session limit</small>
-              <strong>{p.seconds / 60} min</strong>
-            </div>
-            <div>
-              <small>Voice level</small>
-              <strong>{Math.round(p.volume * 100)}%</strong>
-            </div>
-          </div>
-          <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
-          <VoicePanel />
           <div className="practice-grid">
             <div className="practice-editor">
-              <fieldset className="manifest-fields sentence-fields">
-                <legend>Sentences ({p.lines.length}/50)</legend>
-                <label>
-                  Practice name
-                  <input
-                    disabled={active}
-                    value={p.name}
-                    maxLength={80}
-                    onChange={(e) => change({ name: e.target.value })}
-                  />
+              <fieldset className="manifest-fields">
+                <legend>1. Practice details</legend>
+                <label>Practice name
+                  <input disabled={active} value={p.name} maxLength={80}
+                    onChange={event => change({ name: event.target.value })} />
                 </label>
+              </fieldset>
+              <details className="manifest-fields sentence-fields" open={p.lines.length ? true : undefined}>
+                <summary>2. Sentences or recorded affirmations ({p.lines.length}/50)</summary>
+                <button onClick={onLibrary}>Choose affirmations</button>
+                <details className="custom-sentence">
+                  <summary>Write your own affirmation</summary>
+                  <label>
+                    Your own sentence
+                    <textarea
+                      aria-label="Your own sentence"
+                      disabled={active}
+                      rows={2}
+                      value={custom}
+                      maxLength={300}
+                      placeholder="Write the words you want to repeat"
+                      onChange={(e) => composer(e.target.value)}
+                    />
+                  </label>
+                  <div className="admin-actions">
+                    <button
+                      disabled={
+                        active || !custom.trim() || p.lines.length >= 50
+                      }
+                      onClick={() => {
+                        const added = change({
+                          lines: [
+                            ...p.lines,
+                            { id: crypto.randomUUID(), text: custom.trim() },
+                          ],
+                        });
+                        if (added) composer("");
+                      }}
+                    >
+                      Add sentence
+                    </button>
+                  </div>
+                </details>
                 <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>
                 <div className="manifest-lines">
                   {p.lines.map((line, i) => (
@@ -265,7 +327,7 @@ export function Manifestation({
                         <div className="queue-copy">
                           <p>{line.text}</p>
                           <small>
-                            {line.recordingId
+                            {line.audioAffirmation ? "Audio affirmation" : line.recordingId
                               ? "Personal voice"
                               : "Selected voice"}
                           </small>
@@ -288,7 +350,7 @@ export function Manifestation({
                           <textarea
                             rows={2}
                             aria-label={"Sentence " + (i + 1)}
-                            disabled={active}
+                            disabled={active || !!line.audioAffirmation}
                             value={line.text}
                             maxLength={300}
                             onChange={(e) =>
@@ -303,13 +365,13 @@ export function Manifestation({
                           />
                         </label>
                         <div className="line-actions">
-                          <button
+                          {!line.audioAffirmation && <button
                             disabled={active || !line.text.trim()}
                             onClick={() => setRecordLine(line)}
                           >
                             {line.recordingId ? "Record again" : "Record voice"}
-                          </button>
-                          {line.recordingId && (
+                          </button>}
+                          {line.recordingId && !line.audioAffirmation && (
                             <span className="content-note">
                               Personal voice saved
                             </span>
@@ -363,120 +425,58 @@ export function Manifestation({
                   <div className="queue-empty">
                     <BookOpen size={21} />
                     <p>
-                      Your sequence is empty. Choose affirmations from the
-                      library or write your own below.
+                      Choose affirmations from the library or write your own.
                     </p>
                   </div>
                 )}
-                <details className="custom-sentence">
-                  <summary>Write your own affirmation</summary>
-                  <label>
-                    Your own sentence
-                    <textarea
-                      aria-label="Your own sentence"
-                      disabled={active}
-                      rows={2}
-                      value={custom}
-                      maxLength={300}
-                      placeholder="Write the words you want to repeat"
-                      onChange={(e) => composer(e.target.value)}
-                    />
-                  </label>
-                  <div className="admin-actions">
-                    <button
-                      disabled={
-                        active || !custom.trim() || p.lines.length >= 50
-                      }
-                      onClick={() => {
-                        const added = change({
-                          lines: [
-                            ...p.lines,
-                            { id: crypto.randomUUID(), text: custom.trim() },
-                          ],
-                        });
-                        if (added) composer("");
-                      }}
-                    >
-                      Add sentence
-                    </button>
-                  </div>
-                </details>
-                {!p.lines.length && (
-                  <button
-                    onClick={() => {
-                      const sample = {
-                        ...p,
-                        name: p.name.trim() || "Sample practice",
-                        lines: [
-                          {
-                            id: crypto.randomUUID(),
-                            text: "I take one clear step toward my goals today.",
-                          },
-                        ],
-                        mode: "speech" as const,
-                        volume: p.volume || 0.7,
-                        repeats: 1,
-                        background: null,
-                        backgroundMix: null,
-                      };
-                      change(sample);
-                      manifestPlayer.start(sample);
-                    }}
-                  >
-                    Play sample affirmation
-                  </button>
-                )}
-              </fieldset>
-              <div className="admin-actions practice-actions">
-                <button
-                  className="primary"
-                  disabled={active || !p.lines.length}
-                  onClick={() => {
-                    try {
-                      store.save();
-                      setMessage("Practice saved in Library.");
-                    } catch (e) {
-                      setMessage((e as Error).message);
-                    }
-                  }}
-                >
-                  Save practice
-                </button>
-                <button disabled={active||!p.lines.length} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
-                <button
-                  disabled={active}
-                  onClick={() => {
-                    if (!confirmDraftReplacement(data.draft, data.plans))
-                      return;
-                    try {
-                      store.fresh();
-                      setMessage("");
-                    } catch (e) {
-                      setMessage((e as Error).message);
-                    }
-                  }}
-                >
-                  New practice
-                </button>
-                {data.plans.some((plan) => plan.id === p.id) && (
-                  <button
-                    disabled={active}
-                    onClick={() => {
-                      setView("schedule");
-                      onView?.("schedule");
-                    }}
-                  >
-                    Schedule practice
-                  </button>
-                )}
-              </div>
+              </details>
             </div>
             <div className="practice-settings">
+              <section className="manifest-fields" aria-label="Optional practice audio layers">
+                <h2>3. Audio, sounds and backgrounds</h2>
+                <p className="content-note">Choose any layers you want. Generated sounds use frequency, and nature backgrounds use a frequency filter. Imported files keep their original pitch.</p>
+                {(p.accompaniment?.tone || p.accompaniment?.ambience || p.accompaniment?.audio) && (
+                  <LibraryLayers prefix="Manifest" tracks={tracks} value={p.accompaniment} disabled={active}
+                    onChange={accompaniment => change({ accompaniment })} />
+                )}
+                <div className="admin-actions">
+                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { tone: { sound: "bell", hz: 432, volume: .2 } }] })}>Add sound</button>
+                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { ambience: { sound: "rain", hz: 1000, volume: .2 } }] })}>Add background</button>
+                  <button disabled={active || !tracks.length || additionalLayers.length >= practiceLayerLimit} onClick={() =>
+                    change({ additionalLayers: [...additionalLayers, { audio: { id: tracks[0].id, volume: .35, loop: true } }] })}>Add audio</button>
+                </div>
+                {additionalLayers.map((layer, index) => {
+                  const remove = () => change({ additionalLayers: additionalLayers.filter((_, i) => index !== i) });
+                  return <LibraryLayers key={index} prefix={"Layer " + (index + 1)} only={layer.tone ? "tone" : layer.ambience ? "ambience" : "audio"}
+                    tracks={tracks} value={layer} disabled={active} onRemove={remove} onChange={next => {
+                      if (!next.tone && !next.ambience && !next.audio) { remove(); return; }
+                      change({ additionalLayers: additionalLayers.map((original, i) => i === index ? next : original) });
+                    }} />;
+                })}
+              </section>
               <fieldset
                 disabled={active}
                 className="manifest-fields repeat-fields"
               >
-                <legend>Repetition</legend>
+                <legend>Playback options</legend>
+                {p.lines.length > 0 && <>
+                <div className="practice-mode">
+                  <label>
+                    Practice mode
+                    <select
+                      aria-label="Practice mode"
+                      value={p.mode}
+                      onChange={(e) =>
+                        change({ mode: e.target.value as Plan["mode"] })
+                      }
+                    >
+                      <option value="speech">Spoken voice</option>
+                      <option value="read">Silent reading</option>
+                    </select>
+                  </label>
+                </div>
                 <div className="fields">
                   <label>
                     Repeat order
@@ -507,20 +507,8 @@ export function Manifestation({
                     ? "Repeat all selected sentences in order, then begin the next round."
                     : "Repeat each sentence the chosen number of times before moving to the next."}
                 </p>
+                </>}
                 <div className="fields">
-                  <label>
-                    Practice mode
-                    <select
-                      aria-label="Practice mode"
-                      value={p.mode}
-                      onChange={(e) =>
-                        change({ mode: e.target.value as Plan["mode"] })
-                      }
-                    >
-                      <option value="speech">Spoken voice</option>
-                      <option value="read">Silent reading</option>
-                    </select>
-                  </label>
                   <label>
                     Maximum session
                     <select
@@ -540,7 +528,7 @@ export function Manifestation({
                     </select>
                   </label>
                 </div>
-                <div className="fields">
+                {p.lines.length > 0 && <div className="fields">
                   <label>
                     Gap between sentences (sec)
                     <NumberField
@@ -561,15 +549,75 @@ export function Manifestation({
                       />
                     </label>
                   )}
-                </div>
-
+                </div>}
               </fieldset>
+              {p.lines.length > 0 && <VoicePanel />}
               <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
                 try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
                 catch(error){setMessage((error as Error).message);}
               }}/>
+              <button className="text-button" onClick={onBackgrounds}>Manage background library</button>
+              <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
+              <details className="workbench-panel practice-summary">
+                <summary>Practice summary</summary>
+          <div
+            className="workspace-summary"
+            aria-label="Practice configuration summary"
+          >
+            <div>
+              <small>Sentences</small>
+              <strong>{p.lines.length}/50</strong>
+            </div>
+            <div>
+              <small>Repetitions</small>
+              <strong>{p.repeats} rounds</strong>
+            </div>
+            <div>
+              <small>Session limit</small>
+              <strong>{p.seconds / 60} min</strong>
+            </div>
+            <div>
+              <small>Voice level</small>
+              <strong>{Math.round(p.volume * 100)}%</strong>
             </div>
           </div>
+              </details>
+            </div>
+          </div>
+              <div className="admin-actions practice-actions">
+                <button
+                  className="primary"
+                  disabled={active || !canPlay || !p.name.trim()}
+                  onClick={() => {
+                    try {
+                      store.save();
+                      setMessage("Practice saved.");
+                    } catch (e) {
+                      setMessage((e as Error).message);
+                    }
+                  }}
+                >
+                  Save practice
+                </button>
+                <button disabled={active||!canPlay||!p.name.trim()} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
+                <button
+                  disabled={active}
+                  onClick={newPractice}
+                >
+                  New practice
+                </button>
+                {data.plans.some((plan) => plan.id === p.id) && (
+                  <button
+                    disabled={active}
+                    onClick={() => {
+                      setView("schedule");
+                      onView?.("schedule");
+                    }}
+                  >
+                    Schedule practice
+                  </button>
+                )}
+              </div>
         </>
       ) : (
         <Schedules
@@ -596,19 +644,19 @@ export function Manifestation({
           }}
         />
       )}
-      <section
+      {!queueActive&&(view !== "practices" || active)&&<section
         ref={dock}
         className="player-dock manifest-player-dock"
         aria-label="Manifestation player"
       >
         <p className="dock-caption">
           {active ? state.plan?.name : p.name} ·{" "}
-          {active ? labelTime(state.elapsed) : p.lines.length + " sentences"}
+          {active ? labelTime(state.elapsed) : p.lines.length ? p.lines.length + " sentences" : "Audio and sound layers"}
         </p>
         <div className="transport">
           <button
             className="primary"
-            disabled={!p.lines.length && !active}
+            disabled={(!canPlay || !p.name.trim()) && !active}
             onClick={start}
           >
             {active && state.status === "playing"
@@ -626,7 +674,7 @@ export function Manifestation({
             Resume repeats the current sentence from its beginning.
           </p>
         )}
-      </section>
+      </section>}
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}
@@ -637,18 +685,14 @@ export function Manifestation({
 }
 export function ManifestLibrary({
   onPractice,
-  initialCategory = "Health",
-  recordingsOpen = false,
   search = "",
   sort = "recent",
   section = "all",
-  onCategory,
+  focusOnEntry = true,
 }: {
-  onPractice: (id?: string) => void;
-  initialCategory?: string;
+  onPractice?: (id?: string) => void;
   section?: "all" | "saved" | "recordings";
-  onCategory?: (category: string) => void;
-  recordingsOpen?: boolean;
+  focusOnEntry?: boolean;
   search?:string;
   sort?:string;
 }) {
@@ -661,48 +705,73 @@ export function ManifestLibrary({
     affirmationLibrary.subscribe,
     affirmationLibrary.snapshot,
   );
-  const [editing, setEditing] = useState<EditLibrary>(),
-    [manage, setManage] = useState(false);
+  const [editing, setEditing] = useState<EditLibrary>();
   const libraryInput = useRef<HTMLInputElement>(null);
-  const savedSection = useRef<HTMLElement>(null);
+  const audioInput = useRef<HTMLInputElement>(null);
+  const [audioFile, setAudioFile] = useState<File>();
+  const [recordAudio, setRecordAudio] = useState(false);
+  const [audioClips, setAudioClips] = useState<PersonalRecording[]>([]);
+  const [audioError, setAudioError] = useState("");
   useEffect(() => {
-    if (section === "saved") {
-      savedSection.current?.scrollIntoView({ block: "start" });
-      savedSection.current?.focus({ preventScroll: true });
-    }
+    if (section !== "all") return;
+    let alive = true;
+    const read = () => void recordings("affirmation").then(clips => {
+      if (alive) {
+        setAudioClips(clips);
+        setAudioError("");
+      }
+    }).catch(error => { if (alive) setAudioError(error.message); });
+    read();
+    addEventListener("core-aura-recordings-changed", read);
+    return () => {
+      alive = false;
+      removeEventListener("core-aura-recordings-changed", read);
+    };
   }, [section]);
-  const [category, setCategory] = useState<string>(initialCategory),
-    [query, setQuery] = useState(""),
+  const savedSection = useRef<HTMLElement>(null);
+  const recordingsSection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusOnEntry) return;
+    if (section === "saved") {
+      savedSection.current?.focus({ preventScroll: true });
+    } else if (section === "recordings") {
+      recordingsSection.current?.focus({ preventScroll: true });
+    }
+  }, [section, focusOnEntry]);
+  const [query, setQuery] = useState(""),
     [selectedPlans,setSelectedPlans]=useState<string[]>([]),
     [message, setMessage] = useState("");
-  useEffect(() => setCategory(initialCategory), [initialCategory]);
-  useEffect(() => {
-    if (!catalog.data.categories.includes(category)) {
-      const next = catalog.data.categories[0] || "";
-      setCategory(next);
-      onCategory?.(next);
-    }
-  }, [catalog.data, category]);
+  const visiblePlans = data.plans.filter(plan => matchesItem(plan.name, "practice", plan.id, search));
+  if (sort === "name") visiblePlans.sort((a, b) => a.name.localeCompare(b.name));
+  else visiblePlans.reverse();
+  const chosenPlans = visiblePlans.filter(plan => selectedPlans.includes(plan.id));
+  const needle = query.trim().toLowerCase();
+  const matchingAffirmations = catalog.data.affirmations.filter(
+    affirmation => affirmation.text.toLowerCase().includes(needle),
+  );
+  const matchingAudio = audioClips.filter(clip => (clip.title ?? clip.text).toLowerCase().includes(needle));
+  const selectedCount = data.draft.lines.length;
+  useEffect(() => setSelectedPlans([]), [search]);
   const input = useRef<HTMLInputElement>(null);
   const active = practiceActive(state);
-  function select(id: string, text: string) {
+  function selectedLine(line: Line) {
+    return data.draft.lines.find(candidate => line.audioAffirmation
+      ? candidate.recordingId === line.recordingId
+      : !candidate.audioAffirmation && candidate.text === line.text);
+  }
+  function select(line: Line) {
     try {
-      const selected = data.draft.lines.some((l) => l.text === text);
+      const selected = selectedLine(line);
       if (!selected && data.draft.lines.length >= 50)
         throw Error("Choose up to 50 sentences.");
       store.draft({
         ...data.draft,
         lines: selected
-          ? data.draft.lines.filter((l) => l.text !== text)
-          : [
-              ...data.draft.lines,
-              {
-                id: data.draft.lines.some((l) => l.id === id)
-                  ? crypto.randomUUID()
-                  : id,
-                text,
-              },
-            ],
+          ? data.draft.lines.filter(candidate => candidate.id !== selected.id)
+          : [...data.draft.lines, {
+            ...line,
+            id: data.draft.lines.some(candidate => candidate.id === line.id) ? crypto.randomUUID() : line.id,
+          }],
       });
       setMessage("");
     } catch (e) {
@@ -728,205 +797,87 @@ export function ManifestLibrary({
   }
   return (
     <section className="manifest-workspace" aria-label="Manifestation library">
-      <div className="section-heading">
-        <h2>Affirmation library</h2>
-        <button
-          className="primary"
-          disabled={!data.draft.lines.length}
-          onClick={() => onPractice()}
-        >
-          Use selection ({data.draft.lines.length})
-        </button>
-      </div>
-      <VoicePanel />
-      <div className="fields">
-        <label>
-          Category
-          <select
-            aria-label="Category"
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              onCategory?.(e.target.value);
-            }}
-          >
-            {catalog.data.categories.map((c) => (
-              <option key={c}>{c}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Find a sentence
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-      </div>
-      {active && (
-        <p className="content-note">
-          Stop the current practice before changing its sentences.
-        </p>
-      )}
-      <details
-        className="library-management"
-        onToggle={(e) => setManage(e.currentTarget.open)}
-      >
-        <summary>Manage categories &amp; affirmations</summary>
-        <p className="content-note">
-          Changes are saved on this device. Export your library to back it up or
-          move it to another device.
-        </p>
-        <div className="admin-actions">
-          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,-1);}catch(e){setMessage((e as Error).message);}}}>Move category up</button>
-          <button disabled={active} onClick={()=>{try{affirmationLibrary.reorderCategory(category,1);}catch(e){setMessage((e as Error).message);}}}>Move category down</button>
-          <button
-            disabled={active}
-            onClick={() => setEditing({ kind: "category-add", category })}
-          >
-            Add category
-          </button>
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "category-edit", category })}
-          >
-            Rename category
-          </button>
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "category-delete", category })}
-          >
-            Delete category
-          </button>
-          <button
-            disabled={active || !category}
-            onClick={() => setEditing({ kind: "affirmation-add", category })}
-          >
-            Add affirmation
-          </button>
-          <button
-            disabled={!!catalog.error}
-            onClick={() =>
-              void download(
-                JSON.stringify(catalog.data, null, 2),
-                "core-aura-affirmation-library.json",
-                "application/json",
-              )
-                .then(setMessage)
-                .catch((e) => setMessage(e.message))
-            }
-          >
-            Export library
-          </button>
-          <button
-            disabled={active}
-            onClick={() => libraryInput.current?.click()}
-          >
-            Import library
-          </button>
+      {section === "all" && <>
+        <div className="home-actions">
+          <button className="primary" disabled={active} onClick={() => setEditing({ kind: "affirmation-add" })}><Plus size={16} aria-hidden="true" /> Add affirmation</button>
+          <button disabled={active} onClick={() => setRecordAudio(true)}><Mic size={16} aria-hidden="true" /> Record audio affirmation</button>
         </div>
-      </details>
-      <input
-        ref={libraryInput}
-        type="file"
-        accept="application/json,.json"
-        className="sr-only"
-        aria-label="Import affirmation library"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          if (file.size > 2 * 1024 * 1024) {
-            setMessage("Choose a library JSON file under 2 MB.");
-            return;
-          }
-          void file
-            .text()
-            .then((text) => {
-              if (
-                !confirm(
-                  "Replace this device’s affirmation library with this backup? Saved practices remain available.",
-                )
-              )
-                return;
-              affirmationLibrary.restore(JSON.parse(text));
-              setMessage("Affirmation library restored.");
-            })
-            .catch((e) => setMessage(e.message));
-        }}
-      />
-      {editing && (
-        <LibraryEditor
-          edit={editing}
-          onClose={() => setEditing(undefined)}
-          onCategory={(value) => {
-            setCategory(value);
-            onCategory?.(value);
-          }}
-        />
-      )}
-      {catalog.error && <p role="status">{catalog.error}</p>}
-      {!catalog.data.categories.length && (
-        <p className="notice">
-          Add a category to start your affirmation library.
-        </p>
-      )}
-      <div className="affirmation-list">
-        {catalog.data.affirmations
-          .filter(
-            (a) =>
-              a.category === category &&
-              a.text.toLowerCase().includes((query+" "+search).trim().toLowerCase()),
-          )
-          .map((a) => (
-            <div className="affirmation-row" key={a.id}>
-              <label className="affirmation-choice">
-                <input
-                  type="checkbox"
-                  disabled={active}
-                  checked={data.draft.lines.some((l) => l.text === a.text)}
-                  onChange={() => select(a.id, a.text)}
-                />
-                <span>{a.text}</span>
-              </label>
-              <PreviewButton line={a} id={a.id} />
-              {manage && (
-                <div className="library-row-actions">
-                  <button
-                    disabled={active}
-                    aria-label={"Edit affirmation: " + a.text}
-                    onClick={() =>
-                      setEditing({
-                        kind: "affirmation-edit",
-                        category,
-                        item: a,
-                      })
-                    }
-                  >
-                    Edit / Move
-                  </button>
-                  <button disabled={active} onClick={()=>setEditing({kind:"affirmation-add",category,item:a})}>Duplicate and edit</button>
-                  <button
-                    disabled={active}
-                    aria-label={"Delete affirmation: " + a.text}
-                    onClick={() =>
-                      setEditing({
-                        kind: "affirmation-delete",
-                        category,
-                        item: a,
-                      })
-                    }
-                  >
-                    Delete
-                  </button>
-                </div>
-              )}
-            </div>
+        <label>Search affirmations<input type="search" value={query} onChange={e => setQuery(e.target.value)} /></label>
+        <input ref={libraryInput} type="file" accept="application/json,.json" className="sr-only"
+          aria-label="Import affirmation JSON" onChange={e => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            if (file.size > 2 * 1024 * 1024) { setMessage("Choose an affirmations JSON file under 2 MB."); return; }
+            void file.text().then(text => {
+              const count = affirmationLibrary.importTexts(JSON.parse(text));
+              setMessage(count === 1 ? "1 affirmation imported." : count + " affirmations imported.");
+            }).catch(error => setMessage(error.message));
+          }} />
+        <input ref={audioInput} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" className="sr-only"
+          aria-label="Import affirmation audio from device" onChange={event => {
+            setAudioFile(event.target.files?.[0]);
+            event.target.value = "";
+          }} />
+        {audioFile && <ImportRecording file={audioFile} audioAffirmation onCancel={() => setAudioFile(undefined)}
+          onSave={() => { setAudioFile(undefined); setMessage("Audio affirmation imported."); }} />}
+        {recordAudio && <RecordSentence line={{ id: "new-audio-affirmation", text: "" }} audioAffirmation
+          saveLabel="Save audio affirmation" closeLabel="Back to affirmations" onClose={() => setRecordAudio(false)}
+          onSave={() => { setRecordAudio(false); setMessage("Audio affirmation saved."); }} />}
+        {audioError && <p role="status">{audioError}</p>}
+        {editing && <LibraryEditor edit={editing} onClose={() => setEditing(undefined)} />}
+        {catalog.error && <p role="status">{catalog.error}</p>}
+        {onPractice && <button disabled={!selectedCount} onClick={() => onPractice()}>Use selection ({selectedCount})</button>}
+        <div className="affirmation-list">
+          {!matchingAffirmations.length && !matchingAudio.length && <p role="status">{needle ? "No matching affirmations." : "No affirmations yet."}</p>}
+          {matchingAudio.map(clip => {
+            const name = clip.title ?? clip.text;
+            const line: Line = { id: clip.id, text: name, recordedText: name, recordingId: clip.id, audioAffirmation: true };
+            const label = <span className="affirmation-audio-title">{name}<small>Audio · {Math.max(1, Math.round(clip.seconds))} sec</small></span>;
+            return <article className="affirmation-row" key={clip.id}>
+              {onPractice ? <label className="affirmation-choice"><input type="checkbox" disabled={active}
+                checked={!!selectedLine(line)} onChange={() => select(line)} />{label}</label> : label}
+              <div className="library-row-actions">
+                <PreviewButton line={line} id={clip.id} label={"Test play: " + name} catalog iconOnly />
+                <button className="icon-button" title="Edit affirmation" disabled={active} aria-label={"Edit affirmation: " + name}
+                  onClick={() => setEditing({ kind: "audio-edit", clip })}><Pencil size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Export audio" aria-label={"Export audio: " + name}
+                  onClick={() => void exportVoice(clip).then(blob => deliverFile(blob, `core-aura-affirmation-${clip.id}.wav`))
+                    .then(setMessage).catch(error => setMessage(error.message))}><Download size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Delete affirmation" disabled={active} aria-label={"Delete affirmation: " + name}
+                  onClick={() => setEditing({ kind: "audio-delete", clip })}><Trash2 size={16} aria-hidden="true" /></button>
+              </div>
+            </article>;
+          })}
+          {matchingAffirmations.map(item => (
+            <article className="affirmation-row" key={item.id}>
+              {onPractice ? <label className="affirmation-choice"><input type="checkbox" disabled={active}
+                checked={!!selectedLine(item)}
+                onChange={() => select({ id: item.id, text: item.text })} /><span>{item.text}</span></label> : <p>{item.text}</p>}
+              <div className="library-row-actions">
+                <PreviewButton line={item} id={item.id} label={"Test play: " + item.text} catalog iconOnly />
+                <button className="icon-button" title="Edit affirmation" disabled={active} aria-label={"Edit affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-edit", item })}><Pencil size={16} aria-hidden="true" /></button>
+                <button className="icon-button" title="Delete affirmation" disabled={active} aria-label={"Delete affirmation: " + item.text}
+                  onClick={() => setEditing({ kind: "affirmation-delete", item })}><Trash2 size={16} aria-hidden="true" /></button>
+              </div>
+            </article>
           ))}
-      </div>
-      <PersonalVoices initiallyOpen={recordingsOpen} />
-      <section
+        </div>
+        <div className="catalog-footer">
+          <button disabled={active} onClick={() => audioInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import audio affirmation</button>
+          <button disabled={active} onClick={() => libraryInput.current?.click()}><Upload size={16} aria-hidden="true" /> Import affirmations</button>
+          <button disabled={!!catalog.error} onClick={() => void download(
+            JSON.stringify({ schemaVersion: 1, affirmations: catalog.data.affirmations.map(item => item.text) }, null, 2),
+            "core-aura-affirmations.json", "application/json",
+          ).then(setMessage).catch(error => setMessage(error.message))}><Download size={16} aria-hidden="true" /> Export affirmations</button>
+        </div>
+      </>}
+      {section === "recordings" && <div ref={recordingsSection} tabIndex={-1} className="recordings-section">
+        <DefaultVoiceList />
+        <PersonalVoices initiallyOpen allowAttach={Boolean(onPractice)} />
+      </div>}
+      {section === "saved" && <section
         className="saved-practices-section"
         ref={savedSection}
         tabIndex={-1}
@@ -934,9 +885,7 @@ export function ManifestLibrary({
       >
         <div className="section-heading">
           <h2>Saved practices</h2>
-          <button onClick={() => input.current?.click()}>
-            Import practice
-          </button>
+          {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>New practice</button>}
         </div>
         <input
           className="sr-only"
@@ -946,14 +895,32 @@ export function ManifestLibrary({
           aria-label="Import manifestation practice"
           onChange={(e) => void importPlan(e.target.files?.[0])}
         />
-        <div className="home-actions"><button disabled={!data.plans.length} onClick={()=>setSelectedPlans(data.plans.filter(p=>matchesItem(p.name,"practice",p.id,search)).map(p=>p.id))}>Select shown practices</button><button onClick={()=>setSelectedPlans([])}>Clear practice selection</button><button disabled={!selectedPlans.length} onClick={()=>{const text=JSON.stringify({kind:"core-aura-practice-collection",schemaVersion:1,practices:data.plans.filter(p=>selectedPlans.includes(p.id)).map(withoutRecordings)});if(text.length>100000){setMessage("Select fewer practices or use a backup ZIP.");return;}void download(text,"core-aura-practices.json","application/json").then(setMessage).catch(e=>setMessage(e.message));}}>Export selected practices</button><button disabled={!selectedPlans.length} onClick={()=>{if(!confirm("Delete selected practices and their reminders?"))return;try{store.removeMany(selectedPlans);setSelectedPlans([]);void syncPhoneReminders().then(setMessage).catch(e=>setMessage(e.message));}catch(e){setMessage((e as Error).message);}}}>Delete selected practices</button></div>
+        <div className="home-actions">
+          <button disabled={!visiblePlans.length} onClick={() => setSelectedPlans(visiblePlans.map(plan => plan.id))}>Select shown practices</button>
+          <button disabled={!chosenPlans.length} onClick={() => setSelectedPlans([])}>Clear practice selection</button>
+          <button disabled={!chosenPlans.length} onClick={() => {
+            const text = JSON.stringify({kind: "core-aura-practice-collection", schemaVersion: 1, practices: chosenPlans.map(withoutRecordings)});
+            if (text.length > 100000) { setMessage("Select fewer practices or use a full backup ZIP."); return; }
+            void download(text, "core-aura-practices.json", "application/json").then(setMessage).catch(error => setMessage(error.message));
+          }}>Export selected practices</button>
+          <button disabled={!chosenPlans.length} onClick={() => {
+            if (!confirmSourceDeletion("practice", chosenPlans, "Schedules for these practices will also be removed.")) return;
+            try {
+              if (chosenPlans.some(plan => state.plan?.id === plan.id)) manifestPlayer.stop();
+              store.removeMany(chosenPlans.map(plan => plan.id));
+              setSelectedPlans([]);
+              void syncPhoneReminders().then(setMessage).catch(error => setMessage(error.message));
+            } catch (error) { setMessage((error as Error).message); }
+          }}>Delete selected practices</button>
+        </div>
+        {chosenPlans.length > 0 && <p className="content-note">{chosenPlans.length} selected</p>}
+        {data.plans.length > 0 && !visiblePlans.length && <p role="status">No practices match this search.</p>}
         {!data.plans.length && (
           <p className="content-note">
-            Save your selected sentences as a practice to schedule them.
-            Practices stay on this device; export backups to keep a copy.
+            {onPractice ? "Save your selected sentences as a practice to schedule them." : "Import a practice backup to get started."}
           </p>
         )}
-        {data.plans.filter(plan=>matchesItem(plan.name,"practice",plan.id,search)).slice().sort((a,b)=>sort==="name"?a.name.localeCompare(b.name):0).map((plan) => (
+        {visiblePlans.map((plan) => (
           <article className="saved-card" key={plan.id}>
             <label className="check"><input aria-label={"Select practice "+plan.name} type="checkbox" checked={selectedPlans.includes(plan.id)} onChange={e=>setSelectedPlans(e.target.checked?[...selectedPlans,plan.id]:selectedPlans.filter(id=>id!==plan.id))}/> Select</label>
             <div>
@@ -963,7 +930,7 @@ export function ManifestLibrary({
                 {plan.mode === "speech" ? "spoken" : "reading"}
               </p>
             </div>
-            <button
+            {onPractice && <button
               className="primary"
               onClick={() => {
                 try {
@@ -973,12 +940,12 @@ export function ManifestLibrary({
                 }
               }}
             >
-              Open practice
-            </button>
+              Edit practice
+            </button>}
             <div className="saved-actions">
               <button
                 aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
-                onClick={() => {
+                onClick={async () => {
                   try {
                     if (
                       state.plan?.id === plan.id &&
@@ -990,7 +957,10 @@ export function ManifestLibrary({
                       state.status === "paused"
                     )
                       manifestPlayer.resume();
-                    else manifestPlayer.start(plan);
+                    else {
+                      await verifyPractice(plan);
+                      manifestPlayer.start(plan);
+                    }
                   } catch (e) {
                     setMessage((e as Error).message);
                   }
@@ -1002,32 +972,9 @@ export function ManifestLibrary({
                     ? "Resume"
                     : "Play"}
               </button>
-              <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
-              <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
-              <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
-              <button
-                onClick={() =>
-                  download(
-                    JSON.stringify(withoutRecordings(plan), null, 2),
-                    "core-aura-practice.json",
-                    "application/json",
-                  )
-                    .then(setMessage)
-                    .catch((e) => setMessage(e.message))
-                }
-              >
-                Export practice
-              </button>
               <button
                 onClick={() => {
-                  if (
-                    !confirm(
-                      "Delete " +
-                        plan.name +
-                        " and its schedules from this device?",
-                    )
-                  )
-                    return;
+                  if (!confirmSourceDeletion("practice", [plan], "Schedules for this practice will also be removed.")) return;
                   try {
                     if (state.plan?.id === plan.id) manifestPlayer.stop();
                     store.remove(plan.id);
@@ -1044,9 +991,34 @@ export function ManifestLibrary({
                 Delete practice
               </button>
             </div>
+            <details className="practice-actions">
+              <summary>More options</summary>
+              <div className="saved-actions">
+                <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
+                <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
+                <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
+                <button
+                  onClick={() =>
+                    download(
+                      JSON.stringify(withoutRecordings(plan), null, 2),
+                      "core-aura-practice.json",
+                      "application/json",
+                    )
+                      .then(setMessage)
+                      .catch((e) => setMessage(e.message))
+                  }
+                >
+                  Export practice
+                </button>
+              </div>
+            </details>
           </article>
         ))}
-      </section>
+        <div className="catalog-footer">          <button onClick={() => input.current?.click()}>
+            Import practice
+          </button>
+</div>
+      </section>}
       {(message || error) && (
         <p role="status" className="notice">
           {message || error}
@@ -1166,9 +1138,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
       >
         Enable reminders
       </button>
-      {!data.plans.length ? (
-        <p className="notice">Save a practice before creating a schedule.</p>
-      ) : (
+      {data.plans.length > 0 && (
         <form onSubmit={add} className="manifest-fields">
           <div className="fields">
             <label>

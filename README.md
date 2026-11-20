@@ -1,10 +1,68 @@
 # Core-aura
 
-Core-aura 0.26.0 is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
+
+## v0.45.0 Choose what goes into a manifestation practice
+
+Create a named practice from any combination of sentences, recordings, audio, sounds and backgrounds. Layer-only sessions play for the selected session time. Library lists saved practices and exposes creation, editing and deletion. Android update retries keep receiving installer progress and offer the official download page when recovery is needed.
+
+## v0.44.0 Mobile listening interface
+
+Home opens with the selected playlist, quick playback, saved sessions and the playlist queue. The app uses bottom navigation on phones and a sidebar on desktop. The shared palette, headings and workspace panels bring the redesign to the existing application.
+
+## v0.43.0 Offline listening readiness
+
+Home and Library show whether saved playlists are ready offline, need a device voice, or refer to missing media. Manual practice and playlist starts check their dependencies before replacing active playback. Android release verification now checks the public APK checksum.
+
+## v0.42.0 Listening and recovery
+
+Home plays saved practices, playlists and mixes. Its replay shortcut survives a reload and never starts automatically. Queues check linked audio files before playback, and backups support the current themes and audio affirmation references. The release check can verify both the web and Android channels.
+
+[Release-readiness audit and acceptance checks](docs/release-readiness.md)
+
+## v0.41.0 Offline Library and Android release channel
+
+Library → Sound packs can download available packs together, check their total size, and play them from Downloaded packs without internet. Generated sounds and imported files are already local. When a practice uses online speech, an installed device voice for the same language can read it offline.
+
+## v0.40.0 Library audio affirmations
+
+Sounds and Backgrounds offer visible delete controls for imported files and reversible removal for built-in sounds. Voices keeps WAV import and clip management. Affirmations supports text, audio file import, and microphone recording. Audio affirmations can be previewed, exported as WAV, and included in a spoken practice.
+
+## v0.39.0 Library layers
+
+Library lists have import controls below their items. Backgrounds contains ambient and imported files. Manifest and each chakra can use an extra generated sound, an ambient layer with a filter frequency, and an imported file with its own level and loop control. File references are saved with the practice or chakra mix; the audio remains in the on-device Library.
+
+## v0.38.0 Library collections
+
+Sounds holds raw instruments, tones, and user samples. Backgrounds holds ambient sources and background mixes. Audio files is for music and longer recordings. Each collection uses the device file picker and can export its original imports. Voices lists the speech voices available to the device and Core-aura service, and manages personal WAV recordings. Affirmations is a flat list with additive JSON import.
+
+## v0.37.0 Library catalog
+
+Library is a category list with item management and test playback. Sound layers, levels, timers, and mix editing live in Sounds. Practice editing opens in Manifest. Playlist JSON import adds copies of playlists and preserves matching item references on the device.
+
+## v0.36.0 Library overview
+
+See all nine Library collections and all nine bundled starter items from the Library overview. Search collection names and starter titles, play or pause a starter directly, and open a collection for creation and management. Saved mixes put secondary actions under More options.
+
+## v0.35.0 Library starter content
+
+Library includes three silent affirmation practices, two generated backgrounds, two saved-mix templates, and two ready-to-play playlists. The starter items are bundled with the app. Use Save copy to add a practice or mix to your personal library. Audio files links to the original downloadable samples in Sound packs.
+
+## v0.34.0 Library rebuild
+
+Library includes generated sounds and favorites, saved backgrounds, voice recordings and speech voices, affirmations, manifestation practices, imported audio files, sound packs, saved mixes, and playlists. Home, Manifest, Sounds, and Chakras remain staged. Settings offers System, Light, Dark, Green, Yellow, and a custom colour.
+
+## v0.32.0 Manifestation and Library
+
+Manifest opens the practice list. Open a saved practice or start a new one, add sentences, set playback, and save or schedule it. Library separates affirmations, personal voice recordings, audio, backgrounds, and playlists. Backgrounds use saved mixes of up to eight layers. Editing a saved mix preserves its identity, while attaching it to a practice keeps a separate copy.
+
+## v0.30.0 audit fixes
+
+Library has a direct Playlists destination. Search and sorting apply to saved content, and bulk delete confirms the visible items and any affected playlists. Imported audio and explicitly saved Chakra sequences can play in a playlist. A Chakra sequence keeps its order and timing in playlist playback and WAV export. Existing Chakra mixes still play together. To move an imported-track playlist to another device, include the audio in the ZIP backup.
 
 ## Operating workspace
 
-Home provides direct manifestation, sound and seven-chakra controls using the same state as the editors. Reorder/collapse modules, pin practices/mixes, use editable presets, run chakra sequences, manage opt-in history, search/tag collections and export selected-audio ZIP backups. Playback replacement and unfinished-work protection are explicit. [Structure, capabilities and verification](docs/workspace-structure.md).
+Home plays saved manifestations, sound mixes, and chakra sessions while preserving editor drafts. Reorder/collapse modules, pin practices/mixes, use editable presets, run chakra sequences, manage opt-in history, search/tag collections and export selected-audio ZIP backups. Playback replacement and unfinished-work protection are explicit. [Structure, capabilities and verification](docs/workspace-structure.md).
 
 ## Development
 
@@ -21,7 +79,7 @@ The build output is dist/. The production player needs HTTPS, including for its 
 
 ## Manifestation
 
-Home is the starting workspace: current practice, saved counts, eight tool shortcuts, affirmation categories, saved-practice transport, upcoming reminders and quick tone setup. Manifest is the practice editor. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, attach a saved generated sound mix or background tone and save practices. Background level stays adjustable during playback; optional voice reduction lowers it while affirmations speak and restores it in gaps. Attached mixes survive deletion of the source session. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. The category/affirmation library supports add, rename/edit, move, delete and JSON backup on this device. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Voice selection, language filtering and Test voice are available in the compact Voice & playback panel in Manifest and Library. Optional self-hosted eSpeak NG voices work through the backend when device speech is unavailable. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
+Home shows saved practices, playlists, recent playback, upcoming reminders, and shortcuts. Manifest is the practice editor. Choose single/multiple affirmations from eight categories, write your own sentences, set sequence/each repetition, speak or read silently, attach a saved generated sound mix or background tone and save practices. Background level stays adjustable during playback; optional voice reduction lowers it while affirmations speak and restores it in gaps. Attached mixes survive deletion of the source session. Schedule weekday reminders or export calendar reminders. Schedules default to reminder → tap Play, with optional visible/idle auto-start. The category/affirmation library supports add, rename/edit, move, delete and JSON backup on this device. Every affirmation has a Play preview; selected sentences can use personal microphone recordings or imported PCM WAV files. Personal recordings export as portable WAV; saved practices have direct Play/Pause controls. Opt-in web push reminders work through the PostgreSQL reminder worker; closed-app automatic speech remains unsupported. Voice selection, language filtering and Test voice are available in the compact Voice & playback panel in Manifest and Library. Optional self-hosted eSpeak NG voices work through the backend when device speech is unavailable. Native notification/speech plugins require a new native build. See [manifestation guide](docs/manifestation.md).
 
 ## Continuity
 
@@ -53,7 +111,7 @@ The first Core Resonance pack contains original 15-second bell, bowl and flute s
 
 ## Android APK and updates
 
-The website links to /download.html and the persistent /android/core-aura-latest.apk download. Android Settings includes one Update latest action: it downloads a compatible update privately, verifies package/version/signing identity and submits a same-app update through Android without a browser or manual APK-opening step. Eligible Android 12+ devices can update without an extra installation prompt; Android confirmation is handled when required. Android may ask once to allow updates from Core-aura. Older stable app versions need a one-time normal upgrade to get the new native updater. The VPS signs verified CI build inputs with its permanent private key; a web deployment does not remove the APK channel. Publish using sudo bash ops/publish-android.sh after the verified main build. See [Android distribution](docs/android-distribution.md) for exact commands, private key backup and the one-time migration from the old temporary test APK.
+The website links to /download.html and the persistent /android/core-aura-latest.apk download. Android Settings includes one Update latest action: it downloads a compatible update privately, verifies package/version/signing identity and submits a same-app update through Android without a browser or manual APK-opening step. Eligible Android 12+ devices can update without an extra installation prompt; Android confirmation is handled when required. Android may ask once to allow updates from Core-aura. Older stable app versions need a one-time normal upgrade to get the new native updater. The VPS signs verified CI build inputs with its permanent private key; a web deployment does not remove the APK channel. Publish using sudo bash ops/publish-android.sh after CI has published build inputs from the verified release branch. See [Android distribution](docs/android-distribution.md) for exact commands, private key backup and the one-time migration from the old temporary test APK.
 
 Capacitor packages the shared interface in Android and iOS projects. Run npm run native:sync, then open Android Studio or Xcode. Automated verification builds Android debug/release packages, tests real APK signing/publication and compiles the iOS simulator project. Physical-device acceptance and iOS production signing/store distribution remain separate.
 

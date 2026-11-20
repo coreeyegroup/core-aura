@@ -1,1 +1,31 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/viewport.js"></script><meta name="theme-color" content="#173e34"><title>Update Core-aura</title><style>body{font:16px/1.5 system-ui;background:#f6f5ef;color:#173e34;margin:0;padding:32px 20px}main{max-width:480px;margin:auto}button,a{display:inline-flex;align-items:center;min-height:48px;padding:8px 16px;border:1px solid #c6d2c7;border-radius:12px;background:white;color:#173e34;font:inherit;text-decoration:none}[hidden]{display:none}h1{font-size:28px}</style></head><body><main><h1>Update Core-aura</h1><p id="message" role="status">Checking for updates…</p><button id="retry" hidden>Try again</button> <a href="/">Return to player</a></main><script type="module" src="/updater.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#f4f6f8">
+    <script src="/viewport.js"></script>
+    <title>Update Core-aura</title>
+    <style>
+      :root { --paper:#f4f6f8; --surface:#fff; --ink:#18232e; --accent:#16645d; --line:#82939e; color-scheme:light }
+      :root[data-resolved-theme="dark"] { --paper:#10161d; --surface:#18212a; --ink:#edf3f7; --accent:#a3e0d1; --line:#6e8493; color-scheme:dark }
+      :root[data-resolved-theme="contrast"] { --paper:#000; --surface:#000; --ink:#fff; --accent:#ffeb70; --line:#fff; color-scheme:dark }
+      * { box-sizing:border-box }
+      body { font:calc(16px * var(--text-scale,1))/1.5 system-ui,sans-serif; background:var(--paper); color:var(--ink); margin:0; padding:26px 16px }
+      main { max-width:480px; margin:auto }
+      h1 { font-size:1.6em; letter-spacing:-.025em; margin:0 }
+      button,a { display:inline-flex; align-items:center; min-height:44px; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--accent); font:inherit }
+      button { cursor:pointer }
+      [hidden] { display:none }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Update Core-aura</h1>
+      <p id="message" role="status">Checking for updates…</p>
+      <button id="retry" hidden>Try again</button>
+      <a href="/">Return to player</a>
+    </main>
+    <script type="module" src="/updater.js"></script>
+  </body>
+</html>

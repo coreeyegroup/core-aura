@@ -97,9 +97,8 @@ export function ConnectionPanel({
         </div>
       </dl>
       <p className="content-note">
-        Tones and saved local content do not require the server. Server voices,
-        pack downloads and web push need their services and an internet
-        connection.
+        Generated sounds, imported files, recordings and downloaded packs are available offline.
+        Download packs under Library → Sound packs. Server voices and web push require internet.
       </p>
       <button disabled={busy} onClick={() => void check()}>
         Check connection
