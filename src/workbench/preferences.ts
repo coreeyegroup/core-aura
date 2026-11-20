@@ -1,12 +1,14 @@
+import { parsePlaylists, type Playlist } from "../playlists/model";
 export const moduleIds=["manifest","sound","chakra","schedule","pinned","tools"] as const;
 export type ModuleId=(typeof moduleIds)[number];
 export type ItemRef={kind:"practice"|"session";id:string};
-export type Preferences={order:ModuleId[];collapsed:ModuleId[];pins:ItemRef[];recent:ItemRef[];start:"home"|"manifest"|"studio"|"chakras"|"library";history:boolean;labels:Record<string,{tags:string;folder:string}>};
+export type Preferences={order:ModuleId[];collapsed:ModuleId[];pins:ItemRef[];recent:ItemRef[];start:"home"|"manifest"|"studio"|"chakras"|"library";history:boolean;lastQueue?:Pick<Playlist,"name"|"items">;labels:Record<string,{tags:string;folder:string}>};
 const key="core-aura.workbench.v1";
-const initial=():Preferences=>({order:[...moduleIds],collapsed:[],pins:[],recent:[],start:"home",history:false,labels:{}});
+const initial=():Preferences=>({order:[...moduleIds],collapsed:["schedule","pinned","tools"],pins:[],recent:[],start:"home",history:false,labels:{}});
 export function parsePreferences(v:unknown):Preferences {
  const p=v as Preferences;if(!p||!Array.isArray(p.order)||p.order.length!==6||new Set(p.order).size!==6||p.order.some(x=>!moduleIds.includes(x))||!Array.isArray(p.collapsed)||p.collapsed.some(x=>!moduleIds.includes(x))||!["home","manifest","studio","chakras","library"].includes(p.start)||typeof p.history!=="boolean")throw Error("Invalid workspace preferences.");
  for(const list of [p.pins,p.recent])if(!Array.isArray(list)||list.length>100||list.some(r=>!r||!["practice","session"].includes(r.kind)||typeof r.id!=="string"||!r.id||r.id.length>100)||new Set(list.map(r=>r.kind+":"+r.id)).size!==list.length)throw Error("Invalid saved shortcuts.");
+ if(p.lastQueue!==undefined)parsePlaylists({schemaVersion:1,playlists:[{...p.lastQueue,id:"last-queue"}]});
  if(!p.labels||typeof p.labels!=="object"||Object.keys(p.labels).length>1000||Object.entries(p.labels).some(([k,x])=>k.length>120||!x||typeof x.tags!=="string"||x.tags.length>200||typeof x.folder!=="string"||x.folder.length>80))throw Error("Invalid library labels.");return structuredClone(p);
 }
 let error="",value=initial();try{const raw=localStorage.getItem(key);if(raw)value=parsePreferences(JSON.parse(raw));}catch{error="Workspace preferences could not be restored. The original data was kept; export a backup before resetting.";}

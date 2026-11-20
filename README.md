@@ -2,6 +2,12 @@
 
 Core-aura is a manifestation, sound-generation and personal meditation application. React and TypeScript provide the shared phone interface. An AudioWorklet mixes tunable tones, synthesized instruments, two raga phrase studies and seven chakra channels on the listening device.
 
+## v0.42.0 Listening and recovery
+
+Home plays saved practices, playlists and mixes. Its replay shortcut survives a reload and never starts automatically. Queues check linked audio files before playback, and backups support the current themes and audio affirmation references. The release check can verify both the web and Android channels.
+
+[Release-readiness audit and acceptance checks](docs/release-readiness.md)
+
 ## v0.41.0 Offline Library and Android release channel
 
 Library → Sound packs can download available packs together, check their total size, and play them from Downloaded packs without internet. Generated sounds and imported files are already local. When a practice uses online speech, an installed device voice for the same language can read it offline.

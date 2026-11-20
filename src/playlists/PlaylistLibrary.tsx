@@ -34,12 +34,12 @@ export function PlaylistLibrary({ sessions, tracks, trackError }: {
  <div className="home-actions"><button className="primary" disabled={!editing.name.trim() || !editing.items.length}>Save playlist</button><button type="button" onClick={() => { if ((editing.name || editing.items.length) && !confirm("Discard unfinished playlist edits?"))
             return; setEditing(null); }}>Cancel editing</button></div></form>}
  {!data.playlists.length && !editing && <p className="content-note">No playlists yet. Create a routine from your saved content.</p>}
- {data.playlists.map(p => { let duration = 0, missing = false; try {
+ {data.playlists.map(p => { let duration = 0, missing = ""; try {
         duration = resolveItems(p.items, manifest.plans, sessions, tracks).reduce((n, v) => n + itemDuration(v), 0);
     }
-    catch {
-        missing = true;
-    } return <article className="home-list-row" aria-label={p.name + " playlist"} key={p.id}><div><strong>{p.name}</strong><small>{p.items.length} items · {missing ? "Source unavailable · edit required" : durationLabel(duration) + " maximum"}</small></div><button className="icon-button primary" disabled={missing} aria-label={"Play playlist " + p.name} onClick={() => attempt(() => startQueue(resolveItems(p.items, manifest.plans, sessions, tracks), p.name))}><Play size={18}/></button><button disabled={!!editing} onClick={() => { setEditing(structuredClone(p)); setSource(""); }}>{missing ? "Repair playlist" : "Edit"}</button><button className="icon-button" aria-label={"Delete playlist " + p.name} onClick={() => { if (confirm("Delete this playlist? Saved practices and sound sessions remain."))
+    catch (error) {
+        missing = (error as Error).message;
+    } return <article className="home-list-row" aria-label={p.name + " playlist"} key={p.id}><div><strong>{p.name}</strong><small>{p.items.length} items · {missing ? missing : durationLabel(duration) + " maximum"}</small></div><button className="icon-button primary" disabled={Boolean(missing)} aria-label={"Play playlist " + p.name} onClick={() => attempt(() => startQueue(resolveItems(p.items, manifest.plans, sessions, tracks), p.name))}><Play size={18}/></button><button disabled={!!editing} onClick={() => { setEditing(structuredClone(p)); setSource(""); }}>{missing ? "Repair playlist" : "Edit"}</button><button className="icon-button" aria-label={"Delete playlist " + p.name} onClick={() => { if (confirm("Delete this playlist? Saved practices and sound sessions remain."))
         attempt(() => playlistStore.remove(p.id)); }}><Trash2 size={16}/></button></article>; })}
  <div className="catalog-footer">
    <button disabled={!!editing || !!error} onClick={() => importInput.current?.click()}>Import playlists</button>

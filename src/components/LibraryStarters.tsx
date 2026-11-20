@@ -93,7 +93,7 @@ export function LibraryStarters({ section, onSaveMix, query = "" }: {
                 setMessage("");
                 if (playing) queuePlayer.pause();
                 else {
-                  const action = paused ? queuePlayer.resume() : startQueue(items, entry.name);
+                  const action = paused ? queuePlayer.resume() : startQueue(items, entry.name, false);
                   void action.catch(error => setMessage(error.message));
                 }
               }}>

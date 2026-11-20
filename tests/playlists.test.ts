@@ -150,3 +150,15 @@ it("plays saved chakra channels in order and keeps the transition gap paused", a
         h.player.dispose();
     }
 });
+
+it("identifies missing audio layers before starting a practice or mix from a queue", () => {
+    const id = "track:" + "a".repeat(64);
+    const accompaniment = { audio: { id, volume: .2, loop: true } };
+    const layered = { ...practice, accompaniment };
+    expect(() => resolveItems([refs[0]], [layered], [])).toThrow(/Quiet morning.*missing audio file.*Manifest/);
+    const layeredMix = { ...session, channels: [{ ...session.channels[0], accompaniment }] };
+    expect(() => resolveItems([refs[1]], [], [layeredMix])).toThrow(/Evening bowl.*missing audio file.*Sounds/);
+    const track = { id, title: "Rain", filename: "Rain.wav", duration: 30, bytes: 1000,
+        createdAt: "2026-11-20T00:00:00Z", volume: .5, muted: false, loop: false };
+    expect(resolveItems(refs, [layered], [layeredMix], [track])).toHaveLength(2);
+});

@@ -25,15 +25,14 @@ The website remains the first-install/recovery route. The web build and APK chan
 ```bash
 cd ~/core-aura
 git fetch origin release/v0.27.0-peaceful-home --tags
-release=android-v0.41.0
-git worktree add --detach "$HOME/core-aura-android-0.41.0" "$release"
+release=android-v0.42.0
+git worktree add --detach "$HOME/core-aura-android-0.42.0" "$release"
 sudo bash ops/deploy.sh "$release"
-sudo bash "$HOME/core-aura-android-0.41.0/ops/publish-android.sh"
-bash ops/verify.sh 0.41.0
-curl -fsS https://core-aura.coreeye.in/android/latest.json
+sudo bash "$HOME/core-aura-android-0.42.0/ops/publish-android.sh"
+bash "$HOME/core-aura-android-0.42.0/ops/verify.sh" 0.42.0 --android
 ```
 
-Confirm that `versionName` in the Android metadata is also `0.41.0` before opening Update latest on the phone. If the website has updated while Android still shows the previous version, the signed APK has yet to be published.
+Confirm that `versionName` in the Android metadata is also `0.42.0` before opening Update latest on the phone. If the website has updated while Android still shows the previous version, the signed APK has yet to be published.
 
 The VPS validates exact-version CI input hashes/source digest, signs the release with its existing permanent private key, verifies it and atomically publishes metadata/immutable APK paths. Java runtime/keytool are installed if missing; no Android SDK is needed on the VPS. Failed publication preserves the current release. Both app version and Android versionCode must increase for changed releases.
 

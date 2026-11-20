@@ -113,7 +113,7 @@ const tabs = [
 ] as const;
 
 // Add each rebuilt screen here as it is ready. Explore shares the Sounds tab.
-const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["library", "studio", "manifest", "chakras"]);
+const rebuiltScreens: ReadonlySet<(typeof tabs)[number][0]> = new Set(["home", "library", "studio", "manifest", "chakras"]);
 
 export default function App() {
   const [route, setRoute] = useState<Route>(() =>
@@ -1475,7 +1475,7 @@ export default function App() {
 
                     <div className="saved-actions">
                       <button aria-label={"Test play " + row.name} onClick={() => {
-                        void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions), row.name)
+                        void startQueue(resolveItems([{ kind: "session", id: row.id }], [], sessions, localTracks), row.name)
                           .catch(error => setMessage(error.message));
                       }}>Test play</button>
                       {row.kind === "nature" ? <button onClick={() => {

@@ -43,18 +43,32 @@ export function parsePlaylists(value: unknown): PlaylistData {
 export function resolveItems(refs: PlaylistRef[], plans: Plan[], sessions: Session[], tracks: Track[] = []): PlayItem[] {
     if (!refs.length || refs.length > 100)
         throw Error("Choose 1–100 saved items.");
-    return refs.map(r => { if (r.kind === "practice") {
-        const p = plans.find(p => p.id === r.id);
-        if (!p)
-            throw Error("A practice is unavailable. Edit the playlist to replace it.");
-        return { kind: "practice", id: r.id, name: p.name, plan: parsePlan(structuredClone(p)) };
-    } if (r.kind === "track") {
-        const track = tracks.find(item => item.id === r.id);
-        if (!track) throw Error("An imported track is unavailable. Edit the playlist to replace it.");
-        return { kind: "track", id: r.id, name: track.title, track: { ...track } };
-    } if (r.kind !== "session")
-        throw Error("Unsupported playlist item."); const s = sessions.find(s => s.id === r.id); if (!s)
-        throw Error("A sound session is unavailable. Edit the playlist to replace it."); return { kind: "session", id: r.id, name: s.name, session: parseSession(structuredClone(s)) }; });
+    const trackIds = new Set(tracks.map(track => track.id));
+    function checkAudio(name: string, ids: (string | undefined)[], section: string) {
+        if (ids.some(id => id && !trackIds.has(id))) {
+            throw Error(`“${name}” uses a missing audio file. Reimport it in Library or replace the layer in ${section}.`);
+        }
+    }
+    return refs.map(ref => {
+        if (ref.kind === "practice") {
+            const plan = plans.find(plan => plan.id === ref.id);
+            if (!plan) throw Error("A practice is unavailable. Edit the playlist to replace it.");
+            checkAudio(plan.name, [plan.accompaniment?.audio?.id], "Manifest");
+            return { kind: "practice", id: ref.id, name: plan.name, plan: parsePlan(plan) };
+        }
+        if (ref.kind === "track") {
+            const track = tracks.find(track => track.id === ref.id);
+            if (!track) throw Error("An imported track is unavailable. Edit the playlist to replace it.");
+            return { kind: "track", id: ref.id, name: track.title, track: { ...track } };
+        }
+        if (ref.kind !== "session") throw Error("Unsupported playlist item.");
+        const session = sessions.find(session => session.id === ref.id);
+        if (!session) throw Error("A sound session is unavailable. Edit the playlist to replace it.");
+        checkAudio(session.name, session.channels.map(channel => channel.accompaniment?.audio?.id),
+            session.kind === "chakras" ? "Chakras" : "Sounds");
+        return { kind: "session", id: ref.id, name: session.name, session: parseSession(structuredClone(session)) };
+    });
 }
+
 export function itemDuration(item: PlayItem) { return item.kind === "practice" ? item.plan.seconds : item.kind === "track" ? item.track.duration : sessionDuration(item.session); }
 export function durationLabel(seconds: number) { return seconds < 60 ? Math.round(seconds) + " sec" : Math.ceil(seconds / 60) + " min"; }

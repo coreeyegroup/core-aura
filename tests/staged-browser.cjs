@@ -4,7 +4,6 @@ const { chromium } = require("playwright");
 const AxeBuilder = require("@axe-core/playwright").default;
 
 const origin = "http://localhost:8089";
-const screens = ["Home"];
 const palettes = ["system", "light", "dark", "green", "yellow", "custom"];
 const collections = [
   ["Sounds", "#library/sounds", "Import sounds"],
@@ -86,19 +85,35 @@ function testAudio(name) {
 
     const settings = page.getByRole("button", { name: "Settings", exact: true });
     const nav = page.getByRole("navigation", { name: "Main navigation" });
-    async function assertEmpty(name) {
-      const heading = page.getByRole("main").getByRole("heading", { name, exact: true });
-      await heading.waitFor({ state: "attached" });
-      assert.equal(await page.locator("main > *").count(), 1);
-      assert.equal(await page.locator("main > .sr-only").count(), 1);
-      assert.equal(await page.locator(".player-dock, .mini-player, .queue-player").count(), 0);
-      assert.equal(await nav.getByRole("button", { name, exact: true }).getAttribute("aria-current"), "page");
+    await nav.getByRole("button", { name: "Home", exact: true }).click();
+    await page.getByRole("heading", { name: "Your practice", exact: true }).waitFor();
+    const home = page.getByRole("region", { name: "Home playlists" });
+    await home.getByRole("combobox", { name: "Home playlist" }).selectOption({ label: "Saved routine" });
+    const homePlayer = page.getByRole("region", { name: "Playlist player" });
+    await home.getByRole("button", { name: "Play selected playlist" }).click();
+    await homePlayer.getByText("Saved mix", { exact: true }).waitFor();
+    await homePlayer.getByRole("button", { name: "Pause playlist" }).click();
+    await nav.getByRole("button", { name: "Library", exact: true }).click();
+    await homePlayer.getByRole("button", { name: "Resume playlist" }).click();
+    await homePlayer.getByRole("button", { name: "Stop playlist" }).click();
+    await nav.getByRole("button", { name: "Home", exact: true }).click();
+    await page.reload();
+    assert.equal(await homePlayer.count(), 0);
+    const replay = page.getByRole("region", { name: "Continue listening" });
+    await replay.getByText("Saved routine", { exact: true }).waitFor();
+    await replay.getByRole("button", { name: "Play again" }).click();
+    await homePlayer.getByText("Saved mix", { exact: true }).waitFor();
+    await homePlayer.getByRole("button", { name: "Stop playlist" }).click();
+    await page.getByRole("button", { name: "Play selected manifestation", exact: true }).click();
+    await homePlayer.getByText("Stay present.", { exact: true }).waitFor();
+    await homePlayer.getByRole("button", { name: "Stop playlist" }).click();
+    for (const width of [320, 390, 768, 1024]) {
+      await page.setViewportSize({ width, height: 800 });
+      assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     }
-
-    for (const name of screens) {
-      await nav.getByRole("button", { name, exact: true }).click();
-      await assertEmpty(name);
-    }
+    await page.setViewportSize({ width: 320, height: 740 });
+    const homeAudit = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze();
+    assert.deepEqual(homeAudit.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) })), []);
     await nav.getByRole("button", { name: "Library", exact: true }).click();
     const libraryGrid = page.getByRole("group", { name: "Library collections" });
     await libraryGrid.waitFor();
@@ -436,6 +451,52 @@ function testAudio(name) {
     await player.getByRole("button", { name: "Stop playlist" }).click();
     await player.waitFor({ state: "detached" });
     await context.setOffline(false);
+    await settings.click();
+    const chooseTheme = page.getByRole("combobox", { name: "Theme", exact: true });
+    await chooseTheme.selectOption("custom");
+    await page.getByText("Backup, restore & storage", { exact: true }).click();
+    const backupClip = page.getByRole("checkbox", { name: "Back up A calmer breath", exact: true });
+    await backupClip.check();
+    async function backup() {
+      const downloaded = page.waitForEvent("download");
+      await page.getByRole("button", { name: "Export backup ZIP", exact: true }).click();
+      return readFile(await (await downloaded).path());
+    }
+    const fullBackup = await backup();
+    await page.getByRole("button", { name: "Settings only", exact: true }).click();
+    const settingsBackup = await backup();
+    async function removeFixtureClip() {
+      await page.evaluate(() => new Promise((resolve, reject) => {
+        const data = JSON.parse(localStorage.getItem("core-aura.manifestation.v1"));
+        const id = data.plans.flatMap(plan => plan.lines).find(line => line.audioAffirmation).recordingId;
+        const open = indexedDB.open("core-aura-personal-voice", 1);
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result, tx = db.transaction("recordings", "readwrite");
+          tx.objectStore("recordings").delete(id);
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => reject(tx.error);
+        };
+      }));
+    }
+    async function restore(buffer) {
+      page.once("dialog", dialog => dialog.accept());
+      await page.getByLabel("Restore Core-aura backup").setInputFiles({ name: "backup.zip", mimeType: "application/zip", buffer });
+      await page.getByText(/^Backup restored/).waitFor();
+    }
+    await removeFixtureClip();
+    await restore(fullBackup);
+    await page.goto(origin + "/#library/affirmations");
+    await page.reload();
+    await page.getByRole("button", { name: "Test play: A calmer breath", exact: true }).waitFor();
+    assert.equal(await page.locator("html").getAttribute("data-theme"), "custom");
+    await removeFixtureClip();
+    await settings.click();
+    await page.getByText("Backup, restore & storage", { exact: true }).click();
+    await restore(settingsBackup);
+    const recovered = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")).plans);
+    const fallback = recovered.flatMap(plan => plan.lines).find(line => line.text === "A calmer breath");
+    assert.ok(fallback && !fallback.audioAffirmation && !fallback.recordingId);
     assert.deepEqual(errors, []);
     console.log("Verified ten Library collections, isolated sound testing, separate mix editing, six themes, custom colour persistence, keyboard focus, accessibility and saved data.");
   } finally {

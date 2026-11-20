@@ -116,6 +116,9 @@ export const manifestationStore = {
   },
   removeMany:(ids:string[])=>commit({...state.data,plans:state.data.plans.filter(p=>!ids.includes(p.id)),reminders:state.data.reminders.filter(r=>!ids.includes(r.planId)),draft:ids.includes(state.data.draft.id)?newPlan():state.data.draft}),
   detachRecording: (id: string) => {
+    if ([state.data.draft, ...state.data.plans].some(plan =>
+      plan.lines.some(line => line.recordingId === id && line.audioAffirmation)
+    )) throw Error("This audio is used in a practice. Remove it from the practice and save your changes before deleting.");
     const clean = (p: Plan) => ({
       ...p,
       lines: p.lines.map((l) => {

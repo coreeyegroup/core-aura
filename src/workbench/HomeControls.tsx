@@ -110,7 +110,8 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
     .sort((a, b) => +a.date! - +b.date!)[0];
   const nextPractice = upcoming && data.plans.find((plan) => plan.id === upcoming.reminder.planId);
   const active = queue.status === "playing" || queue.status === "paused";
-  const replayItem = queue.items[queue.index]?.name || queue.name;
+  const replay = prefs.lastQueue;
+  const replayMissing = replay?.items.some(ref => !itemFor(ref)) ?? false;
 
   async function attempt(action: () => unknown) {
     setMessage("");
@@ -256,12 +257,15 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
         </div>
       </section>
 
-      {!active && queue.items.length > 0 && (
+      {!active && replay && (
         <section className="home-continue" aria-label="Continue listening">
-          <div><small>Last played</small><strong>{replayItem}</strong></div>
-          <button className="text-button" onClick={() => void attempt(() => startQueue(queue.items, queue.name))}>
-            <Play size={16} aria-hidden="true" /> Play again
-          </button>
+          <div><small>Last played</small><strong>{replay.name}</strong>
+            {replayMissing && <small>A source is missing. Open Library to choose a replacement.</small>}
+          </div>
+          {replayMissing ? <button className="text-button" onClick={() => onOpen("library")}>Open Library</button>
+            : <button className="text-button" onClick={() => void play(replay.items, replay.name)}>
+              <Play size={16} aria-hidden="true" /> Play again
+            </button>}
         </section>
       )}
 

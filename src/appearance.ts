@@ -12,7 +12,7 @@ export type Appearance = {
   customColor?: string;
 };
 
-function validColor(value: unknown): value is string {
+export function validColor(value: unknown): value is string {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
 }
 
