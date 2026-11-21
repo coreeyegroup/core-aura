@@ -102,14 +102,14 @@ const { chromium } = require("playwright"),
       );
       await p.goForward();
       await p.getByLabel("Practice name", { exact: true }).waitFor();
-      await p.locator(".custom-sentence > summary").click();
+      await p.getByRole("button", { name: "Write your own affirmation", exact: true }).click();
       await p
         .getByLabel("Your own sentence", { exact: true })
         .fill("Unfinished words stay with me.");
       await nav("Home");
       await nav("Manifest");
       await p.getByRole("button", { name: "Practice", exact: true }).click();
-      await p.locator(".custom-sentence > summary").click();
+      await p.getByRole("button", { name: "Write your own affirmation", exact: true }).click();
       assert.equal(
         await p.getByLabel("Your own sentence", { exact: true }).inputValue(),
         "Unfinished words stay with me.",
@@ -208,6 +208,7 @@ const { chromium } = require("playwright"),
       );
       await nav("Manifest");
       await p.getByRole("button", { name: "Practice", exact: true }).click();
+      await p.getByText("2.2 Playback options", { exact: true }).click();
       await p
         .getByLabel("Practice mode", { exact: true })
         .selectOption("speech");
@@ -295,7 +296,7 @@ const { chromium } = require("playwright"),
         .click();
       await nav("Manifest");
       await p.getByRole("button", { name: "Practice", exact: true }).click();
-      await p.locator(".custom-sentence > summary").click();
+      await p.getByRole("button", { name: "Write your own affirmation", exact: true }).click();
       assert.equal(
         await p.getByLabel("Your own sentence", { exact: true }).inputValue(),
         "Unfinished words stay with me.",

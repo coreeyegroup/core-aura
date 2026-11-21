@@ -2768,43 +2768,139 @@ progress {
 /* Route changes focus headings for assistive technology. Interactive controls keep their focus rings. */
 .app main h1[tabindex="-1"]:focus { outline: none; }
 
-.practice-editor h2 small { color: var(--muted); margin-inline-start: .35rem; }
-.practice-sentences,
-.repeat-fields,
-.repeat-fields > fieldset { display: grid; gap: var(--gap); min-width: 0; }
+.practice-editor {
+  gap: 0;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.practice-step,
+.practice-footer {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 10px var(--pad);
+}
+.practice-step + .practice-step,
+.practice-footer { border-top: 1px solid var(--line); }
+.practice-step h2 { font-size: calc(15px * var(--text-scale)); }
+.practice-step h3 { font-size: calc(13px * var(--text-scale)); }
+.practice-step-heading {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
+}
+.practice-step-heading .text-button { min-height: 36px; padding-block: 0; }
+.practice-sentences { display: grid; gap: 6px; min-width: 0; }
+.practice-source-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.practice-source-actions button { padding-inline: 6px; }
+.practice-source-actions button[aria-expanded="true"],
+.practice-layer-actions button[aria-expanded="true"] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.practice-composer:not([hidden]) { display: grid; gap: 4px; }
+.practice-composer .admin-actions { align-items: center; gap: 8px; }
+.practice-editor .manifest-line { padding: 0; }
+.practice-editor .sentence-queue-head { min-height: 44px; }
+.practice-editor .sentence-editor > summary { top: 0; min-height: 44px; }
+.practice-editor .queue-index { min-width: 1.6em; }
+.practice-playback,
+.practice-more {
+  padding: 0;
+  min-width: 0;
+}
+.practice-playback > summary { border-top: 1px solid var(--line); }
+.practice-playback > summary small { margin-inline-start: auto; }
+.practice-playback > summary::after { margin-inline-start: 4px; }
+.practice-playback-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  border: 0;
+  margin: 0 0 6px;
+  padding: 0;
+  min-width: 0;
+  gap: 6px;
+}
+@media (min-width: 720px) {
+  .practice-playback-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.practice-footer { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.practice-more[open] { grid-column: 1 / -1; }
+.practice-more .workbench-panel { margin-top: 6px; }
+.practice-layer-actions { gap: 6px; }
+.practice-layer-actions button { flex: 1 1 auto; }
 .practice-layer {
   position: relative;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   min-width: 0;
 }
+.practice-layer.unassigned-mix { border-color: transparent; }
 .practice-layer > details { border: 0; background: transparent; margin: 0; padding: 0; }
 .practice-layer > details > summary {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   list-style: none;
-  min-height: 48px;
-  padding: 6px 12px;
+  min-height: 44px;
+  padding: 4px 8px;
   cursor: pointer;
 }
 .practice-layer > details > summary::after { display: none; }
-.practice-layer:has(.practice-layer-preview) > details > summary { padding-inline-end: 62px; }
+.practice-layer:has(.practice-layer-preview) > details > summary { padding-inline-end: 52px; }
 .practice-layer > details > summary svg { flex: none; transform: rotate(-90deg); }
 .practice-layer > details[open] > summary svg { transform: none; }
-.practice-layer summary :is(strong, small) { display: block; overflow-wrap: anywhere; }
-.practice-layer summary small { color: var(--muted); }
-.practice-layer > details[open] > :not(summary) { margin: 0 10px 10px; }
-.practice-layer-preview { position: absolute; inset-block-start: 5px; inset-inline-end: 6px; }
+.practice-layer-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 7px;
+  overflow-wrap: anywhere;
+}
+.practice-layer-copy small { font-weight: 400; }
+.practice-layer > details[open] > :not(summary) { margin: 0 8px 8px; }
+.practice-layer-preview { position: absolute; inset-block-start: 0; inset-inline-end: 0; }
+.unassigned-mix > details:not([open]) > summary { color: var(--muted); font-size: calc(12px * var(--text-scale)); }
 #practice-layer-picker:not([hidden]) {
   display: grid;
-  gap: 8px;
-  justify-items: start;
-  padding: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
+  padding: 6px;
   border: 1px solid var(--line);
   border-radius: var(--radius);
 }
 .practice-layer :is(fieldset, .fields),
 #practice-layer-picker > fieldset { grid-template-columns: minmax(0, 1fr); }
-#practice-layer-picker > fieldset { width: 100%; }
+#practice-layer-picker > fieldset { padding: 0; margin: 0; min-width: 0; border: 0; }
+.saved-practice-row {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0 3px;
+  padding: 5px 51px 5px 8px;
+}
+.saved-practice-copy { display: flex; gap: 6px; align-items: center; }
+.saved-practice-copy h3 { font-size: calc(14px * var(--text-scale)); }
+.saved-practice-more { grid-column: 1 / -1; }
+.saved-practice-more > summary {
+  position: absolute;
+  inset-block-start: 5px;
+  inset-inline-end: 5px;
+  min-width: 44px;
+  justify-content: center;
+  border-radius: var(--radius);
+  margin: 0;
+}
+.saved-practice-more > summary::after { display: none; }
+.saved-practice-more[open] > summary { background: var(--accent-soft); color: var(--accent); }
+.saved-practice-more[open] > .saved-actions { margin-block: 6px 2px; }
 button svg:is(.lucide-play, .lucide-pause, .lucide-square) { fill: currentColor; }

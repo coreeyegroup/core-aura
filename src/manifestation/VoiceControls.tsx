@@ -97,6 +97,8 @@ export function PreviewButton({
                 .closest(".manifest-workspace")
                 ?.querySelector<HTMLDetailsElement>(".voice-panel");
               if (panel) {
+                const playback = panel.closest<HTMLDetailsElement>(".practice-playback");
+                if (playback) playback.open = true;
                 panel.open = true;
                 panel.scrollIntoView({ block: "start" });
               }

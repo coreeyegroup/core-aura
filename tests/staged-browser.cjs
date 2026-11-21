@@ -367,13 +367,21 @@ function testAudio(name) {
     await page.getByRole("button", { name: "New practice", exact: true }).click();
     await page.getByRole("textbox", { name: "Practice name" }).fill("Rain without narration");
     assert.deepEqual(await page.locator(".practice-editor h2, .practice-editor h3").allTextContents(), [
-      "2. Sentences or audio 0/50", "2.1 Choose from library", "2.2 Playback options", "3. Audio, sounds and backgrounds",
+      "1. Practice details", "2. Sentences or audio", "2.1 Choose from library", "2.2 Playback options", "3. Audio, sounds and backgrounds",
     ]);
     assert.equal(await page.getByRole("button", { name: "Manage background library", exact: true }).count(), 0);
+    const playbackOptions = page.getByText("2.2 Playback options", { exact: true });
+    const maximumSession = page.getByLabel("Maximum session", { exact: true });
+    assert.equal(await maximumSession.isVisible(), false);
+    await playbackOptions.click();
+    assert.equal(await maximumSession.isVisible(), true);
+    await playbackOptions.click();
+    assert.equal(await page.getByLabel("Your own sentence", { exact: true }).isVisible(), false);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.getByRole("button", { name: "Add background", exact: true }).click();
     await page.getByLabel("New layer background sound", { exact: true }).selectOption("stream");
     assert.equal(await page.locator("#practice-layer-picker").isVisible(), false);
-    await page.getByText("Gentle stream · 1000 Hz filter · 20%", { exact: true }).waitFor();
+    await page.getByText("1000 Hz filter · 20% · Background layer", { exact: true }).waitFor();
     assert.equal(await page.getByLabel("Layer 1 background sound", { exact: true }).isVisible(), false);
     await page.getByRole("button", { name: "Add sound", exact: true }).click();
     await page.getByLabel("New layer extra sound", { exact: true }).selectOption("sine");
@@ -413,6 +421,8 @@ function testAudio(name) {
     await page.goto(origin + "/#library/practices");
     const updated = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")).plans.find(plan => plan.name === "Rain without narration"));
     assert.equal(updated.additionalLayers.length, 2);
+    assert.equal(await layeredCard.getByRole("button", { name: "Delete practice", exact: true }).isVisible(), false);
+    await layeredCard.getByLabel("More options for Rain without narration", { exact: true }).click();
     page.once("dialog", dialog => dialog.accept());
     await layeredCard.getByRole("button", { name: "Delete practice", exact: true }).click();
     await layeredCard.waitFor({ state: "detached" });
@@ -471,13 +481,19 @@ function testAudio(name) {
     await page.goto(origin + "/#library/practices");
     const practiceCard = page.locator(".saved-card").filter({ has: page.getByRole("heading", {name:"Saved practice", exact:true}) });
     await practiceCard.getByRole("button", { name: "Edit practice", exact: true }).click();
+    const firstSentence = page.getByLabel("Select sentence 1", { exact: true });
+    assert.equal(await firstSentence.count(), 0);
+    await page.getByRole("button", { name: "Select sentences", exact: true }).click();
+    await firstSentence.check();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    assert.equal(await firstSentence.count(), 0);
     await page.getByRole("button", { name: "Add sound", exact: true }).click();
     await page.getByLabel("New layer extra sound", { exact: true }).selectOption("bell");
     await page.getByRole("button", { name: "Add background", exact: true }).click();
     await page.getByLabel("New layer background sound", { exact: true }).selectOption("rain");
     await page.getByRole("button", { name: "Add audio", exact: true }).click();
     await page.getByLabel("New layer audio file", { exact: true }).selectOption({label: "Ambient layer"});
-    await page.getByText("Bell · 432 Hz · 20%", { exact: true }).waitFor();
+    await page.getByText("432 Hz · 20% · Sound layer", { exact: true }).waitFor();
     const authored = "I make steady progress in my own time.";
     await page.getByText("Write your own affirmation", { exact: true }).click();
     await page.getByLabel("Your own sentence", { exact: true }).fill(authored);

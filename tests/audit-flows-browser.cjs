@@ -108,9 +108,10 @@ function testAudio() {
     page.once("dialog", dialog => dialog.accept());
     await button("New practice").click();
     await label("Practice name").waitFor();
-    assert.equal(await page.getByText("3. Playback options", {exact:true}).count(), 1);
+    assert.equal(await page.getByText("2.2 Playback options", {exact:true}).count(), 1);
     await button("Practices").click();
     assert.equal(await affirmationSearch.count(), 0);
+    await button("Select practices").click();
     await label("Select practice Older practice").check();
     await label("Search library").fill("Newer");
     assert.equal(await button("Delete selected practices").isDisabled(), true);

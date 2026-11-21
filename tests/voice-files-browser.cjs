@@ -34,7 +34,7 @@ function wav() {
       errors = [];
     p.on("pageerror", (e) => errors.push(e.message));
     await p.goto("http://localhost:8089/#manifest");
-    await p.locator(".custom-sentence > summary").click();
+    await p.getByRole("button", { name: "Write your own affirmation", exact: true }).click();
     await p
       .getByLabel("Your own sentence", { exact: true })
       .fill("I make steady progress.");

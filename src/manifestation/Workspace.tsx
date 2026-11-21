@@ -7,7 +7,7 @@ import {HistoryPanel} from "../workbench/HistoryPanel";
 import type { Track } from "../tracks/storage";
 import { PracticeLayers } from "./PracticeLayers";
 import { Session } from "../model";
-import { Download, Mic, Pause, Pencil, Play, Plus, Square, Trash2, Upload } from "lucide-react";
+import { Download, Ellipsis, Mic, Pause, Pencil, Play, Plus, Square, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -125,6 +125,8 @@ export function Manifestation({
   const [practiceSort, setPracticeSort] = useState("recent");
   const [recordLine, setRecordLine] = useState<Line>();
   const [selectedLines,setSelectedLines]=useState<string[]>([]);
+  const [selectSentences, setSelectSentences] = useState(false);
+  const [writeAffirmation, setWriteAffirmation] = useState(false);
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
     const element = dock.current;
@@ -143,6 +145,10 @@ export function Manifestation({
   }, [view, queueActive, state.status]);
   const active = practiceActive(state),
     p = active && state.plan ? state.plan : data.draft;
+  useEffect(() => {
+    setSelectSentences(false);
+    setSelectedLines([]);
+  }, [p.id]);
   function composer(value: string) {
     setCustom(value);
     try {
@@ -239,7 +245,6 @@ export function Manifestation({
       </div>
       {view === "practices" ? <>
         <div className="home-actions">
-          <button className="primary" disabled={active} onClick={newPractice}>New practice</button>
           <button onClick={onPlaylists}>Playlists</button>
         </div>
         <div className="fields">
@@ -253,7 +258,7 @@ export function Manifestation({
           </label>
         </div>
         <ManifestLibrary section="saved" search={practiceSearch} sort={practiceSort}
-          onPractice={id => id && onOpenPractice(id)} focusOnEntry={false} />
+          onPractice={id => id ? onOpenPractice(id) : newPractice()} focusOnEntry={false} />
       </> : view === "practice" ? (
         <>
           {(active ||
@@ -284,67 +289,77 @@ export function Manifestation({
             </div>
           )}
           <div className="practice-editor">
-              <fieldset className="manifest-fields">
-                <legend>1. Practice details</legend>
+              <section className="practice-step" aria-labelledby="practice-details">
+                <h2 id="practice-details">1. Practice details</h2>
                 <label>Practice name
                   <input disabled={active} value={p.name} maxLength={80}
                     onChange={event => change({ name: event.target.value })} />
                 </label>
-              </fieldset>
-              <section className="manifest-fields sentence-fields" aria-labelledby="practice-sentences">
-                <h2 id="practice-sentences">2. Sentences or audio <small>{p.lines.length}/50</small></h2>
+              </section>
+              <section className="practice-step sentence-fields" aria-labelledby="practice-sentences">
+                <div className="practice-step-heading">
+                  <h2 id="practice-sentences">2. Sentences or audio</h2>
+                  <small aria-label={p.lines.length + " of 50 items"}>{p.lines.length}/50</small>
+                </div>
                 <div className="practice-sentences">
-                  <h3>2.1 Choose from library</h3>
-                  <div className="home-actions">
-                    <button disabled={active || p.lines.length >= 50} onClick={onLibrary}>Choose affirmations</button>
+                  <div className="practice-step-heading">
+                    <h3>2.1 Choose from library</h3>
+                    {p.lines.length > 0 && <button type="button" className="text-button" aria-pressed={selectSentences}
+                      disabled={active} onClick={() => {
+                        setSelectSentences(!selectSentences);
+                        setSelectedLines([]);
+                      }}>{selectSentences ? "Done" : "Select sentences"}</button>}
                   </div>
-                  <details className="custom-sentence">
-                    <summary>Write your own affirmation</summary>
-                    <label>
-                      Your own sentence
-                      <textarea
-                        aria-label="Your own sentence"
-                        disabled={active}
-                        rows={2}
-                        value={custom}
-                        maxLength={300}
-                        placeholder="Write the words you want to repeat"
-                        onChange={(e) => composer(e.target.value)}
-                      />
-                    </label>
-                    <div className="admin-actions">
-                      <button
-                        disabled={
-                          active || !custom.trim() || p.lines.length >= 50
-                        }
-                        onClick={addSentence}
-                      >
-                        Add sentence
-                      </button>
-                      <span className="content-note">Also saved to your affirmation library.</span>
-                    </div>
-                  </details>
-                  {p.lines.length > 0 && <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>}
+                  <div className="practice-source-actions">
+                    <button disabled={active || p.lines.length >= 50} onClick={onLibrary}>Choose affirmations</button>
+                    <button type="button" aria-expanded={writeAffirmation} aria-controls="practice-composer"
+                      disabled={active || p.lines.length >= 50} onClick={() => setWriteAffirmation(!writeAffirmation)}>
+                      Write your own affirmation
+                    </button>
+                  </div>
+                  <div id="practice-composer" className="practice-composer" hidden={!writeAffirmation}>
+                      <label className="sr-only" htmlFor="practice-custom-sentence">Your own sentence</label>
+                      <textarea id="practice-custom-sentence" disabled={active} rows={2} value={custom}
+                        maxLength={300} placeholder="Write an affirmation"
+                        onChange={event => composer(event.target.value)} />
+                      <div className="admin-actions">
+                        <button disabled={active || !custom.trim() || p.lines.length >= 50} onClick={addSentence}>
+                          <Plus size={15} aria-hidden="true" /> Add sentence
+                        </button>
+                        <small>Also saved to your library</small>
+                      </div>
+                  </div>
+                  {selectSentences && <div className="home-actions practice-bulk-actions">
+                    <button disabled={active} onClick={() => setSelectedLines(p.lines.map(line => line.id))}>Select all sentences</button>
+                    <button disabled={!selectedLines.length} onClick={() => setSelectedLines([])}>Clear sentence selection</button>
+                    <button disabled={active || !selectedLines.length} onClick={() => {
+                      if (confirm("Remove selected sentences?") && change({ lines: p.lines.filter(line => !selectedLines.includes(line.id)) })) {
+                        setSelectedLines([]);
+                        setSelectSentences(false);
+                      }
+                    }}>Remove selected sentences</button>
+                  </div>}
                   <div className="manifest-lines">
                     {p.lines.map((line, i) => (
                       <article className="manifest-line" key={line.id}>
                         <div className="sentence-queue-head">
-                          <input aria-label={"Select sentence "+(i+1)} type="checkbox" disabled={active} checked={selectedLines.includes(line.id)} onChange={e=>setSelectedLines(e.target.checked?[...selectedLines,line.id]:selectedLines.filter(id=>id!==line.id))}/>
-                          <span className="queue-index">
-                            {String(i + 1).padStart(2, "0")}
-                          </span>
+                          {selectSentences ? <input aria-label={"Select sentence " + (i + 1)} type="checkbox"
+                            disabled={active} checked={selectedLines.includes(line.id)} onChange={event =>
+                              setSelectedLines(event.target.checked
+                                ? [...selectedLines, line.id]
+                                : selectedLines.filter(id => id !== line.id))} />
+                            : <span className="queue-index">{i + 1}.</span>}
                           <div className="queue-copy">
                             <p>{line.text}</p>
-                            <small>
-                              {line.audioAffirmation ? "Audio affirmation" : line.recordingId
-                                ? "Personal voice"
-                                : "Selected voice"}
-                            </small>
+                            {(line.audioAffirmation || line.recordingId) && <small>
+                              {line.audioAffirmation ? "Audio affirmation" : "Personal voice"}
+                            </small>}
                           </div>
                           <PreviewButton
                             line={line}
                             id={line.id}
                             recorded={p.useRecordings}
+                            iconOnly
                           />
                         </div>
                         <details className="sentence-editor">
@@ -431,101 +446,50 @@ export function Manifestation({
                     ))}
                   </div>
                 </div>
-                <section className="repeat-fields" aria-labelledby="practice-playback">
-                  <h3 id="practice-playback">2.2 Playback options</h3>
-                  <fieldset disabled={active} aria-labelledby="practice-playback">
+                <details className="practice-playback">
+                  <summary aria-labelledby="practice-playback">
+                    <h3 id="practice-playback">2.2 Playback options</h3>
+                    <small>{p.lines.length > 0 && (p.mode === "speech" ? "Spoken" : "Reading") + " · "}{p.seconds / 60} min max</small>
+                  </summary>
+                  <fieldset className="practice-playback-fields" disabled={active} aria-labelledby="practice-playback">
                     {p.lines.length > 0 && <>
-                    <div className="practice-mode">
-                      <label>
-                        Practice mode
-                        <select
-                          aria-label="Practice mode"
-                          value={p.mode}
-                          onChange={(e) =>
-                            change({ mode: e.target.value as Plan["mode"] })
-                          }
-                        >
+                      <label>Practice mode
+                        <select aria-label="Practice mode" value={p.mode}
+                          onChange={event => change({ mode: event.target.value as Plan["mode"] })}>
                           <option value="speech">Spoken voice</option>
                           <option value="read">Silent reading</option>
                         </select>
                       </label>
-                    </div>
-                    <div className="fields">
-                      <label>
-                        Repeat order
-                        <select
-                          aria-label="Repeat order"
-                          value={p.order}
-                          onChange={(e) =>
-                            change({ order: e.target.value as Plan["order"] })
-                          }
-                        >
+                      <label>Repeat order
+                        <select aria-label="Repeat order" value={p.order}
+                          onChange={event => change({ order: event.target.value as Plan["order"] })}>
                           <option value="sequence">Whole sequence</option>
                           <option value="each">Each sentence</option>
                         </select>
                       </label>
-                      <label>
-                        Repetitions
-                        <NumberField
-                          integer
-                          min={1}
-                          max={108}
-                          value={p.repeats}
-                          onValue={(repeats) => change({ repeats })}
-                        />
+                      <label>Repetitions
+                        <NumberField integer min={1} max={108} value={p.repeats}
+                          onValue={repeats => change({ repeats })} />
                       </label>
-                    </div>
-                    <p className="content-note">
-                      {p.order === "sequence"
-                        ? "Repeat all selected sentences in order, then begin the next round."
-                        : "Repeat each sentence the chosen number of times before moving to the next."}
-                    </p>
+                      <label>Gap between sentences (sec)
+                        <NumberField min={0} max={30} value={p.gap} onValue={gap => change({ gap })} />
+                      </label>
+                      {p.mode === "read" && <label>Reading time (sec)
+                        <NumberField min={2} max={30} value={p.readSeconds}
+                          onValue={readSeconds => change({ readSeconds })} />
+                      </label>}
                     </>}
-                    <div className="fields">
-                      <label>
-                        Maximum session
-                        <select
-                          aria-label="Maximum session"
-                          value={p.seconds}
-                          onChange={(e) =>
-                            change({ seconds: Number(e.target.value) })
-                          }
-                        >
-                          {[...new Set([p.seconds, 60, 300, 600, 900, 1800, 3600])]
-                            .sort((a, b) => a - b)
-                            .map((n) => (
-                              <option value={n} key={n}>
-                                {n / 60} min
-                              </option>
-                            ))}
-                        </select>
-                      </label>
-                    </div>
-                    {p.lines.length > 0 && <div className="fields">
-                      <label>
-                        Gap between sentences (sec)
-                        <NumberField
-                          min={0}
-                          max={30}
-                          value={p.gap}
-                          onValue={(gap) => change({ gap })}
-                        />
-                      </label>
-                      {p.mode === "read" && (
-                        <label>
-                          Reading time (sec)
-                          <NumberField
-                            min={2}
-                            max={30}
-                            value={p.readSeconds}
-                            onValue={(readSeconds) => change({ readSeconds })}
-                          />
-                        </label>
-                      )}
-                    </div>}
+                    <label>Maximum session
+                      <select aria-label="Maximum session" value={p.seconds}
+                        onChange={event => change({ seconds: Number(event.target.value) })}>
+                        {[...new Set([p.seconds, 60, 300, 600, 900, 1800, 3600])]
+                          .sort((a, b) => a - b)
+                          .map(seconds => <option key={seconds} value={seconds}>{seconds / 60} min</option>)}
+                      </select>
+                    </label>
                   </fieldset>
                   {p.lines.length > 0 && <VoicePanel />}
-                </section>
+                </details>
               </section>
               <PracticeLayers key={p.id} plan={p} sessions={sessions} tracks={tracks} active={active}
                 onChange={change} onBackgroundChange={patch => {
@@ -535,33 +499,7 @@ export function Manifestation({
                   }
                   catch (error) { setMessage((error as Error).message); return false; }
                 }} />
-              <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
-              <details className="workbench-panel practice-summary">
-                <summary>Practice summary</summary>
-          <div
-            className="workspace-summary"
-            aria-label="Practice configuration summary"
-          >
-            <div>
-              <small>Sentences</small>
-              <strong>{p.lines.length}/50</strong>
-            </div>
-            <div>
-              <small>Repetitions</small>
-              <strong>{p.repeats} rounds</strong>
-            </div>
-            <div>
-              <small>Session limit</small>
-              <strong>{p.seconds / 60} min</strong>
-            </div>
-            <div>
-              <small>Voice level</small>
-              <strong>{Math.round(p.volume * 100)}%</strong>
-            </div>
-          </div>
-              </details>
-          </div>
-              <div className="admin-actions practice-actions">
+              <div className="practice-footer">
                 <button
                   className="primary"
                   disabled={active || !canPlay || !p.name.trim()}
@@ -576,25 +514,26 @@ export function Manifestation({
                 >
                   Save practice
                 </button>
-                <button disabled={active||!canPlay||!p.name.trim()} onClick={()=>{try{store.copy();setMessage("Practice copied and saved.");}catch(e){setMessage((e as Error).message);}}}>Save as copy</button>
-                <button
-                  disabled={active}
-                  onClick={newPractice}
-                >
-                  New practice
-                </button>
-                {data.plans.some((plan) => plan.id === p.id) && (
-                  <button
-                    disabled={active}
-                    onClick={() => {
+                <details className="practice-more">
+                  <summary>More practice actions</summary>
+                  <div className="home-actions">
+                    <button disabled={active || !canPlay || !p.name.trim()} onClick={() => {
+                      try { store.copy(); setMessage("Practice copied and saved."); }
+                      catch (error) { setMessage((error as Error).message); }
+                    }}>Save as copy</button>
+                    <button disabled={active} onClick={newPractice}>New practice</button>
+                    {data.plans.some(plan => plan.id === p.id) && <button disabled={active} onClick={() => {
                       setView("schedule");
                       onView?.("schedule");
-                    }}
-                  >
-                    Schedule practice
-                  </button>
-                )}
+                    }}>Schedule practice</button>}
+                  </div>
+                  <Presets onOpen={() => { setView("practice"); onView?.("practice"); }} />
+                  <p className="content-note" aria-label="Practice configuration summary">
+                    {p.lines.length}/50 sentences · {p.repeats} repetitions · {p.seconds / 60} min max · {Math.round(p.volume * 100)}% voice
+                  </p>
+                </details>
               </div>
+          </div>
         </>
       ) : (
         <Schedules
@@ -723,6 +662,7 @@ export function ManifestLibrary({
   if (sort === "name") visiblePlans.sort((a, b) => a.name.localeCompare(b.name));
   else visiblePlans.reverse();
   const chosenPlans = visiblePlans.filter(plan => selectedPlans.includes(plan.id));
+  const [selectPractices, setSelectPractices] = useState(false);
   const needle = query.trim().toLowerCase();
   const matchingAffirmations = catalog.data.affirmations.filter(
     affirmation => affirmation.text.toLowerCase().includes(needle),
@@ -863,7 +803,14 @@ export function ManifestLibrary({
       >
         <div className="section-heading">
           <h2>Saved practices</h2>
-          {onPractice && !focusOnEntry && <button disabled={active} onClick={() => onPractice()}>New practice</button>}
+          <div className="home-actions">
+            {onPractice && <button className="primary" disabled={active} onClick={() => onPractice()}>New practice</button>}
+            <button type="button" onClick={() => input.current?.click()}>Import practice</button>
+            {visiblePlans.length > 0 && <button type="button" aria-pressed={selectPractices} onClick={() => {
+              setSelectPractices(!selectPractices);
+              setSelectedPlans([]);
+            }}>{selectPractices ? "Done" : "Select practices"}</button>}
+          </div>
         </div>
         <input
           className="sr-only"
@@ -873,7 +820,7 @@ export function ManifestLibrary({
           aria-label="Import manifestation practice"
           onChange={(e) => void importPlan(e.target.files?.[0])}
         />
-        <div className="home-actions">
+        {selectPractices && <div className="home-actions">
           <button disabled={!visiblePlans.length} onClick={() => setSelectedPlans(visiblePlans.map(plan => plan.id))}>Select shown practices</button>
           <button disabled={!chosenPlans.length} onClick={() => setSelectedPlans([])}>Clear practice selection</button>
           <button disabled={!chosenPlans.length} onClick={() => {
@@ -890,7 +837,7 @@ export function ManifestLibrary({
               void syncPhoneReminders().then(setMessage).catch(error => setMessage(error.message));
             } catch (error) { setMessage((error as Error).message); }
           }}>Delete selected practices</button>
-        </div>
+        </div>}
         {chosenPlans.length > 0 && <p className="content-note">{chosenPlans.length} selected</p>}
         {data.plans.length > 0 && !visiblePlans.length && <p role="status">No practices match this search.</p>}
         {!data.plans.length && (
@@ -899,17 +846,21 @@ export function ManifestLibrary({
           </p>
         )}
         {visiblePlans.map((plan) => (
-          <article className="saved-card" key={plan.id}>
-            <label className="check"><input aria-label={"Select practice "+plan.name} type="checkbox" checked={selectedPlans.includes(plan.id)} onChange={e=>setSelectedPlans(e.target.checked?[...selectedPlans,plan.id]:selectedPlans.filter(id=>id!==plan.id))}/> Select</label>
-            <div>
-              <h3>{plan.name}</h3>
-              <p>
-                {plan.lines.length} sentences · {plan.repeats} repetitions ·{" "}
-                {plan.mode === "speech" ? "spoken" : "reading"}
-              </p>
+          <article className="saved-card saved-practice-row" key={plan.id}>
+            <div className="saved-practice-copy">
+              {selectPractices && <input aria-label={"Select practice " + plan.name} type="checkbox"
+                checked={selectedPlans.includes(plan.id)} onChange={event => setSelectedPlans(event.target.checked
+                  ? [...selectedPlans, plan.id]
+                  : selectedPlans.filter(id => id !== plan.id))} />}
+              <div>
+                <h3>{plan.name}</h3>
+                <p>{plan.lines.length ? plan.lines.length + (plan.lines.length === 1 ? " sentence" : " sentences") : "Audio and sound layers"} · {plan.seconds / 60} min max</p>
+              </div>
             </div>
             {onPractice && <button
-              className="primary"
+              className="icon-button"
+              aria-label="Edit practice"
+              title="Edit practice"
               onClick={() => {
                 try {
                   onPractice(plan.id);
@@ -918,10 +869,9 @@ export function ManifestLibrary({
                 }
               }}
             >
-              Edit practice
+              <Pencil size={16} aria-hidden="true" />
             </button>}
-            <div className="saved-actions">
-              <button
+              <button className="icon-button" title={state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"}
                 aria-label={`${state.plan?.id === plan.id && state.status === "playing" ? "Pause" : state.plan?.id === plan.id && state.status === "paused" ? "Resume" : "Play"} practice: ${plan.name}`}
                 onClick={async () => {
                   try {
@@ -945,11 +895,13 @@ export function ManifestLibrary({
                 }}
               >
                 {state.plan?.id === plan.id && state.status === "playing"
-                  ? "Pause"
-                  : state.plan?.id === plan.id && state.status === "paused"
-                    ? "Resume"
-                    : "Play"}
+                  ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
               </button>
+            <details className="saved-practice-more">
+              <summary aria-label={"More options for " + plan.name} title="More options">
+                <Ellipsis size={18} aria-hidden="true" />
+              </summary>
+              <div className="saved-actions">
               <button
                 onClick={() => {
                   if (!confirmSourceDeletion("practice", [plan], "Schedules for this practice will also be removed.")) return;
@@ -968,10 +920,6 @@ export function ManifestLibrary({
               >
                 Delete practice
               </button>
-            </div>
-            <details className="practice-actions">
-              <summary>More options</summary>
-              <div className="saved-actions">
                 <PinButton item={{kind:"practice",id:plan.id}}/><LibraryLabels item={{kind:"practice",id:plan.id}}/>
                 <button onClick={()=>{try{if(!confirmDraftReplacement(data.draft,data.plans))return;store.copy(plan.id);setMessage("Practice duplicated.");}catch(e){setMessage((e as Error).message);}}}>Duplicate practice</button>
                 <button onClick={()=>{const name=prompt("Practice name",plan.name);if(!name?.trim())return;try{store.rename(plan.id,name);setMessage("Practice renamed.");}catch(e){setMessage((e as Error).message);}}}>Rename practice</button>
@@ -992,10 +940,6 @@ export function ManifestLibrary({
             </details>
           </article>
         ))}
-        <div className="catalog-footer">          <button onClick={() => input.current?.click()}>
-            Import practice
-          </button>
-</div>
       </section>}
       {(message || error) && (
         <p role="status" className="notice">

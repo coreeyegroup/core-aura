@@ -8,9 +8,9 @@ import { newPlan, practiceLayerLimit, type Plan } from "./model";
 import { manifestPlayer } from "./player";
 
 const layerKinds = [
-  { key: "tone", action: "Add sound", label: "Sound layer" },
-  { key: "ambience", action: "Add background", label: "Background layer" },
-  { key: "audio", action: "Add audio", label: "Audio layer" },
+  { key: "tone", action: "Add sound", name: "Sound", label: "Sound layer" },
+  { key: "ambience", action: "Add background", name: "Background", label: "Background layer" },
+  { key: "audio", action: "Add audio", name: "Audio", label: "Audio layer" },
 ] as const;
 
 const percent = (volume: number) => Math.round(volume * 100) + "%";
@@ -87,7 +87,7 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
       <details>
         <summary>
           <ChevronDown size={15} aria-hidden="true" />
-          <span><strong>{title}</strong><small>{name} · {tuning}{percent(source.volume)}</small></span>
+          <span className="practice-layer-copy"><strong>{name}</strong><small>{tuning}{percent(source.volume)} · {title}</small></span>
         </summary>
         <LibraryLayers inline only={kind} prefix={prefix} tracks={tracks} value={layer} disabled={active}
           onRemove={remove} onChange={next => {
@@ -109,15 +109,15 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
   const savedBackground = plan.backgroundMix ?? plan.background;
   const backgroundName = plan.backgroundMix?.name ?? (plan.background && sounds[plan.background.sound].name);
   const backgroundFrequency = plan.background ? " · " + plan.background.hz + " Hz" : "";
-  return <section ref={panel} className="manifest-fields practice-layers" aria-labelledby="practice-layers-heading">
+  return <section ref={panel} className="practice-step practice-layers" aria-labelledby="practice-layers-heading">
     <h2 id="practice-layers-heading">3. Audio, sounds and backgrounds</h2>
-    <div className="home-actions">
-      {layerKinds.map(({ key, action }) => <button key={key} type="button"
+    <div className="home-actions practice-layer-actions">
+      {layerKinds.map(({ key, action, name }) => <button key={key} type="button"
         ref={node => { if (node) addButtons.current[key] = node; }}
         disabled={!canAdd || (key === "audio" && !tracks.length)}
-        aria-expanded={picker === key && canAdd} aria-controls="practice-layer-picker"
+        aria-label={action} aria-expanded={picker === key && canAdd} aria-controls="practice-layer-picker"
         onClick={() => setPicker(picker === key ? undefined : key)}>
-        <Plus size={15} aria-hidden="true" /> {action}
+        <Plus size={15} aria-hidden="true" /> {name}
       </button>)}
     </div>
     <div id="practice-layer-picker" ref={pickerPanel} hidden={!picker || !canAdd}>
@@ -150,13 +150,13 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
               manifestPlayer.snapshot().plan?.id.startsWith(previewPrefix)) manifestPlayer.endPreview();
         });
     })}
-    <div className="practice-layer">
+    <div className={savedBackground ? "practice-layer" : "practice-layer unassigned-mix"}>
       <BackgroundControls plan={plan} sessions={sessions} active={active} onChange={patch => {
         stopPreview("mix");
         return onBackgroundChange(patch);
       }} summary={savedBackground
-        ? <><strong>Background layer</strong><small>{backgroundName}{backgroundFrequency} · {percent(savedBackground.volume)}{plan.backgroundMuted ? " · Muted" : ""}</small></>
-        : "Saved mix and background settings"} />
+        ? <span className="practice-layer-copy"><strong>{backgroundName}</strong><small>Background layer{backgroundFrequency} · {percent(savedBackground.volume)}{plan.backgroundMuted ? " · Muted" : ""}</small></span>
+        : "Saved mix or tone"} />
       {savedBackground && backgroundName && previewButton("mix", backgroundName, {
         background: plan.background, backgroundMix: plan.backgroundMix, backgroundMuted: plan.backgroundMuted,
       })}

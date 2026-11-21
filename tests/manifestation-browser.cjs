@@ -162,6 +162,7 @@ function speechMock() {
       ...texts,
       ...texts,
     ]);
+    await p.getByText("2.2 Playback options", { exact: true }).click();
     await p.getByLabel("Repeat order", { exact: true }).selectOption("each");
     await p.getByRole("button", { name: "Play practice", exact: true }).click();
     await p.getByText("Practice complete", { exact: true }).waitFor();
@@ -262,6 +263,7 @@ function speechMock() {
     await p.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
     await ctx.setOffline(true);
     await p.reload();
+    await p.getByText("2.2 Playback options", { exact: true }).click();
     await p.getByLabel("Practice mode", { exact: true }).selectOption("read");
     await p.getByRole("button", { name: "Play practice", exact: true }).click();
     await p.getByRole("button", { name: "Pause", exact: true }).waitFor();
@@ -274,7 +276,7 @@ function speechMock() {
     await p
       .getByRole("heading", { name: "Morning manifestation", exact: true })
       .waitFor();
-    await p.locator(".practice-actions > summary").click();
+    await p.locator(".saved-practice-more > summary").click();
     const exporting = p.waitForEvent("download");
     await p
       .getByRole("button", { name: "Export practice", exact: true })
