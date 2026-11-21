@@ -1,5 +1,5 @@
 import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
-export const VERSION = "0.45.3";
+export const VERSION = "0.45.4";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"

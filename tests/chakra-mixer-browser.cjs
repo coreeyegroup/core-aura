@@ -61,6 +61,26 @@ const fs=require("node:fs");
   await p.reload();
   await p.getByLabel("Root sound type",{exact:true}).waitFor();
   assert.equal(await p.getByLabel("Root sound type",{exact:true}).inputValue(),"flute");
+  await p.getByRole("button",{name:"All seven",exact:true}).click();
+  assert.equal(await rows.getByRole("checkbox",{name:/^Select /}).evaluateAll(choices=>choices.filter(choice=>choice.checked).length),7);
+  await p.getByLabel("Select Root",{exact:true}).uncheck();
+  await p.getByRole("button",{name:"Selected (6)",exact:true}).waitFor();
+  await p.getByRole("button",{name:"In sequence",exact:true}).click();
+  await p.getByLabel("Sequence chakra duration",{exact:true}).selectOption("15");
+  await p.getByLabel("Transition gap",{exact:true}).selectOption("2");
+  await p.getByText("Sequence order",{exact:true}).click();
+  await p.getByRole("button",{name:"Move Solar plexus up",exact:true}).click();
+  await dock.getByRole("button",{name:"Play sequence",exact:true}).click();
+  await dock.getByText(/Solar plexus · 1\/6/).waitFor();
+  await dock.getByRole("button",{name:"Stop sequence",exact:true}).click();
+  await p.getByRole("button",{name:"Save",exact:true}).click();
+  await p.getByLabel("Session name",{exact:true}).fill("Ordered meditation");
+  await p.getByRole("button",{name:"Save to Library",exact:true}).click();
+  const session = await p.evaluate(()=>JSON.parse(localStorage.getItem("core-aura.sessions.v2")).find(row=>row.name==="Ordered meditation"));
+  assert.equal(session.channels[0].id,"solar");
+  assert.equal(session.channels[0].seconds,15);
+  assert.equal(session.sequenceGap,2);
+
   for(const width of [320,360,393,430]){
    await p.setViewportSize({width,height:852});
    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Overflow at "+width);

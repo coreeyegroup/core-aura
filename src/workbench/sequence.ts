@@ -18,3 +18,8 @@ export class ChakraSequence {
 export const chakraSequence=new ChakraSequence();
 
 export function parseSequenceConfig(v:unknown):{seconds:number;gap:number;order:string[]}{const p=v as {seconds:number;gap:number;order:string[]};if(!p||!Number.isInteger(p.seconds)||p.seconds<1||p.seconds>3600||!Number.isFinite(p.gap)||p.gap<0||p.gap>30||!Array.isArray(p.order)||p.order.length>7||new Set(p.order).size!==p.order.length||p.order.some(id=>!chakras.some(c=>c.id===id)))throw Error("Invalid chakra sequence settings.");return structuredClone(p);}
+
+export function orderChakras(channels: readonly Channel[], order: readonly string[]) {
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return [...channels].sort((a, b) => (rank.get(a.id) ?? order.length) - (rank.get(b.id) ?? order.length));
+}

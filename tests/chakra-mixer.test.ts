@@ -19,3 +19,13 @@ it("paused voices do not attenuate an audible chakra",async()=>{
  expect(energyA).toBeGreaterThan(0);expect(energyB).toBeCloseTo(energyA,6);
  vi.unstubAllGlobals();
 });
+
+it("matches the saved sequence order for a selected subset and appends new selections", async () => {
+  const { orderChakras } = await import("../src/workbench/sequence");
+  const channels = chakras.slice(0, 4).map(chakra => ({
+    id: chakra.id, hz: chakra.hz, sound: "sine" as const, seconds: 300, volume: .25, muted: false,
+  }));
+  expect(orderChakras(channels, ["crown", "solar", "root"]).map(channel => channel.id))
+    .toEqual(["solar", "root", "sacral", "heart"]);
+  expect(channels.map(channel => channel.id)).toEqual(["root", "sacral", "solar", "heart"]);
+});

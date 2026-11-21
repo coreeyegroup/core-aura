@@ -1,7 +1,73 @@
-import { Pause, Play, Square } from "lucide-react";
-import {useState,useSyncExternalStore} from "react";
-import {Channel,chakras} from "../model";
-import {chakraSequence} from "./sequence";
-import {prepareSound} from "./actions";
-export function SequenceTransport(){const s=useSyncExternalStore(chakraSequence.subscribe,chakraSequence.snapshot);return <div><p className="content-note">Chakra sequence · {s.index+1}/{s.channels.length} · {chakras.find(c=>c.id===s.channels[s.index]?.id)?.name} · {Math.round(s.elapsed)} / {s.seconds} sec</p><div className="transport"><button className="primary" onClick={()=>s.status==="playing"?chakraSequence.pause():chakraSequence.resume()}>{s.status==="playing" ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />} {s.status==="playing"?"Pause sequence":"Resume sequence"}</button><button onClick={()=>chakraSequence.stop()}><Square size={14} aria-hidden="true" /> Stop sequence</button></div></div>;}
-export function SequenceSetup({channels,showTransport=true}:{channels:Channel[];showTransport?:boolean}){const s=useSyncExternalStore(chakraSequence.subscribe,chakraSequence.snapshot),[message,setMessage]=useState("");const active=["playing","paused"].includes(s.status),seconds=s.seconds,gap=s.gap;const selected=active?s.channels.map(c=>c.id):s.order.filter(id=>channels.some(c=>c.id===id));if(!active)channels.forEach(c=>{if(!selected.includes(c.id))selected.push(c.id);});return <details className="workbench-panel"><summary>Sequential chakra playback <span>{channels.length} selected</span></summary><div className="fields"><label>Per chakra<select aria-label="Sequence chakra duration" disabled={active} value={seconds} onChange={e=>{try{chakraSequence.configure({seconds:Number(e.target.value)});}catch(e){setMessage((e as Error).message);}}}>{[1,15,30,60,120,300,600].map(n=><option value={n} key={n}>{n} sec</option>)}</select></label><label>Transition gap<select aria-label="Sequence transition gap" disabled={active} value={gap} onChange={e=>{try{chakraSequence.configure({gap:Number(e.target.value)});}catch(e){setMessage((e as Error).message);}}}>{[0,1,2,5,10,30].map(n=><option value={n} key={n}>{n} sec</option>)}</select></label></div>{selected.map((id,i)=><div className="workbench-row" key={id}><span>{i+1}. {chakras.find(c=>c.id===id)?.name}</span><button disabled={active||i===0} aria-label={"Move sequence "+id+" up"} onClick={()=>{const next=[...selected];[next[i-1],next[i]]=[next[i],next[i-1]];try{chakraSequence.configure({order:next});}catch(e){setMessage((e as Error).message);}}}>↑</button><button disabled={active||i===selected.length-1} aria-label={"Move sequence "+id+" down"} onClick={()=>{const next=[...selected];[next[i+1],next[i]]=[next[i],next[i+1]];try{chakraSequence.configure({order:next});}catch(e){setMessage((e as Error).message);}}}>↓</button></div>)}<button disabled={!channels.length||active} onClick={()=>{try{if(!prepareSound(channels.map(c=>c.id)))return;chakraSequence.start(selected.map(id=>channels.find(c=>c.id===id)!),seconds,gap);setMessage("");}catch(e){setMessage((e as Error).message);}}}>Start sequence</button>{active&&showTransport&&<SequenceTransport/>}{(message||s.error)&&<p role="status">{message||s.error}</p>}</details>;}
+import { ChevronDown, ChevronUp, Pause, Play, Square } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import { Channel, chakras } from "../model";
+import { chakraSequence, orderChakras } from "./sequence";
+
+function durationLabel(seconds: number) {
+  return seconds % 60 === 0 ? seconds / 60 + " min" : seconds + " sec";
+}
+
+export function SequenceTransport() {
+  const sequence = useSyncExternalStore(chakraSequence.subscribe, chakraSequence.snapshot);
+  const playing = sequence.status === "playing";
+  const name = chakras.find(chakra => chakra.id === sequence.channels[sequence.index]?.id)?.name;
+  return <>
+    <p className="dock-caption">{name} · {sequence.index + 1}/{sequence.channels.length} · {Math.round(sequence.elapsed)} / {sequence.seconds} sec</p>
+    <div className="transport">
+      <button className="primary" onClick={() => playing ? chakraSequence.pause() : chakraSequence.resume()}>
+        {playing ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
+        {playing ? "Pause sequence" : "Resume sequence"}
+      </button>
+      <button onClick={() => chakraSequence.stop()}><Square size={14} aria-hidden="true" /> Stop sequence</button>
+    </div>
+  </>;
+}
+
+export function SequenceSetup({ channels, disabled, onError }: {
+  channels: Channel[];
+  disabled: boolean;
+  onError: (message: string) => void;
+}) {
+  const { seconds, gap, order } = useSyncExternalStore(chakraSequence.subscribe, chakraSequence.snapshot);
+  const ordered = orderChakras(channels, order);
+  function configure(patch: Parameters<typeof chakraSequence.configure>[0]) {
+    try { chakraSequence.configure(patch); }
+    catch (error) { onError((error as Error).message); }
+  }
+  function move(index: number, offset: number) {
+    const ids = ordered.map(channel => channel.id);
+    [ids[index], ids[index + offset]] = [ids[index + offset], ids[index]];
+    configure({ order: ids });
+  }
+  return <div className="chakra-sequence-settings">
+    <div className="fields">
+      <label>Time per chakra
+        <select aria-label="Sequence chakra duration" disabled={disabled} value={seconds}
+          onChange={event => configure({ seconds: Number(event.target.value) })}>
+          {[...new Set([1, 15, 30, 60, 120, 300, 600, seconds])].sort((a, b) => a - b)
+            .map(value => <option key={value} value={value}>{durationLabel(value)}</option>)}
+        </select>
+      </label>
+      <label>Gap between chakras
+        <select aria-label="Transition gap" disabled={disabled} value={gap}
+          onChange={event => configure({ gap: Number(event.target.value) })}>
+          {[...new Set([0, 1, 2, 5, 10, 30, gap])].sort((a, b) => a - b)
+            .map(value => <option key={value} value={value}>{value ? durationLabel(value) : "No gap"}</option>)}
+        </select>
+      </label>
+    </div>
+    {ordered.length > 1 && <details className="chakra-order">
+      <summary>Sequence order</summary>
+      <ol>{ordered.map((channel, index) => {
+        const name = chakras.find(chakra => chakra.id === channel.id)?.name ?? channel.id;
+        return <li key={channel.id}>
+          <span>{index + 1}. {name}</span>
+          <button type="button" className="icon-button" aria-label={"Move " + name + " up"}
+            disabled={disabled || index === 0} onClick={() => move(index, -1)}><ChevronUp size={17} aria-hidden="true" /></button>
+          <button type="button" className="icon-button" aria-label={"Move " + name + " down"}
+            disabled={disabled || index === ordered.length - 1} onClick={() => move(index, 1)}><ChevronDown size={17} aria-hidden="true" /></button>
+        </li>;
+      })}</ol>
+    </details>}
+  </div>;
+}

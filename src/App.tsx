@@ -4,7 +4,7 @@ import { confirmSourceDeletion } from "./playlists/store";
 import {queuePlayer, startQueue} from "./playlists/runtime";
 import {QueueTransport} from "./playlists/QueueTransport";
 import {PlaylistLibrary} from "./playlists/PlaylistLibrary";
-import {chakraSequence} from "./workbench/sequence";
+import {chakraSequence, orderChakras} from "./workbench/sequence";
 import {SequenceTransport} from "./workbench/SequenceControls";
 import {BackgroundControls} from "./manifestation/BackgroundControls";
 import {SettingsTools} from "./workbench/SettingsTools";
@@ -408,7 +408,13 @@ export default function App() {
   }
   const [saveName, setSaveName] = useState("");
   const [editingMix, setEditingMix] = useState<Session | undefined>();
-  const [saveAsSequence, setSaveAsSequence] = useState(false);
+  const [chakraMode, setChakraMode] = useState<"together" | "sequence">(() => {
+    try { return localStorage.getItem("core-aura.chakra-mode") === "sequence" ? "sequence" : "together"; }
+    catch { return "together"; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem("core-aura.chakra-mode", chakraMode); } catch {}
+  }, [chakraMode]);
   const [saving, setSaving] = useState(false);
   const [query, setQuery] = useState("");
   const [localTracks, setLocalTracks] = useState<Track[]>([]);
@@ -458,6 +464,18 @@ export default function App() {
   const currentWithTime = current.map((c) => ({ ...c, seconds }));
   const isStudio = tab === "studio",
     isChakras = tab === "chakras";
+  const sequenceActive = sequence.status === "playing" || sequence.status === "paused";
+  const chakraDuration = chakraMode === "sequence"
+    ? current.length * sequence.seconds + Math.max(0, current.length - 1) * sequence.gap
+    : chakraSeconds;
+  function playChakraSequence() {
+    const ordered = orderChakras(currentWithTime, sequence.order);
+    if (!ordered.length || !prepareSound(ordered.map(channel => channel.id), false, true)) return;
+    try {
+      chakraSequence.start(ordered, sequence.seconds, sequence.gap);
+      setMessage("");
+    } catch (error) { setMessage((error as Error).message); }
+  }
   const isNatureView = tab === "explore" && exploreView === "nature";
   const miniRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -697,12 +715,8 @@ export default function App() {
   }
   function save(asCopy = false) {
     try {
-      const ordered = [...currentWithTime];
-      const sequential = isChakras && saveAsSequence;
-      if (sequential) {
-        const order = sequence.order.concat(ordered.map(channel => channel.id));
-        ordered.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-      }
+      const sequential = isChakras && chakraMode === "sequence";
+      const ordered = sequential ? orderChakras(currentWithTime, sequence.order) : currentWithTime;
       const original = !asCopy && editingMix?.kind === (isChakras ? "chakras" : "studio")
         ? sessions.find(session => session.id === editingMix.id) : undefined;
       const row = parseSession({
@@ -732,9 +746,13 @@ export default function App() {
     setEditingMix(edit ? row : undefined);
     if (edit) setSaveName(row.name);
     setOpenedSoundName(row.name);
+    chakraSequence.stop();
     engine.stopAll();
     setMaster(row.master);
-    if(row.kind==="chakras")setChakraSeconds(row.channels[0].seconds);else setStudioSeconds(row.channels[0].seconds);
+    if (row.kind === "chakras") {
+      setChakraMode(row.sequenceGap === undefined ? "together" : "sequence");
+      if (row.sequenceGap === undefined) setChakraSeconds(row.channels[0].seconds);
+    } else setStudioSeconds(row.channels[0].seconds);
     if (row.kind === "nature") {
       setNatureSessionToLoad(row);navigate("explore",{exploreView:"nature"});
     } else if (row.kind === "chakras") {
@@ -1314,28 +1332,26 @@ export default function App() {
           </>
         )}
         {isChakras && (
-          <>
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">
-                  {selected.length}/7 selected · {seconds / 60} min
-                </p>
-                <h1>Chakra meditation</h1>
-              </div>
+          <div className="chakra-workspace">
+            <div className="section-heading chakra-heading">
+              <h1>Chakra meditation</h1>
               <button
                 className="text-button"
                 disabled={!current.length}
                 onClick={(event) => {
                   modalOpener.current = event.currentTarget;
-                  setSaveAsSequence(editingMix?.kind === "chakras" && editingMix.sequenceGap !== undefined);
                   setSaving(true);
                 }}
               >
                 Save
               </button>
             </div>
-            <ChakraMixer tracks={localTracks} focusId={chakraFocus} channels={chakraChannels} states={states} selected={selected} target={mixTarget} seconds={seconds} master={master} onSelect={setSelected} onTarget={setMixTarget} onSeconds={setSeconds} onMaster={setMaster} onChange={patch} onError={setMessage}/>
-          </>
+            <ChakraMixer tracks={localTracks} focusId={chakraFocus} channels={chakraChannels} states={states}
+              selected={selected} target={mixTarget} mode={chakraMode} sequenceActive={sequenceActive}
+              onMode={setChakraMode} seconds={chakraMode === "sequence" ? sequence.seconds : seconds}
+              master={master} onSelect={setSelected} onTarget={setMixTarget} onSeconds={setSeconds}
+              onMaster={setMaster} onChange={patch} onError={setMessage} />
+          </div>
         )}
         {tab === "library" && (
           <>
@@ -1546,13 +1562,18 @@ export default function App() {
             ) : null}
           </>
         )}
-        {(isStudio || isChakras) && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
-        {(isStudio || isChakras || (tab === "explore" && exploreView === "nature")) && <SoundTracks />}
-        {isChakras && <details className="generated-track-panel">
+        {isStudio && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
+        {(isStudio || (tab === "explore" && exploreView === "nature")) && <SoundTracks />}
+        {isChakras && <details className="workbench-panel chakra-accompaniment">
+          <summary>Additional audio</summary>
+          <button onClick={() => navigate("explore", { exploreView: "nature" })}>Nature &amp; sound library</button>
+          <SoundTracks />
+          <details className="generated-track-panel">
           <summary>Generated sound layers <span>{layers.length} in Studio</span></summary>
           <p className="content-note">These use the same layers as Studio and can accompany chakra sounds and imported tracks. Each layer has its own controls.</p>
           {layers.map((value,i)=><ChannelEditor allowMix key={value.id} title={"Generated layer "+(i+1)} value={{...value,seconds:studioSeconds}} states={states} onChange={patch} onError={setMessage} remove={layers.length>1 ? ()=>{engine.stop(value.id);setLayers(rows=>rows.filter(c=>c.id!==value.id));} : undefined}/>)}
           <button disabled={layers.length>=8} onClick={()=>setLayers(rows=>[...rows,channel("bowl",432)])}>Add generated layer</button>
+          </details>
         </details>}
         {message && (
           <div role="status" className="notice">
@@ -1612,8 +1633,17 @@ export default function App() {
               </label>
             </div>
           </details>}
-          {isChakras&&["playing","paused"].includes(sequence.status)?<SequenceTransport/>:errorInvalid ? (
+          {isChakras && !sequenceActive && current.length > 0 &&
+            <p className="dock-caption">{current.length} {current.length === 1 ? "chakra" : "chakras"} · {chakraMode === "sequence" ? "In sequence" : "Together"} · {time(chakraDuration)}</p>}
+          {isChakras && sequenceActive ? <SequenceTransport /> : errorInvalid ? (
             <p role="alert">Enter a frequency within the instrument’s range.</p>
+          ) : isChakras && chakraMode === "sequence" ? (
+            <div className="transport">
+              <button className="primary" disabled={!current.length} onClick={playChakraSequence}>Play sequence</button>
+              <button disabled={!chakraChannels.some(channel => states.some(state =>
+                state.id === channel.id && state.status !== "stopping"))}
+                onClick={() => chakraChannels.forEach(channel => engine.stop(channel.id))}>Stop</button>
+            </div>
           ) : (
             <Transport
               channels={currentWithTime}
@@ -1623,7 +1653,8 @@ export default function App() {
               onError={setMessage}
             />
           )}
-          {!current.length && (
+          {isChakras && chakraMode === "sequence" && sequence.error && <p role="status">{sequence.error}</p>}
+          {!current.length && !sequenceActive && (
             <p className="dock-caption">
               Select a chakra above or choose All seven.
             </p>
@@ -1937,15 +1968,10 @@ export default function App() {
                 onChange={(e) => setSaveName(e.target.value)}
               />
             </label>
-            {isChakras && <label className="check">
-              <input type="checkbox" checked={saveAsSequence} onChange={event => setSaveAsSequence(event.target.checked)} />
-              Save as a sequence
-            </label>}
-            <p>
-              {current.length} layers · {time(isChakras && saveAsSequence
-                ? current.length * sequence.seconds + Math.max(0, current.length - 1) * sequence.gap
-                : seconds)}
-            </p>
+            <p>{isChakras
+              ? current.length + (current.length === 1 ? " chakra" : " chakras") + " · " +
+                (chakraMode === "sequence" ? "In sequence" : "Together") + " · " + time(chakraDuration)
+              : current.length + " layers · " + time(seconds)}</p>
             <button
               className="primary wide"
               disabled={!saveName.trim() || !current.length}
