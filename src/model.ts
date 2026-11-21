@@ -1,5 +1,5 @@
 import { AmbienceSound, natureCatalog, isNature } from "./nature/catalog";
-export const VERSION = "0.45.4";
+export const VERSION = "0.45.5";
 export const ENGINE_VERSION = "2.0";
 export type Sound =
   | "sine"
@@ -22,6 +22,7 @@ export type Tab =
   | "library"
   | "admin";
 export type GeneratedLayer = { sound: Sound; hz: number; volume: number };
+export const additionalLayerLimit = 5;
 export type Accompaniment = {
   tone?: GeneratedLayer;
   ambience?: GeneratedLayer;
@@ -53,6 +54,7 @@ export type Session = {
   master: number;
   createdAt: string;
   sequenceGap?: number;
+  additionalLayers?: Accompaniment[];
 };
 const instrumentSounds: Record<
   Exclude<Sound, AmbienceSound>,
@@ -282,6 +284,10 @@ export function parseSession(value: unknown): Session {
     )
   )
     throw Error("This chakra session uses unsupported settings.");
+  if (s.additionalLayers !== undefined && (s.kind !== "chakras" || !Array.isArray(s.additionalLayers) ||
+      s.additionalLayers.length > additionalLayerLimit || s.additionalLayers.some(layer =>
+        !validAccompaniment(layer) || [layer.tone, layer.ambience, layer.audio].filter(Boolean).length !== 1)))
+    throw Error("This chakra session has invalid background or audio settings.");
   if (s.sequenceGap !== undefined && (s.kind !== "chakras" ||
       !Number.isFinite(s.sequenceGap) || s.sequenceGap < 0 || s.sequenceGap > 30 ||
       s.channels.some(channel => channel.seconds !== s.channels[0].seconds))) {

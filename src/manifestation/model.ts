@@ -1,5 +1,6 @@
+import { chakraScheduleTarget } from "../scheduling/recurrence";
 import { maxScheduleTimes, recentOccurrences, scheduleClock, scheduleTimePattern, upcomingOccurrences, type ScheduleTiming } from "../scheduling/recurrence";
-import { Channel, validChannel, validAccompaniment, type Accompaniment } from "../model";
+import { additionalLayerLimit, Channel, validChannel, validAccompaniment, type Accompaniment } from "../model";
 export type Category =
   | "Health"
   | "Wealth"
@@ -140,7 +141,7 @@ export function newPlan(): Plan {
 }
 const finite = (v: unknown, min: number, max: number) =>
   typeof v === "number" && Number.isFinite(v) && v >= min && v <= max;
-export const practiceLayerLimit = 5;
+export const practiceLayerLimit = additionalLayerLimit;
 export function hasPracticeContent(plan: Plan): boolean {
   return !!(plan.lines.length || plan.background || plan.backgroundMix ||
     plan.accompaniment?.tone || plan.accompaniment?.ambience || plan.accompaniment?.audio ||
@@ -255,7 +256,7 @@ export function parseReminders(value: unknown, plans: Plan[]): Reminder[] {
         !Number.isInteger(r.slot) ||
         r.slot < 0 ||
         r.slot > 7 ||
-        !plans.some((p) => p.id === r.planId) ||
+        (!plans.some((p) => p.id === r.planId) && !chakraScheduleTarget(r.planId)) ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time) ||
         typeof r.enabled !== "boolean" ||
         (r.frequency !== undefined && !["daily", "weekly", "monthly"].includes(r.frequency)) ||

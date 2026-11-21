@@ -29,3 +29,26 @@ it("matches the saved sequence order for a selected subset and appends new selec
     .toEqual(["solar", "root", "sacral", "heart"]);
   expect(channels.map(channel => channel.id)).toEqual(["root", "sacral", "solar", "heart"]);
 });
+
+it("starts the seven frequencies on one clock and softens a layered strike", async () => {
+  // @ts-expect-error Browser DSP shared by live playback and export.
+  const { createGroupVoice, createState, sample } = await import("../public/dsp.js");
+  const rate = 48000;
+  const channels = chakras.map(chakra => ({
+    id: chakra.id, hz: chakra.hz, sound: "bell", volume: .3, muted: false, seconds: 3,
+  }));
+  const plain = channels.map(createState);
+  const group = channels.map((channel, index) => createGroupVoice(channel, index, channels.length));
+  let plainPeak = 0, groupPeak = 0;
+  for (let i = 0; i < rate; i++) {
+    plainPeak = Math.max(plainPeak, Math.abs(plain.reduce((sum, state) => sum + sample(state, rate), 0)));
+    groupPeak = Math.max(groupPeak, Math.abs(group.reduce((sum, state) =>
+      sum + sample(state, rate) * state.headroom * state.left, 0)));
+  }
+  expect(group.map(state => state.currentHz)).toEqual(chakras.map(chakra => chakra.hz));
+  expect(group.every(state => state.time === group[0].time)).toBe(true);
+  expect(group[0].left).toBeGreaterThan(group[0].right);
+  expect(group[6].right).toBeGreaterThan(group[6].left);
+  expect(groupPeak).toBeGreaterThan(0);
+  expect(groupPeak).toBeLessThan(plainPeak * .7);
+});

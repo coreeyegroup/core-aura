@@ -1,5 +1,5 @@
-import { createState, sample } from "./dsp.js";
-export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap) {
+import { createGroupVoice, createState, sample } from "./dsp.js";
+export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap, additionalLayers = [], balancedGroup = false) {
   if (
     !Array.isArray(channels) ||
     channels.length < 1 ||
@@ -34,14 +34,25 @@ export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap)
   view.setUint32(40, frames * 2, true);
   const states = [], starts = [];
   let offset = 0;
-  for (const channel of channels) {
+  for (const [index, channel] of channels.entries()) {
     const layers = [channel, ...[channel.accompaniment?.tone, channel.accompaniment?.ambience]
       .flatMap((source, index) => source ? [{ ...source, focus: index === 1, muted: channel.muted }] : [])];
-    for (const layer of layers) {
-      states.push(createState({ ...layer, seconds: Math.min(channel.seconds, seconds) }));
+    for (const [layerIndex, layer] of layers.entries()) {
+      const config = { ...layer, seconds: Math.min(channel.seconds, seconds) };
+      states.push(balancedGroup && channels.length > 1 && layerIndex === 0
+        ? createGroupVoice(config, index, channels.length) : createState(config));
       starts.push(offset);
     }
     if (sequenceGap !== undefined) offset += Math.round((channel.seconds + sequenceGap) * rate);
+  }
+  const duration = sequenceGap === undefined ? Math.max(...channels.map(channel => channel.seconds)) :
+    offset / rate - sequenceGap;
+  for (const layer of additionalLayers) {
+    for (const [source, focus] of [[layer.tone, false], [layer.ambience, true]]) {
+      if (!source) continue;
+      states.push(createState({ ...source, focus, seconds: Math.min(duration, seconds) }));
+      starts.push(0);
+    }
   }
   for (let start = 0; start < frames; start += 8192) {
     // Match the live mixer's normalization at each rendering block.
@@ -55,7 +66,7 @@ export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap)
         if (i < starts[index]) continue;
         const state = states[index];
         const value = sample(state, rate);
-        if (!state.muted) sum += value * state.volume;
+        if (!state.muted) sum += value * state.volume * (state.headroom ?? 1) * ((state.left ?? 1) + (state.right ?? 1)) / 2;
       }
       const value = Math.max(-0.95, Math.min(0.95, sum * scale));
       view.setInt16(44 + i * 2, Math.round(value * 32767), true);

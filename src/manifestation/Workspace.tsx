@@ -1,5 +1,5 @@
 import { dayNames, RecurrenceFields } from "../scheduling/RecurrenceFields";
-import { scheduleClock, scheduleDate, scheduleFrequency, scheduleTimePattern, scheduleTimes, type Frequency } from "../scheduling/recurrence";
+import { chakraScheduleTarget, scheduleClock, scheduleDate, scheduleFrequency, scheduleTimePattern, scheduleTimes, type Frequency } from "../scheduling/recurrence";
 import { playbackReadiness, usePlaybackInventory, verifyPractice } from "../playlists/readiness";
 import { resolveItems } from "../playlists/model";
 import { confirmSourceDeletion, playlistStore } from "../playlists/store";
@@ -1083,10 +1083,18 @@ export function ManifestLibrary({
     </section>
   );
 }
-function Schedules({ onCreate }: { onCreate: () => void }) {
+export function Schedules({ onCreate, chakraSources, initialTarget }: {
+  onCreate: () => void;
+  chakraSources?: { id: string; name: string }[];
+  initialTarget?: string;
+}) {
   const pushMessage = useSyncExternalStore(pushStatus.subscribe, pushStatus.snapshot);
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
-  const [planId, setPlanId] = useState(data.plans.find(plan => plan.id === data.draft.id)?.id ?? data.plans[0]?.id ?? "");
+  const sources = chakraSources ?? data.plans;
+  const isChakra = !!chakraSources;
+  const [planId, setPlanId] = useState(initialTarget ??
+    (isChakra ? sources[0]?.id : data.plans.find(plan => plan.id === data.draft.id)?.id ?? data.plans[0]?.id) ?? "");
+  const visibleRules = data.reminders.filter(rule => !!chakraScheduleTarget(rule.planId) === isChakra);
   const [frequency, setFrequency] = useState<Frequency | "once">("daily");
   const [times, setTimes] = useState(["07:00"]);
   const [days, setDays] = useState([1]);
@@ -1118,6 +1126,10 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
   function add(event: FormEvent) {
     event.preventDefault();
     setMessage("");
+    if (!sources.some(source => source.id === planId)) {
+      setMessage("Choose an available saved item.");
+      return;
+    }
     const slot = editing?.slot ?? freeSlot();
     if (slot === undefined) { setMessage("Up to eight schedules are supported."); return; }
     const sorted = (frequency === "once" ? times.slice(0, 1) : [...times]).sort();
@@ -1186,17 +1198,17 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
     }
   }
 
-  return <section className="manifest-workspace schedule-workspace" aria-label="Manifestation schedules">
-    <div className="section-heading"><h2>Schedule your practice</h2></div>
-    {!data.plans.length && <div className="notice">
-      <span>Save a practice before adding a reminder.</span><button onClick={onCreate}>Create a practice</button>
+  return <section className="manifest-workspace schedule-workspace" aria-label={isChakra ? "Chakra schedules" : "Manifestation schedules"}>
+    <div className="section-heading"><h2>{isChakra ? "Schedule a chakra session or playlist" : "Schedule your practice"}</h2></div>
+    {!sources.length && <div className="notice">
+      <span>{isChakra ? "Save a chakra session or playlist before adding a reminder." : "Save a practice before adding a reminder."}</span><button onClick={onCreate}>{isChakra ? "Go to session setup" : "Create a practice"}</button>
     </div>}
-    {data.plans.length > 0 && <form ref={form} className="manifest-fields schedule-form" onSubmit={add}>
+    {sources.length > 0 && <form ref={form} className="manifest-fields schedule-form" onSubmit={add}>
       <div className="fields">
-        <label>Saved practice
-          <select required value={planId} onChange={event => setPlanId(event.target.value)}>
-            <option value="" disabled>Choose a practice</option>
-            {data.plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+        <label>{isChakra ? "Saved session or playlist" : "Saved practice"}
+          <select required value={sources.some(source => source.id === planId) ? planId : ""} onChange={event => setPlanId(event.target.value)}>
+            <option value="" disabled>Choose a saved item</option>
+            {sources.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
           </select>
         </label>
         <RecurrenceFields frequency={frequency} setFrequency={setFrequency}
@@ -1218,8 +1230,8 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
       </div>
     </form>}
     {message && <p role="status" className="notice">{message}</p>}
-    {data.reminders.map(rule => {
-      const name = data.plans.find(plan => plan.id === rule.planId)?.name ?? "Practice";
+    {visibleRules.map(rule => {
+      const name = sources.find(plan => plan.id === rule.planId)?.name ?? "Saved item unavailable";
       const next = nextOccurrence(rule, new Date());
       return <article className="saved-card schedule-card" key={rule.id}>
         <div><h3>{name}</h3><p>{describe(rule)} · {scheduleTimes(rule).join(", ")}</p>

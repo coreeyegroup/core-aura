@@ -7,6 +7,7 @@ export type Playlist = {
     id: string;
     name: string;
     items: PlaylistRef[];
+    scope?: "chakras";
 };
 export type PlaylistData = {
     schemaVersion: 1;
@@ -36,10 +37,19 @@ export function parsePlaylists(value: unknown): PlaylistData {
     for (const p of v.playlists) {
         if (!p || typeof p.id !== "string" || !p.id || p.id.length > 100 || ids.has(p.id) || typeof p.name !== "string" || !p.name.trim() || p.name.length > 80 || !Array.isArray(p.items) || !p.items.length || p.items.length > 100 || p.items.some(r => !r || !["practice", "session", "track"].includes(r.kind) || typeof r.id !== "string" || !r.id || r.id.length > 100))
             throw Error("A playlist needs a name and 1–100 saved items.");
+        if (p.scope !== undefined && (p.scope !== "chakras" || p.items.some(item => item.kind === "practice")))
+            throw Error("Invalid chakra playlist.");
         ids.add(p.id);
     }
     return structuredClone(v);
 }
+export function chakraPlaylists(playlists: Playlist[], sessions: Session[]) {
+    const ids = new Set(sessions.filter(row => row.kind === "chakras").map(row => row.id));
+    const isChakra = (item: PlaylistRef) => item.kind === "session" && ids.has(item.id);
+    return playlists.filter(playlist => playlist.scope === "chakras" ||
+        playlist.items.some(isChakra) && playlist.items.every(item => item.kind === "track" || isChakra(item)));
+}
+
 export function resolveItems(refs: PlaylistRef[], plans: Plan[], sessions: Session[], tracks: Track[] = []): PlayItem[] {
     if (!refs.length || refs.length > 100)
         throw Error("Choose 1–100 saved items.");
@@ -64,7 +74,7 @@ export function resolveItems(refs: PlaylistRef[], plans: Plan[], sessions: Sessi
         if (ref.kind !== "session") throw Error("Unsupported playlist item.");
         const session = sessions.find(session => session.id === ref.id);
         if (!session) throw Error("A sound session is unavailable. Edit the playlist to replace it.");
-        checkAudio(session.name, session.channels.map(channel => channel.accompaniment?.audio?.id),
+        checkAudio(session.name, [...(session.additionalLayers ?? []), ...session.channels.map(channel => channel.accompaniment)].map(layer => layer?.audio?.id),
             session.kind === "chakras" ? "Chakras" : "Sounds");
         return { kind: "session", id: ref.id, name: session.name, session: parseSession(structuredClone(session)) };
     });

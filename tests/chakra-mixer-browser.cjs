@@ -81,6 +81,31 @@ const fs=require("node:fs");
   assert.equal(session.channels[0].seconds,15);
   assert.equal(session.sequenceGap,2);
 
+  await p.getByRole("button",{name:"Add background",exact:true}).click();
+  const background=p.getByLabel("New layer background sound",{exact:true});
+  const backgroundId=await background.locator("option").nth(1).getAttribute("value");
+  await background.selectOption(backgroundId);
+  await p.getByRole("button",{name:"Add layer",exact:true}).click();
+  await dock.getByRole("button",{name:"Play session",exact:true}).click();
+  const player=p.getByRole("region",{name:"Playlist player"});
+  await player.getByRole("button",{name:"Pause playlist",exact:true}).waitFor();
+  await player.getByRole("button",{name:"Stop playlist",exact:true}).click();
+  await p.getByRole("button",{name:"Save",exact:true}).click();
+  await p.getByLabel("Session name",{exact:true}).fill("Chakras with background");
+  await p.getByRole("button",{name:"Save to Library",exact:true}).click();
+  await p.getByRole("button",{name:"Playlists",exact:true}).click();
+  await p.getByRole("button",{name:"New playlist",exact:true}).click();
+  await p.getByLabel("Playlist name",{exact:true}).fill("Morning chakra playlist");
+  await p.getByLabel("Playlist saved item",{exact:true}).selectOption({label:"Chakras with background · Chakra"});
+  await p.getByRole("button",{name:"Add item",exact:true}).click();
+  await p.getByRole("button",{name:"Save playlist",exact:true}).click();
+  await p.getByLabel("Morning chakra playlist playlist",{exact:true}).getByRole("button",{name:"Schedule",exact:true}).click();
+  await p.getByRole("button",{name:"Add time",exact:true}).click();
+  await p.getByLabel("Reminder time 2",{exact:true}).fill("19:30");
+  await p.getByRole("button",{name:"Add schedule",exact:true}).click();
+  await p.getByText("Daily · 07:00, 19:30",{exact:true}).waitFor();
+  await p.getByRole("button",{name:"Session setup",exact:true}).click();
+
   for(const width of [320,360,393,430]){
    await p.setViewportSize({width,height:852});
    assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),"Overflow at "+width);

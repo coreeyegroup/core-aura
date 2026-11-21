@@ -1,7 +1,7 @@
-import { resolveItems } from "./playlists/model";
+import { chakraPlaylists, resolveItems } from "./playlists/model";
 import { Track, tracks, trackEvent, trackCollection } from "./tracks/storage";
-import { confirmSourceDeletion } from "./playlists/store";
-import {queuePlayer, startQueue} from "./playlists/runtime";
+import { confirmSourceDeletion, playlistStore } from "./playlists/store";
+import {queuePlayer, startQueue, startScheduledQueue} from "./playlists/runtime";
 import {QueueTransport} from "./playlists/QueueTransport";
 import {PlaylistLibrary} from "./playlists/PlaylistLibrary";
 import {chakraSequence, orderChakras} from "./workbench/sequence";
@@ -39,6 +39,7 @@ import { Capacitor } from "@capacitor/core";
 import { deliverFile, cleanupExports, fileSharing } from "./files/deliver";
 import {
   Channel,
+  Accompaniment,
   Session,
   Sound,
   Tab,
@@ -72,12 +73,16 @@ import {
 import { Waveform } from "./components/Waveform";
 import { PacksPanel } from "./packs/PacksPanel";
 import { Admin } from "./admin/Admin";
-import { Manifestation, ManifestLibrary } from "./manifestation/Workspace";
+import { Manifestation, ManifestLibrary, Schedules } from "./manifestation/Workspace";
 import { LibrarySounds } from "./components/LibrarySounds";
 import { manifestationStore } from "./manifestation/store";
 import { manifestPlayer } from "./manifestation/player";
 import { observePushReminders } from "./manifestation/push";
-import { Due, observeReminders } from "./manifestation/reminders";
+import { Due, observeReminders, syncPhoneReminders } from "./manifestation/reminders";
+import { chakraScheduleId, chakraScheduleTarget } from "./scheduling/recurrence";
+import { scheduledChakraName } from "./scheduling/targets";
+import { PracticeLayers } from "./manifestation/PracticeLayers";
+import { newPlan } from "./manifestation/model";
 import {
   readAppearance,
   saveAppearance,
@@ -191,6 +196,11 @@ export default function App() {
   const queue=useSyncExternalStore(queuePlayer.subscribe,queuePlayer.snapshot);
   const queueBusy=["playing","paused","error"].includes(queue.status);
   const [due, setDue] = useState<Due | null>(null);
+  const [chakraView, setChakraView] = useState<"setup" | "playlists" | "schedule">("setup");
+  const [chakraScheduleSelection, setChakraScheduleSelection] = useState<string>();
+  const [chakraLayers, setChakraLayers] = useState<Accompaniment[]>([]);
+  const [chakraLayerPlan] = useState(() => newPlan());
+  const { data: playlistData } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
   const practice = useSyncExternalStore(
     manifestPlayer.subscribe,
     manifestPlayer.snapshot,
@@ -232,9 +242,45 @@ export default function App() {
       );
     }
   }
+  function openReminder(id: string) {
+    const target = chakraScheduleTarget(id);
+    if (!target) return openManifest(id);
+    const name = scheduledChakraName(id);
+    if (!name) {
+      setMessage("The scheduled chakra session or playlist is unavailable.");
+      return false;
+    }
+    navigate("chakras");
+    setChakraView(target.kind === "playlist" ? "playlists" : "schedule");
+    setChakraScheduleSelection(id);
+    setDue({ id, planId: id, name, time: "", autoStart: false });
+    return true;
+  }
+
+  async function playScheduledChakra(id: string, automatic = false) {
+    const target = chakraScheduleTarget(id);
+    if (!target) return false;
+    const saved = readSessions().filter(row => row.kind === "chakras");
+    const playlist = target.kind === "playlist"
+      ? playlistStore.snapshot().data.playlists.find(row => row.id === target.id) : undefined;
+    const name = playlist?.name ?? saved.find(row => target.kind === "session" && row.id === target.id)?.name;
+    if (!name) throw Error("The scheduled chakra session or playlist is unavailable.");
+    const refs = playlist?.items ?? [{ kind: "session" as const, id: target.id }];
+    const items = resolveItems(refs, [], saved, await tracks());
+    return automatic ? startScheduledQueue(items, name) : startQueue(items, name);
+  }
   useEffect(() => {
     if (!rebuiltScreens.has("manifest")) return;
     return observeReminders((reminder) => {
+      if (chakraScheduleTarget(reminder.planId)) {
+        if (reminder.autoStart && location.hash !== "#admin" && !fileSharing() &&
+            !["playing", "paused"].includes(chakraSequence.snapshot().status))
+          void playScheduledChakra(reminder.planId, true).then(started => {
+            if (!started) setDue(reminder);
+          }).catch(() => setDue(reminder));
+        else setDue(reminder);
+        return;
+      }
       const { draft, plans } = manifestationStore.snapshot().data;
       const scheduled = plans.find((p) => p.id === reminder.planId);
       const unsaved = draftChanged(draft, plans);
@@ -256,13 +302,13 @@ export default function App() {
         } catch {}
       }
       setDue(reminder);
-    }, openManifest);
+    }, openReminder);
   }, []);
   useEffect(() => {
     const url = new URL(location.href);
     const id = url.searchParams.get("manifestPlan");
     if (id) {
-      if (openManifest(id)) {
+      if (openReminder(id)) {
         url.searchParams.delete("manifestPlan");
         history.replaceState(
           null,
@@ -299,6 +345,9 @@ export default function App() {
   useEffect(()=>{try{localStorage.setItem("core-aura.chakra-timer",String(chakraSeconds));}catch{}},[chakraSeconds]);
   useEffect(()=>observeHistory(),[]);
   const [master, setMaster] = useState(workspace.data?.master ?? 0.5);
+  useEffect(() => {
+    if (!queueBusy) engine.setMaster(master);
+  }, [master, queueBusy]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [homePlaylist, setHomePlaylist] = useState(() => {
     try { return localStorage.getItem("core-aura.home-playlist") ?? ""; }
@@ -342,6 +391,7 @@ export default function App() {
   }, [appearance]);
   const [exporting, setExporting] = useState<Session | null>(null);
   const [exportSeconds, setExportSeconds] = useState(60);
+  const exportLimit = exporting ? Math.min(600, Math.ceil(sessionDuration(exporting))) : 600;
   const [exportProgress, setExportProgress] = useState<number | null>(null);
   const [exportError, setExportError] = useState("");
   const exportWorker = useRef<Worker | null>(null);
@@ -400,6 +450,8 @@ export default function App() {
         master: row.master,
         seconds: exportSeconds,
         sequenceGap: row.sequenceGap,
+        balancedGroup: row.kind === "chakras" && row.sequenceGap === undefined,
+        additionalLayers: row.additionalLayers,
       });
     } catch {
       setExportError("This session cannot be exported.");
@@ -474,6 +526,12 @@ export default function App() {
     try {
       chakraSequence.start(ordered, sequence.seconds, sequence.gap);
       setMessage("");
+    } catch (error) { setMessage((error as Error).message); }
+  }
+  async function playLayeredChakras() {
+    try {
+      const draft = buildMix("Chakra meditation", "chakra-draft");
+      await startQueue(resolveItems([{ kind: "session", id: draft.id }], [], [draft], localTracks), draft.name, false);
     } catch (error) { setMessage((error as Error).message); }
   }
   const isNatureView = tab === "explore" && exploreView === "nature";
@@ -705,6 +763,8 @@ export default function App() {
     try {
       writeSessions(rows);
       setSessions(rows);
+      if (manifestationStore.snapshot().data.reminders.some(rule => chakraScheduleTarget(rule.planId)))
+        void syncPhoneReminders().catch(() => {});
       return true;
     } catch {
       setMessage(
@@ -713,23 +773,23 @@ export default function App() {
       return false;
     }
   }
+  function buildMix(name: string, id: string, createdAt = new Date().toISOString()) {
+    const sequential = isChakras && chakraMode === "sequence";
+    const channels = sequential ? orderChakras(currentWithTime, sequence.order)
+      .map(channel => ({ ...channel, seconds: sequence.seconds })) : currentWithTime;
+    return parseSession({
+      schemaVersion: 2, engineVersion: ENGINE_VERSION, id, name, createdAt, channels, master,
+      kind: isChakras ? "chakras" : "studio",
+      sequenceGap: sequential ? sequence.gap : undefined,
+      additionalLayers: isChakras && chakraLayers.length ? chakraLayers : undefined,
+    });
+  }
+
   function save(asCopy = false) {
     try {
-      const sequential = isChakras && chakraMode === "sequence";
-      const ordered = sequential ? orderChakras(currentWithTime, sequence.order) : currentWithTime;
       const original = !asCopy && editingMix?.kind === (isChakras ? "chakras" : "studio")
         ? sessions.find(session => session.id === editingMix.id) : undefined;
-      const row = parseSession({
-        schemaVersion: 2,
-        engineVersion: ENGINE_VERSION,
-        id: original?.id ?? crypto.randomUUID(),
-        name: saveName.trim(),
-        kind: isChakras ? "chakras" : "studio",
-        channels: sequential ? ordered.map(channel => ({ ...channel, seconds: sequence.seconds })) : currentWithTime,
-        sequenceGap: sequential ? sequence.gap : undefined,
-        master,
-        createdAt: original?.createdAt ?? new Date().toISOString(),
-      });
+      const row = buildMix(saveName.trim(), original?.id ?? crypto.randomUUID(), original?.createdAt);
       if (storeRows(original ? sessions.map(item => item.id === row.id ? row : item) : [...sessions, row])) {
         setEditingMix(undefined);
         setSaving(false);
@@ -750,6 +810,8 @@ export default function App() {
     engine.stopAll();
     setMaster(row.master);
     if (row.kind === "chakras") {
+      setChakraView("setup");
+      setChakraLayers(row.additionalLayers ?? []);
       setChakraMode(row.sequenceGap === undefined ? "together" : "sequence");
       if (row.sequenceGap === undefined) setChakraSeconds(row.channels[0].seconds);
     } else setStudioSeconds(row.channels[0].seconds);
@@ -1041,13 +1103,15 @@ export default function App() {
         {due && (
           <div className="notice" role="status">
             <span>
-              {due.name} · {due.time}
+              {due.name}{due.time ? " · " + due.time : ""}
             </span>
-            <button onClick={() => openManifest(due.planId)}>
-              Open practice
-            </button>
+            {chakraScheduleTarget(due.planId)
+              ? <button onClick={() => void playScheduledChakra(due.planId).then(played => {
+                  if (played) setDue(null);
+                }).catch(error => setMessage((error as Error).message))}>Play chakra meditation</button>
+              : <button onClick={() => openManifest(due.planId)}>Open practice</button>}
             <button
-              aria-label="Dismiss manifestation reminder"
+              aria-label={chakraScheduleTarget(due.planId) ? "Dismiss chakra reminder" : "Dismiss manifestation reminder"}
               onClick={() => setDue(null)}
             >
               Dismiss
@@ -1335,7 +1399,7 @@ export default function App() {
           <div className="chakra-workspace">
             <div className="section-heading chakra-heading">
               <h1>Chakra meditation</h1>
-              <button
+              {chakraView === "setup" && <button
                 className="text-button"
                 disabled={!current.length}
                 onClick={(event) => {
@@ -1344,13 +1408,55 @@ export default function App() {
                 }}
               >
                 Save
-              </button>
+              </button>}
             </div>
+            <div className="segmented" aria-label="Chakra workspace">
+              <button aria-pressed={chakraView === "setup"} onClick={() => setChakraView("setup")}>Session setup</button>
+              <button aria-pressed={chakraView === "playlists"} onClick={() => setChakraView("playlists")}>Playlists</button>
+              <button aria-pressed={chakraView === "schedule"} onClick={() => {
+                setChakraScheduleSelection(undefined);
+                setChakraView("schedule");
+              }}>Schedule</button>
+            </div>
+            {chakraView === "setup" && <>
             <ChakraMixer tracks={localTracks} focusId={chakraFocus} channels={chakraChannels} states={states}
               selected={selected} target={mixTarget} mode={chakraMode} sequenceActive={sequenceActive}
               onMode={setChakraMode} seconds={chakraMode === "sequence" ? sequence.seconds : seconds}
               master={master} onSelect={setSelected} onTarget={setMixTarget} onSeconds={setSeconds}
               onMaster={setMaster} onChange={patch} onError={setMessage} />
+            <PracticeLayers chakra plan={{ ...chakraLayerPlan, additionalLayers: chakraLayers }}
+              sessions={sessions} tracks={localTracks} active={sequenceActive || queueBusy ||
+                states.some(state => current.some(channel => channel.id === state.id) && state.status !== "stopping")}
+              queueActive={queueBusy} onAudioLibrary={() => navigate("library", { libraryView: "audio" })}
+              onChange={patch => { setChakraLayers(patch.additionalLayers ?? []); return true; }} />
+            {sessions.some(row => row.kind === "chakras") && <details className="workbench-panel">
+              <summary>Saved chakra sessions</summary>
+              {sessions.filter(row => row.kind === "chakras").map(row => <div className="home-list-row" key={row.id}>
+                <div><strong>{row.name}</strong><small>{time(sessionDuration(row))}{row.additionalLayers?.length ? " · " + row.additionalLayers.length + " audio layers" : ""}</small></div>
+                <button onClick={() => void playScheduledChakra(chakraScheduleId("session", row.id))
+                  .catch(error => setMessage((error as Error).message))}>Play</button>
+                <button onClick={() => load(row, true)}>Edit</button>
+                <button onClick={() => {
+                  setChakraScheduleSelection(chakraScheduleId("session", row.id));
+                  setChakraView("schedule");
+                }}>Schedule</button>
+              </div>)}
+            </details>}
+            </>}
+            {chakraView === "playlists" && <PlaylistLibrary chakraOnly sessions={sessions} tracks={localTracks} trackError={trackReadError}
+              onSchedule={id => {
+                setChakraScheduleSelection(chakraScheduleId("playlist", id));
+                setChakraView("schedule");
+              }} />}
+            {chakraView === "schedule" && <Schedules key={chakraScheduleSelection ?? "chakra-schedule"}
+              initialTarget={chakraScheduleSelection} onCreate={() => setChakraView("setup")}
+              chakraSources={[
+                ...sessions.filter(row => row.kind === "chakras").map(row => ({
+                  id: chakraScheduleId("session", row.id), name: row.name + " · Session",
+                })),
+                ...chakraPlaylists(playlistData.playlists, sessions)
+                  .map(row => ({ id: chakraScheduleId("playlist", row.id), name: row.name + " · Playlist" })),
+              ]} />}
           </div>
         )}
         {tab === "library" && (
@@ -1531,12 +1637,7 @@ export default function App() {
                           onClick={(event) => {
                             modalOpener.current = event.currentTarget;
                             setExporting(row);
-                            setExportSeconds(
-                              Math.min(
-                                60,
-                                sessionDuration(row),
-                              ),
-                            );
+                            setExportSeconds(Math.min(60, Math.ceil(sessionDuration(row))));
                             setExportError("");
                           }}
                         >
@@ -1564,8 +1665,8 @@ export default function App() {
         )}
         {isStudio && <button className="wide" onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature &amp; sound library</button>}
         {(isStudio || (tab === "explore" && exploreView === "nature")) && <SoundTracks />}
-        {isChakras && <details className="workbench-panel chakra-accompaniment">
-          <summary>Additional audio</summary>
+        {isChakras && chakraView === "setup" && <details className="workbench-panel chakra-accompaniment">
+          <summary>Explore other sounds</summary>
           <button onClick={() => navigate("explore", { exploreView: "nature" })}>Nature &amp; sound library</button>
           <SoundTracks />
           <details className="generated-track-panel">
@@ -1590,7 +1691,7 @@ export default function App() {
         </> : <h1 className="sr-only">{screenName}</h1>}
       </main>
       {showWorkspace && <>
-      {!queueBusy && (isStudio || isChakras) && (
+      {!queueBusy && (isStudio || isChakras && (chakraView === "setup" || sequenceActive)) && (
         <section
           ref={dockRef}
           className="player-dock"
@@ -1637,6 +1738,9 @@ export default function App() {
             <p className="dock-caption">{current.length} {current.length === 1 ? "chakra" : "chakras"} · {chakraMode === "sequence" ? "In sequence" : "Together"} · {time(chakraDuration)}</p>}
           {isChakras && sequenceActive ? <SequenceTransport /> : errorInvalid ? (
             <p role="alert">Enter a frequency within the instrument’s range.</p>
+          ) : isChakras && chakraLayers.length > 0 ? (
+            <div className="transport"><button className="primary" disabled={!current.length}
+              onClick={() => void playLayeredChakras()}><Play size={20} /> Play session</button></div>
           ) : isChakras && chakraMode === "sequence" ? (
             <div className="transport">
               <button className="primary" disabled={!current.length} onClick={playChakraSequence}>Play sequence</button>
@@ -1649,6 +1753,7 @@ export default function App() {
               channels={currentWithTime}
               stopChannels={isChakras ? chakraChannels : undefined}
               exclusive={isChakras}
+              balancedGroup={isChakras}
               states={states}
               onError={setMessage}
             />
@@ -1878,7 +1983,7 @@ export default function App() {
               </button>
             </div>
             <p>{exporting.name} · mono WAV · 44.1 kHz · 16-bit</p>
-            {exporting.channels.some(channel => channel.accompaniment?.audio) && (
+            {(exporting.channels.some(channel => channel.accompaniment?.audio) || exporting.additionalLayers?.some(layer => layer.audio)) && (
               <p className="content-note">This WAV contains the generated layers. Export imported files separately from Library.</p>
             )}
             <label>
@@ -1889,24 +1994,8 @@ export default function App() {
                 value={exportSeconds}
                 onChange={(e) => setExportSeconds(Number(e.target.value))}
               >
-                {[
-                  ...new Set([
-                    Math.min(
-                      60,
-                      Math.max(...exporting.channels.map((c) => c.seconds)),
-                    ),
-                    15,
-                    30,
-                    60,
-                    300,
-                    600,
-                  ]),
-                ]
-                  .filter(
-                    (n) =>
-                      n <=
-                      Math.max(...exporting.channels.map((c) => c.seconds)),
-                  )
+                {[...new Set([exportSeconds, 15, 30, 60, 300, 600, exportLimit])]
+                  .filter(value => value <= exportLimit)
                   .sort((a, b) => a - b)
                   .map((n) => (
                     <option key={n} value={n}>

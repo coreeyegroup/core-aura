@@ -69,6 +69,17 @@ export function createState(config) {
     status: "playing",
   };
 }
+export function createGroupVoice(channel, index, count) {
+  const angle = Math.PI / 4 + (index / (count - 1) - 0.5) * 0.56;
+  return {
+    ...createState({ ...channel, fadeSeconds: Math.max(0.4, channel.fadeSeconds ?? 0) }),
+    phase: Math.PI * index * (index + 1) / count,
+    pulseDelay: index * 0.065,
+    left: Math.SQRT2 * Math.cos(angle),
+    right: Math.SQRT2 * Math.sin(angle),
+    headroom: Math.max(0.58, 1 / Math.sqrt(count)),
+  };
+}
 function partials(phase, hz, rate, modes, age = 0) {
   let result = 0;
   for (const [ratio, level, decay] of modes) {
@@ -97,6 +108,7 @@ export function sample(state, rate) {
     return 0;
   }
   const s = state.sound;
+  const pulseTime = state.time - (state.pulseDelay ?? 0);
   let target = state.hz,
     breath = 1;
   if (patterns[s]) {
@@ -138,11 +150,11 @@ export function sample(state, rate) {
     value = 0;
     const ratios = [0.75, 1, 1, 0.5];
     for (let i = 0; i < 4; i++) {
-      const age = (state.time - i * 0.85 + 3.4) % 3.4;
+      const age = (pulseTime - i * 0.85 + 3.4) % 3.4;
       const edge = Math.min(1, age / 0.018, (3.4 - age) / 0.08);
       value +=
         0.24 *
-        edge *
+        (pulseTime < 0 ? 0 : edge) *
         Math.exp(-age * 1.7) *
         partials(phase * ratios[i], target * ratios[i], rate, [
           [1, 1, Infinity],
@@ -155,11 +167,11 @@ export function sample(state, rate) {
   } else if (s === "shruti") {
     value=partials(phase,target,rate,[[1,.55,Infinity],[2,.2,Infinity],[3,.12,Infinity],[4,.07,Infinity],[5,.04,Infinity]])*(.9+.06*Math.sin(state.time*.7));
   } else if (s === "harp" || s === "chime") {
-    const period=state.interval??3,age=state.time%period,edge=Math.min(1,age/.008,(period-age)/.05);
+    const period=state.interval??3,age=Math.max(0,pulseTime)%period,edge=Math.min(1,age/.008,(period-age)/.05);
     value=partials(2*Math.PI*state.currentHz*age,target,rate,s === "harp"?[[1,.65,1.2],[2,.2,.55],[3,.08,.3]]:[[1,.55,1.8],[2.02,.25,1.1],[3.03,.12,.7]],age)*edge;
   } else {
     const period = state.interval ?? (s === "drum" ? 0.9 : s === "bell" ? 3 : 5);
-    const age = state.time % period;
+    const age = Math.max(0, pulseTime) % period;
     const edge = Math.min(
       1,
       age / (s === "bowl" ? 0.03 : 0.005),

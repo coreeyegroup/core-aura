@@ -216,3 +216,20 @@ it("plays a layer-only practice without invoking speech and ends at its timer", 
     expect(audio.stop).toHaveBeenCalledWith("manifest-background:layers:1");
   } finally { player.dispose(); }
 });
+
+it("supports multiple local times for a monthly chakra playlist reminder", async () => {
+  const { chakraScheduleId, chakraScheduleTarget } = await import("../src/scheduling/recurrence");
+  const { parseReminders } = await import("../src/manifestation/model");
+  const { calendarFile } = await import("../src/manifestation/reminders");
+  const planId = chakraScheduleId("playlist", "quiet-morning");
+  const rule = {
+    id: "chakra-reminder", slot: 0, planId, time: "07:00", enabled: true,
+    frequency: "monthly" as const, monthDay: 31, days: [0, 1, 2, 3, 4, 5, 6], times: ["07:00", "19:00"],
+  };
+  expect(chakraScheduleTarget(planId)).toEqual({ kind: "playlist", id: "quiet-morning" });
+  expect(parseReminders([rule], [])).toEqual([rule]);
+  const ics = calendarFile(rule, "Quiet morning", new Date(2026, 10, 22)).replaceAll("\r\n ", "");
+  expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+  expect(ics).toContain("FREQ=MONTHLY;BYMONTHDAY=31");
+  expect(ics).toContain("/?manifestPlan=" + planId + "#chakras");
+});

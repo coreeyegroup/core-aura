@@ -17,7 +17,7 @@ const layerKinds = [
 const percent = (volume: number) => Math.round(volume * 100) + "%";
 const previewPrefix = "preview-practice-layer-";
 
-export function PracticeLayers({ plan, sessions, tracks, active, queueActive, onAudioLibrary, onChange, onBackgroundChange }: {
+export function PracticeLayers({ plan, sessions, tracks, active, queueActive, onAudioLibrary, onChange, onBackgroundChange, chakra = false }: {
   plan: Plan;
   sessions: Session[];
   tracks: Track[];
@@ -25,7 +25,8 @@ export function PracticeLayers({ plan, sessions, tracks, active, queueActive, on
   queueActive: boolean;
   onAudioLibrary: () => void;
   onChange: (patch: Partial<Plan>) => boolean;
-  onBackgroundChange: (patch: Partial<Plan>) => void | boolean;
+  chakra?: boolean;
+  onBackgroundChange?: (patch: Partial<Plan>) => void | boolean;
 }) {
   const [picker, setPicker] = useState<LayerKind | "mix">();
   const [pending, setPending] = useState<Accompaniment>({});
@@ -130,7 +131,7 @@ export function PracticeLayers({ plan, sessions, tracks, active, queueActive, on
   const backgroundName = plan.backgroundMix?.name ?? (plan.background && sounds[plan.background.sound].name);
   const backgroundFrequency = plan.background ? " · " + plan.background.hz + " Hz" : "";
   return <section ref={panel} className="practice-step practice-layers" aria-labelledby="practice-layers-heading">
-    <h2 id="practice-layers-heading">3. Audio, sounds and backgrounds</h2>
+    <h2 id="practice-layers-heading">{chakra ? "Audio, sounds and backgrounds" : "3. Audio, sounds and backgrounds"}</h2>
     <div className="home-actions practice-layer-actions">
       {layerKinds.map(({ key, action, name }) => <button key={key} type="button"
         ref={node => { if (node) addButtons.current[key] = node; }}
@@ -139,7 +140,7 @@ export function PracticeLayers({ plan, sessions, tracks, active, queueActive, on
         onClick={() => togglePicker(key)}>
         <Plus size={15} aria-hidden="true" /> {name}
       </button>)}
-      {!savedBackground && <button type="button" ref={node => { if (node) addButtons.current.mix = node; }}
+      {!chakra && !savedBackground && <button type="button" ref={node => { if (node) addButtons.current.mix = node; }}
         disabled={active} aria-expanded={picker === "mix"} aria-controls="practice-layer-picker"
         onClick={() => togglePicker("mix")}><Plus size={15} aria-hidden="true" /> Saved mix</button>}
     </div>
@@ -208,7 +209,7 @@ export function PracticeLayers({ plan, sessions, tracks, active, queueActive, on
     {savedBackground && <div className="practice-layer">
       <BackgroundControls plan={plan} sessions={sessions} active={active} onChange={patch => {
         stopPreview("mix");
-        return onBackgroundChange(patch);
+        return onBackgroundChange?.(patch);
       }} summary={<span className="practice-layer-copy"><strong>{backgroundName}</strong><small>Background layer{backgroundFrequency} · {percent(savedBackground.volume)}{plan.backgroundMuted ? " · Muted" : ""}</small></span>} />
       {savedBackground && backgroundName && previewButton("mix", backgroundName, {
         background: plan.background, backgroundMix: plan.backgroundMix, backgroundMuted: plan.backgroundMuted,

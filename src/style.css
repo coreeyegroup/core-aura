@@ -1941,6 +1941,9 @@ progress {
 .chakra-accompaniment[open] { display: grid; gap: 6px; }
 .chakra-workspace, .chakra-accompaniment { width: min(100%, 940px); margin-inline: auto; }
 .chakra-heading { margin-block-end: 8px; }
+.chakra-workspace > .segmented { margin-block-end: var(--gap); }
+.chakra-workspace > .practice-layers { margin-block: var(--gap); border: 1px solid var(--line); border-radius: var(--radius); }
+.chakra-workspace .home-list-row { flex-wrap: wrap; }
 .chakra-heading > button { flex-shrink: 0; }
 @media (max-width: 480px) {
   .chakra-session-choices { grid-template-columns: minmax(0, 1fr); }

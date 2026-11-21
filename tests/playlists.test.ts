@@ -185,3 +185,46 @@ it("checks imported audio inside an attached practice background mix", () => {
         channels: [{ ...session.channels[0], accompaniment: { audio: { id, volume: .2, loop: true } } }] };
     expect(() => resolveItems([refs[0]], [{ ...practice, backgroundMix }], [])).toThrow(/Quiet morning.*missing audio file/);
 });
+
+it("keeps session audio across chakra sequence gaps and stops it at completion", async () => {
+    vi.useFakeTimers();
+    const h = harness();
+    const source = { id: "track:" + "a".repeat(64), volume: .2, loop: true };
+    const chakraSession = {
+        ...session, kind: "chakras" as const, sequenceGap: 1,
+        channels: [
+            { ...channel("sine", 396), id: "root", seconds: 1 },
+            { ...channel("sine", 417), id: "sacral", seconds: 1 },
+        ],
+        additionalLayers: [{ audio: source }],
+    };
+    const selection = [{ kind: "session" as const, id: chakraSession.id }];
+    expect(() => resolveItems(selection, [], [chakraSession])).toThrow(/missing audio file/);
+    const items = resolveItems(selection, [], [chakraSession], [{
+        ...source, title: "Background", filename: "background.wav", bytes: 100,
+        duration: 1, muted: false, createdAt: session.createdAt,
+    }]);
+    try {
+        await h.player.start(items, "Quiet chakras");
+        const layer = h.audio.play.mock.calls.find(([voice]) => voice.accompaniment)?.[0];
+        expect(layer.accompaniment.audio).toEqual(source);
+        const expireChakra = () => {
+            const voices = h.audio.snapshot();
+            voices.splice(0, voices.length, ...voices.filter(voice => voice.id === layer.id));
+        };
+        expireChakra();
+        await vi.advanceTimersByTimeAsync(200);
+        h.player.pause();
+        expect(h.audio.snapshot()).toEqual([{ id: layer.id, status: "paused", time: 0 }]);
+        await vi.advanceTimersByTimeAsync(1200);
+        expect(h.audio.play).toHaveBeenCalledTimes(2);
+        await h.player.resume();
+        await vi.advanceTimersByTimeAsync(1000);
+        expect(h.audio.play).toHaveBeenCalledTimes(3);
+        expect(h.audio.snapshot().some(voice => voice.id === layer.id)).toBe(true);
+        expireChakra();
+        await vi.advanceTimersByTimeAsync(300);
+        expect(h.player.snapshot().status).toBe("completed");
+        expect(h.audio.snapshot()).toEqual([]);
+    } finally { h.player.dispose(); }
+});

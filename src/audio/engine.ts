@@ -16,6 +16,7 @@ export class AudioEngine {
   private listeners = new Set<() => void>();
   private states: VoiceState[] = [];
   private generation = 0;
+  private alignedGroup = new Set<string>();
   private voiceGeneration = new Map<string, number>();
   private recording?: {
     id: string;
@@ -230,7 +231,7 @@ export class AudioEngine {
         const node = new AudioWorkletNode(context, "core-aura-mixer", {
           numberOfInputs: 0,
           numberOfOutputs: 1,
-          outputChannelCount: [1],
+          outputChannelCount: [2],
         });
         const analyser = context.createAnalyser();
         analyser.fftSize = 1024;
@@ -263,6 +264,7 @@ export class AudioEngine {
     return this.connecting;
   }
   async play(channel: Channel, options: {preview?:boolean} = {}) {
+    this.alignedGroup.delete(channel.id);
     if (!options.preview && channel.id !== "manifest-background" && !channel.id.startsWith("manifest-background:")) signalOtherAudio();
     const token = this.generation;
     const voiceToken = this.voiceGeneration.get(channel.id) || 0;
@@ -288,6 +290,50 @@ export class AudioEngine {
     this.refresh();
     if (channel.accompaniment) await this.playLinked(channel);
   }
+  async playGroup(channels: Channel[]) {
+    if (channels.length < 2) {
+      if (channels[0]) await this.play(channels[0]);
+      return;
+    }
+    signalOtherAudio();
+    const token = this.generation;
+    const voices = channels.map(({ id }) => this.voiceGeneration.get(id) || 0);
+    await this.connect();
+    if (token !== this.generation || channels.some(({ id }, index) =>
+      (this.voiceGeneration.get(id) || 0) !== voices[index])) return;
+    this.stopRecording();
+    const active = channels.filter(({ id }) => this.voiceStates.some(state =>
+      state.id === id && state.status !== "stopping"));
+    if (active.length === channels.length && this.alignedGroup.size === channels.length &&
+        channels.every(({ id }) => this.alignedGroup.has(id))) {
+      this.node!.port.postMessage({ type: "resume-group", ids: channels.map(({ id }) => id) });
+      this.voiceStates = this.voiceStates.map(state =>
+        channels.some(({ id }) => id === state.id) ? { ...state, status: "playing" } : state);
+      this.refresh();
+      await Promise.all(channels.flatMap(({ id }) => {
+        const linked = this.linked.get(id);
+        if (!linked) return [];
+        linked.paused = false;
+        this.node!.port.postMessage({ type: "resume-group", ids: linked.parts });
+        return linked.file ? [this.tracks.resume(linked.file)] : [];
+      }));
+      return;
+    }
+    const ids = new Set(channels.map(({ id }) => id));
+    this.alignedGroup = ids;
+    channels.forEach(({ id }) => this.stopLinked(id));
+    this.node!.port.postMessage({ type: "start-group", channels });
+    this.voiceStates = [...this.voiceStates.filter(state => !ids.has(state.id)),
+      ...channels.map(({ id }) => ({ id, status: "playing" as const, time: 0 }))];
+    this.refresh();
+    try {
+      await Promise.all(channels.map(channel => this.playLinked(channel)));
+    } catch (error) {
+      if (token === this.generation) channels.forEach(({ id }) => this.stop(id));
+      throw error;
+    }
+  }
+  canAutoPlay() { return this.context?.state === "running"; }
   async resume(id: string) {
     const token=this.generation, voice=this.voiceGeneration.get(id)||0;
     await this.connect();
@@ -340,6 +386,7 @@ export class AudioEngine {
     this.node?.port.postMessage({ type: "pause", id });
   }
   stop(id: string) {
+    this.alignedGroup.delete(id);
     this.stopLinked(id);
     if (id.startsWith("track:")) { this.tracks.stop(id); return; }
     this.voiceGeneration.set(id, (this.voiceGeneration.get(id) || 0) + 1);
@@ -355,6 +402,7 @@ export class AudioEngine {
     signalOtherAudio();
     this.tracks.stopAll();
     this.linked.clear();
+    this.alignedGroup.clear();
     this.generation++;
     this.voiceGeneration.clear();
     this.stopRecording();

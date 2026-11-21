@@ -6,7 +6,7 @@ import { QueuePlayer } from "./player";
 import { verifyPracticeAudio } from "./readiness";
 import { PlayItem } from "./model";
 export const queuePlayer = new QueuePlayer(engine, manifestPlayer, (item) => {
-    if (item.kind !== "track") remember({ kind: item.kind, id: item.id });
+    if (item.kind !== "track" && item.id !== "chakra-draft") remember({ kind: item.kind, id: item.id });
 });
 onOtherAudio(() => queuePlayer.interrupt());
 let requestId = 0;
@@ -28,4 +28,15 @@ export async function startQueue(items: PlayItem[], name: string, saveReplay = t
         }
     }
     return true;
+}
+
+export async function startScheduledQueue(items: PlayItem[], name: string) {
+    if (!engine.canAutoPlay()) return false;
+    await verifyPracticeAudio(items);
+    if (document.hidden || document.querySelector("dialog[open], [role=dialog]") ||
+        ["playing", "paused"].includes(queuePlayer.snapshot().status) ||
+        ["playing", "paused"].includes(manifestPlayer.snapshot().status) ||
+        engine.snapshot().some(voice => voice.status !== "stopping")) return false;
+    await queuePlayer.start(items, name);
+    return queuePlayer.snapshot().status === "playing";
 }

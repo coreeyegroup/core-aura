@@ -75,3 +75,13 @@ export function recentOccurrences(rule: ScheduleTiming, now: Date): Date[] {
     [...timesOnDate(rule, yesterday), ...timesOnDate(rule, now)];
   return candidates.filter(due => +due <= +now && +now - +due < 900_000);
 }
+
+export function chakraScheduleId(kind: "session" | "playlist", id: string) {
+  return "chakra-" + kind + "-" + id;
+}
+
+export function chakraScheduleTarget(id: unknown) {
+  if (typeof id !== "string") return undefined;
+  const match = /^chakra-(session|playlist)-([a-z0-9-]{1,84})$/i.exec(id);
+  return match ? { kind: match[1] as "session" | "playlist", id: match[2] } : undefined;
+}

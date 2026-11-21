@@ -12,6 +12,7 @@ export function Transport({
   stopChannels = channels,
   exclusive = false,
   allowMix = false,
+  balancedGroup = false,
 }: {
   channels: Channel[];
   states: VoiceState[];
@@ -20,6 +21,7 @@ export function Transport({
   stopChannels?: Channel[];
   exclusive?: boolean;
   allowMix?: boolean;
+  balancedGroup?: boolean;
 }) {
   const [busy,setBusy] = useState(false);
   const stoppable = stopChannels.some(c=>states.some(s=>s.id===c.id));
@@ -50,8 +52,7 @@ export function Transport({
             setBusy(false);
             return;
           }
-          return engine
-            .toggle(channels)
+          return (balancedGroup && !playing ? engine.playGroup(channels) : engine.toggle(channels))
             .catch(() =>
               onError(
                 "Audio could not start. Check your connection or downloaded player and try again.",

@@ -2,12 +2,14 @@ import { trackBlob } from "../tracks/storage";
 import type { TrackLevel } from "../audio/tracks";
 import type { Plan } from "../manifestation/model";
 import type { Channel } from "../model";
+import { sessionDuration } from "../model";
 import { PlayItem, itemDuration } from "./model";
 type Audio = {
     stop?: (id: string) => void;
     stopAll: () => void;
     toggleSoundtrack?: (id: string, load: () => Promise<Blob>, level: TrackLevel) => Promise<void>;
     play: (c: Channel) => Promise<void>;
+    playGroup?: (channels: Channel[]) => Promise<void>;
     pause: (id: string) => void;
     resume: (id: string) => Promise<void>;
     snapshot: () => {
@@ -48,6 +50,7 @@ export class QueuePlayer {
     private timer?: ReturnType<typeof setInterval>;
     private generation = 0;
     private ids: string[] = [];
+    private accompanimentIds: string[] = [];
     private seen = false;
     private loading = false;
     private needsLaunch = false;
@@ -82,6 +85,7 @@ export class QueuePlayer {
             this.audio.stopAll();
         });
         this.ids = [];
+        this.accompanimentIds = [];
     }
     async start(items: PlayItem[], name: string) { if (!items.length)
         throw Error("Choose a saved item to play."); this.halt(); this.update({ items: structuredClone(items), name, index: 0, status: "playing", elapsed: 0, error: "" }); await this.launch(); }
@@ -89,8 +93,11 @@ export class QueuePlayer {
         const channels = item.session.sequenceGap === undefined
             ? item.session.channels : [item.session.channels[this.stage]];
         this.ids = channels.map((_, index) => "queue:" + token + ":" + this.stage + ":" + index);
-        await Promise.all(channels.map((channel, index) =>
-            this.own(() => this.audio.play({ ...channel, id: this.ids[index] }))));
+        const voices = channels.map((channel, index) => ({ ...channel, id: this.ids[index] }));
+        if (voices.length > 1 && item.session.kind === "chakras" && this.audio.playGroup)
+            await this.own(() => this.audio.playGroup!(voices));
+        else
+            await Promise.all(voices.map(voice => this.own(() => this.audio.play(voice))));
         if (token !== this.generation) return;
         this.seen = true;
         if (this.state.status === "paused") this.ids.forEach(id => this.audio.pause(id));
@@ -119,7 +126,18 @@ export class QueuePlayer {
             }
             else {
                 this.setOutput(item.session.master);
-                await this.launchStage(item, token);
+                const layers = item.session.additionalLayers ?? [];
+                this.accompanimentIds = layers.map((_, index) => "queue:accompaniment:" + token + ":" + index);
+                await Promise.all([
+                    ...layers.map((accompaniment, index) => this.own(() => this.audio.play({
+                        id: this.accompanimentIds[index], sound: "sine", hz: 432, volume: 0, muted: false,
+                        // The queue stops these layers at the end, including time spent in sequence gaps.
+                        seconds: Math.ceil(sessionDuration(item.session)) + 10, accompaniment,
+                    }))),
+                    this.launchStage(item, token),
+                ]);
+                if (token === this.generation && this.state.status === "paused")
+                    this.accompanimentIds.forEach(id => this.audio.pause(id));
             }
             if (token !== this.generation)
                 return;
@@ -198,7 +216,10 @@ export class QueuePlayer {
         this.seen = false;
         try {
             await this.launchStage(item, token);
-            if (token === this.generation) this.loading = false;
+            if (token === this.generation) {
+                this.loading = false;
+                if (this.state.status === "paused") this.accompanimentIds.forEach(id => this.audio.pause(id));
+            }
         } catch (error) {
             if (token !== this.generation) return;
             this.halt();
@@ -211,6 +232,7 @@ export class QueuePlayer {
             this.gapRemaining = Math.max(.001, this.gapRemaining - (Date.now() - this.gapStarted) / 1000);
         }
         this.update({ status: "paused" });
+        if (!this.loading) this.accompanimentIds.forEach(id => this.audio.pause(id));
         if (this.loading) return;
         this.own(() => {
             if (this.state.items[this.state.index]?.kind === "practice") this.manifest.pause();
@@ -221,10 +243,6 @@ export class QueuePlayer {
         if (this.state.status !== "paused") return;
         this.update({ status: "playing" });
         if (this.loading) return;
-        if (this.gapRemaining > 0) {
-            this.gapStarted = Date.now();
-            return;
-        }
         if (this.needsLaunch) {
             this.needsLaunch = false;
             await this.launch();
@@ -232,7 +250,12 @@ export class QueuePlayer {
         }
 
         const token = this.generation;
+        const inGap = this.gapRemaining > 0;
+        if (inGap) this.gapStarted = Date.now();
         try {
+            if (this.accompanimentIds.length)
+                await Promise.all(this.accompanimentIds.map(id => this.own(() => this.audio.resume(id))));
+            if (token !== this.generation || this.snapshot().status !== "playing" || inGap) return;
             if (this.state.items[this.state.index]?.kind === "practice") {
                 this.own(() => this.manifest.resume());
             } else {

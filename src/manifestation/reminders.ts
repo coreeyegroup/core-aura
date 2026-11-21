@@ -1,3 +1,6 @@
+import { playlistStore } from "../playlists/store";
+import { scheduledChakraName } from "../scheduling/targets";
+import { chakraScheduleTarget } from "../scheduling/recurrence";
 import { Capacitor } from "@capacitor/core";
 import {
   LocalNotifications,
@@ -32,12 +35,13 @@ export function syncPhoneReminders(requestPermission = false): Promise<string> {
     let finiteMonthly = false;
     if (access.display === "granted") {
       for (const rule of reminders.filter(item => item.enabled)) {
-        const plan = plans.find(item => item.id === rule.planId);
-        if (!plan) continue;
+        const chakra = chakraScheduleTarget(rule.planId);
+        const name = chakra ? scheduledChakraName(rule.planId) : plans.find(item => item.id === rule.planId)?.name;
+        if (!name) continue;
         const frequency = scheduleFrequency(rule);
         const add = (id: number, schedule: NonNullable<LocalNotificationSchema["schedule"]>) => notifications.push({
-          id, title: "Manifestation practice", body: plan.name, schedule,
-          extra: { planId: plan.id, scheduleId: rule.id },
+          id, title: chakra ? "Chakra meditation" : "Manifestation practice", body: name, schedule,
+          extra: { planId: rule.planId, scheduleId: rule.id },
         });
         if (rule.oneOff) {
           const at = nextOccurrence(rule, now);
@@ -110,11 +114,12 @@ export function observeReminders(
       const scheduleIds = new Set(reminders.map(rule => rule.id));
       delivered = Object.fromEntries(Object.entries(delivered).filter(([key]) => scheduleIds.has(key.split("|")[0])));
       for (const r of reminders) for (const due of dueOccurrences(r, now)) {
-        const p = plans.find(plan => plan.id === r.planId);
+        const chakra = chakraScheduleTarget(r.planId);
+        const name = chakra ? scheduledChakraName(r.planId) : plans.find(plan => plan.id === r.planId)?.name;
         const slot = r.id + "|" + scheduleClock(due.due);
         if (
           !due ||
-          !p ||
+          !name ||
           (delivered[slot] === due.key || delivered[r.id] === due.key) ||
           remembered.has(due.key)
         )
@@ -130,8 +135,8 @@ export function observeReminders(
         if (stopped) return;
         onDue({
           id: due.key,
-          planId: p.id,
-          name: p.name,
+          planId: r.planId,
+          name,
           time: scheduleClock(due.due),
           autoStart:
             Boolean(r.autoStart) && now.getTime() - due.due.getTime() < 60000,
@@ -147,10 +152,10 @@ export function observeReminders(
             const registration =
               await navigator.serviceWorker.getRegistration();
             if (registration?.active)
-              await registration.showNotification("Manifestation practice", {
-                body: p.name,
+              await registration.showNotification(chakra ? "Chakra meditation" : "Manifestation practice", {
+                body: name,
                 tag: due.key,
-                data: { planId: p.id },
+                data: { planId: r.planId },
                 icon: "/icon-192.png",
               });
           } catch {}
@@ -188,6 +193,10 @@ export function observeReminders(
   document.addEventListener("visibilitychange", visibility);
   const timer = setInterval(() => void tick(), 15000);
   visibility();
+  const unsubscribePlaylists = Capacitor.isNativePlatform() ? playlistStore.subscribe(() => {
+    if (manifestationStore.snapshot().data.reminders.some(rule => chakraScheduleTarget(rule.planId)?.kind === "playlist"))
+      void syncPhoneReminders().catch(() => {});
+  }) : undefined;
   if (Capacitor.isNativePlatform())
     void LocalNotifications.addListener(
       "localNotificationActionPerformed",
@@ -201,6 +210,7 @@ export function observeReminders(
     });
   return () => {
     stopped = true;
+    unsubscribePlaylists?.();
     clearInterval(timer);
     removeEventListener("pageshow", visibility);
     document.removeEventListener("visibilitychange", visibility);
@@ -215,6 +225,7 @@ export async function enableReminders() {
 }
 export function calendarFile(r: Reminder, name: string, now = new Date()) {
   const frequency = scheduleFrequency(r);
+  const chakra = chakraScheduleTarget(r.planId);
   const pad = (n: number) => String(n).padStart(2, "0");
   const local = (d: Date) =>
     d.getFullYear() +
@@ -249,11 +260,11 @@ export function calendarFile(r: Reminder, name: string, now = new Date()) {
       "SUMMARY:" + escape(name),
       "DESCRIPTION:Open Core-aura and tap Play for your saved practice.",
       "URL:" + (typeof location === "undefined" ? "https://core-aura.coreeye.in" : location.origin) +
-        "/?manifestPlan=" + encodeURIComponent(r.planId) + "#manifest",
+        "/?manifestPlan=" + encodeURIComponent(r.planId) + (chakra ? "#chakras" : "#manifest"),
       "BEGIN:VALARM",
       "TRIGGER:PT0M",
       "ACTION:DISPLAY",
-      "DESCRIPTION:Manifestation practice",
+      "DESCRIPTION:" + (chakra ? "Chakra meditation" : "Manifestation practice"),
       "END:VALARM",
       "END:VEVENT",
     ];

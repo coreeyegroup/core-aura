@@ -1,3 +1,5 @@
+import { scheduledChakraName } from "../scheduling/targets";
+import { playlistStore } from "../playlists/store";
 import { manifestationStore as store } from "./store";
 const key = "core-aura.push.v1";
 type Settings = { token: string; enabled: boolean; cleanup?: boolean };
@@ -75,10 +77,10 @@ function rows() {
   return reminders
     .filter((r) => r.enabled)
     .flatMap((r) => {
-      const p = plans.find((p) => p.id === r.planId);
-      return p
+      const name = scheduledChakraName(r.planId) ?? plans.find(plan => plan.id === r.planId)?.name;
+      return name
         ? [{
-          id: r.id, planId: p.id, name: p.name, time: r.time, days: r.days,
+          id: r.id, planId: r.planId, name, time: r.time, days: r.days,
           oneOff: r.oneOff, skipDates: r.skipDates, frequency: r.frequency,
           times: r.times, monthDay: r.monthDay, skipOccurrences: r.skipOccurrences,
         }]
@@ -211,11 +213,13 @@ export function observePushReminders() {
       if (!document.hidden) sync();
     };
   const unsubscribe = store.subscribe(() => void syncPushReminders());
+  const unsubscribePlaylists = playlistStore.subscribe(() => void syncPushReminders());
   addEventListener("online", sync);
   document.addEventListener("visibilitychange", visible);
   sync();
   return () => {
     unsubscribe();
+    unsubscribePlaylists();
     removeEventListener("online", sync);
     document.removeEventListener("visibilitychange", visible);
   };
