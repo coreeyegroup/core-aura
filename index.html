@@ -16,9 +16,24 @@
     <link rel="apple-touch-icon" href="/icon-192.png" />
     <script src="/viewport.js"></script>
     <title>Core-aura</title>
+    <style>
+      .core-aura-launch { max-width: 360px; margin: 12vh auto; padding: 24px; color: #263a32;
+        background: #f6f5ed; border: 1px solid #daded2; border-radius: 16px; font: 16px system-ui; }
+      .core-aura-launch h1 { font: 2rem Georgia, serif; margin: 0 0 8px; }
+      .core-aura-launch a { color: inherit; }
+      @media (prefers-color-scheme: dark) {
+        .core-aura-launch { color: #e9efe8; background: #202d27; border-color: #394b41; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="core-aura-launch">
+        <h1>Core-aura</h1>
+        <p>Opening your listening space…</p>
+        <a href="/update.html">Recover or update the player</a>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

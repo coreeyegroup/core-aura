@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LibraryLayers, type LayerKind } from "../components/LibraryLayers";
 import { sounds, type Accompaniment, type Session } from "../model";
 import type { Track } from "../tracks/storage";
+import { attachMix } from "./background";
 import { BackgroundControls } from "./BackgroundControls";
 import { newPlan, practiceLayerLimit, type Plan } from "./model";
 import { manifestPlayer } from "./player";
@@ -16,26 +17,31 @@ const layerKinds = [
 const percent = (volume: number) => Math.round(volume * 100) + "%";
 const previewPrefix = "preview-practice-layer-";
 
-export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBackgroundChange }: {
+export function PracticeLayers({ plan, sessions, tracks, active, queueActive, onAudioLibrary, onChange, onBackgroundChange }: {
   plan: Plan;
   sessions: Session[];
   tracks: Track[];
   active: boolean;
+  queueActive: boolean;
+  onAudioLibrary: () => void;
   onChange: (patch: Partial<Plan>) => boolean;
   onBackgroundChange: (patch: Partial<Plan>) => void | boolean;
 }) {
-  const [picker, setPicker] = useState<LayerKind>();
+  const [picker, setPicker] = useState<LayerKind | "mix">();
+  const [pending, setPending] = useState<Accompaniment>({});
+  const [mixId, setMixId] = useState("");
+  const availableMixes = sessions.filter(session => session.channels.length <= 8);
   const panel = useRef<HTMLElement>(null);
   const pickerPanel = useRef<HTMLDivElement>(null);
-  const addButtons = useRef<Partial<Record<LayerKind, HTMLButtonElement>>>({});
+  const addButtons = useRef<Partial<Record<LayerKind | "mix", HTMLButtonElement>>>({});
   const lastAdded = useRef<number | null>(null);
   const state = useSyncExternalStore(manifestPlayer.subscribe, manifestPlayer.snapshot);
   const layers = plan.additionalLayers ?? [];
   const canAdd = !active && layers.length < practiceLayerLimit;
 
   useEffect(() => {
-    if (picker && canAdd) pickerPanel.current?.querySelector("select")?.focus();
-  }, [picker, canAdd]);
+    if (picker && (picker === "mix" ? !active : canAdd)) pickerPanel.current?.querySelector("select")?.focus();
+  }, [picker, canAdd, active]);
 
   useEffect(() => {
     if (lastAdded.current === null) return;
@@ -50,8 +56,17 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
   }, []);
 
   function closePicker() {
+    stopPreview("pending");
     if (picker) addButtons.current[picker]?.focus();
     setPicker(undefined);
+  }
+
+  function togglePicker(kind: LayerKind | "mix") {
+    if (picker === kind) { closePicker(); return; }
+    stopPreview("pending");
+    setPending({});
+    setMixId("");
+    setPicker(kind);
   }
 
   function stopPreview(id: string) {
@@ -63,7 +78,7 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
     const playing = selected && (state.status === "playing" || state.status === "paused") && !state.error;
     const label = (playing ? "Stop preview: " : "Test play: ") + description;
     return <button type="button" className="icon-button practice-layer-preview" aria-label={label}
-      title={label} data-layer-preview={id} disabled={active || unavailable}
+      title={label} data-layer-preview={id} disabled={active || queueActive || unavailable}
       onClick={() => {
         if (playing) { stopPreview(id); return; }
         manifestPlayer.preview({
@@ -106,6 +121,11 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
     </div>;
   }
 
+  const selectedMix = availableMixes.find(mix => mix.id === mixId);
+  const selectedTone = (["sine", "bowl", "tanpura"] as const).find(sound => "tone:" + sound === mixId);
+  const selectedBackground = selectedMix ? { background: null, backgroundMix: attachMix(selectedMix) } :
+    selectedTone ? { backgroundMix: null, background: { sound: selectedTone, hz: selectedTone === "tanpura" ? 216 : 432, volume: .12 } } : undefined;
+  const selectedBackgroundName = selectedMix?.name ?? (selectedTone ? sounds[selectedTone].name : "");
   const savedBackground = plan.backgroundMix ?? plan.background;
   const backgroundName = plan.backgroundMix?.name ?? (plan.background && sounds[plan.background.sound].name);
   const backgroundFrequency = plan.background ? " · " + plan.background.hz + " Hz" : "";
@@ -114,21 +134,56 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
     <div className="home-actions practice-layer-actions">
       {layerKinds.map(({ key, action, name }) => <button key={key} type="button"
         ref={node => { if (node) addButtons.current[key] = node; }}
-        disabled={!canAdd || (key === "audio" && !tracks.length)}
+        disabled={!canAdd}
         aria-label={action} aria-expanded={picker === key && canAdd} aria-controls="practice-layer-picker"
-        onClick={() => setPicker(picker === key ? undefined : key)}>
+        onClick={() => togglePicker(key)}>
         <Plus size={15} aria-hidden="true" /> {name}
       </button>)}
+      {!savedBackground && <button type="button" ref={node => { if (node) addButtons.current.mix = node; }}
+        disabled={active} aria-expanded={picker === "mix"} aria-controls="practice-layer-picker"
+        onClick={() => togglePicker("mix")}><Plus size={15} aria-hidden="true" /> Saved mix</button>}
     </div>
-    <div id="practice-layer-picker" ref={pickerPanel} hidden={!picker || !canAdd}>
-      {picker && canAdd && <>
-        <LibraryLayers key={picker} inline only={picker} prefix="New layer" tracks={tracks} disabled={active}
-          onChange={next => {
-            if (!next[picker] || !onChange({ additionalLayers: [...layers, next] })) return;
-            lastAdded.current = layers.length;
-            setPicker(undefined);
-          }} />
-        <button type="button" onClick={closePicker}>Cancel</button>
+    <div id="practice-layer-picker" ref={pickerPanel} hidden={!picker || active || (picker !== "mix" && !canAdd)}>
+      {picker === "mix" && !active && <>
+        <label>Saved mix or tone
+          <select value={mixId} onChange={event => { stopPreview("pending"); setMixId(event.target.value); }}>
+            <option value="">Choose a mix</option>
+            {availableMixes.length > 0 && <optgroup label="Saved mixes">
+              {availableMixes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </optgroup>}
+            <optgroup label="Tones">
+              <option value="tone:sine">Pure tone</option><option value="tone:bowl">Singing bowl</option>
+              <option value="tone:tanpura">Tanpura drone</option>
+            </optgroup>
+          </select>
+        </label>
+        {!availableMixes.length && <p className="content-note">Save a mix in Sounds to add it here.</p>}
+        <div className="home-actions">
+          {selectedBackground && <>
+            {previewButton("pending", selectedBackgroundName, selectedBackground)}
+            <button type="button" className="primary" onClick={() => {
+              if (onChange(selectedBackground)) closePicker();
+            }}>{selectedMix ? "Add mix" : "Add tone"}</button>
+          </>}
+          <button type="button" onClick={closePicker}>Cancel</button>
+        </div>
+      </>}
+      {picker && picker !== "mix" && canAdd && <>
+        {picker === "audio" && !tracks.length ? <p className="content-note">Import audio in Library to add a recording or track.</p> :
+          <LibraryLayers key={picker} inline only={picker} prefix="New layer" tracks={tracks} value={pending}
+            disabled={active} onChange={next => { stopPreview("pending"); setPending(next); }} />}
+        <div className="home-actions">
+          {picker === "audio" && <button type="button" onClick={() => { closePicker(); onAudioLibrary(); }}>Import audio</button>}
+          <button type="button" onClick={closePicker}>Cancel</button>
+          {pending[picker] && <>
+            {previewButton("pending", "new layer", { accompaniment: pending })}
+            <button type="button" className="primary" onClick={() => {
+              if (!onChange({ additionalLayers: [...layers, pending] })) return;
+              lastAdded.current = layers.length;
+              closePicker();
+            }}>Add layer</button>
+          </>}
+        </div>
       </>}
     </div>
     {layerKinds.map(({ key }) => {
@@ -150,17 +205,15 @@ export function PracticeLayers({ plan, sessions, tracks, active, onChange, onBac
               manifestPlayer.snapshot().plan?.id.startsWith(previewPrefix)) manifestPlayer.endPreview();
         });
     })}
-    <div className={savedBackground ? "practice-layer" : "practice-layer unassigned-mix"}>
+    {savedBackground && <div className="practice-layer">
       <BackgroundControls plan={plan} sessions={sessions} active={active} onChange={patch => {
         stopPreview("mix");
         return onBackgroundChange(patch);
-      }} summary={savedBackground
-        ? <span className="practice-layer-copy"><strong>{backgroundName}</strong><small>Background layer{backgroundFrequency} · {percent(savedBackground.volume)}{plan.backgroundMuted ? " · Muted" : ""}</small></span>
-        : "Saved mix or tone"} />
+      }} summary={<span className="practice-layer-copy"><strong>{backgroundName}</strong><small>Background layer{backgroundFrequency} · {percent(savedBackground.volume)}{plan.backgroundMuted ? " · Muted" : ""}</small></span>} />
       {savedBackground && backgroundName && previewButton("mix", backgroundName, {
         background: plan.background, backgroundMix: plan.backgroundMix, backgroundMuted: plan.backgroundMuted,
       })}
-    </div>
+    </div>}
     {state.plan?.id.startsWith(previewPrefix) && state.error && <p role="status">{state.error}</p>}
   </section>;
 }

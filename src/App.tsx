@@ -300,6 +300,14 @@ export default function App() {
   useEffect(()=>observeHistory(),[]);
   const [master, setMaster] = useState(workspace.data?.master ?? 0.5);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [homePlaylist, setHomePlaylist] = useState(() => {
+    try { return localStorage.getItem("core-aura.home-playlist") ?? ""; }
+    catch { return ""; }
+  });
+  function selectHomePlaylist(id: string) {
+    setHomePlaylist(id);
+    try { localStorage.setItem("core-aura.home-playlist", id); } catch {}
+  }
   const [openedSoundName,setOpenedSoundName]=useState("");
   const [natureSessionToLoad,setNatureSessionToLoad] = useState<Session>();
   const [starred, setStarred] = useState<Sound[]>(favorites);
@@ -1031,6 +1039,8 @@ export default function App() {
         {tab === "home" && (
           <Dashboard>
             <HomeControls
+              playlistId={homePlaylist}
+              onPlaylistChange={selectHomePlaylist}
               sessions={sessions}
               tracks={localTracks}
               onPractice={openManifest}
@@ -1062,18 +1072,18 @@ export default function App() {
             initialView={manifestSection}
             onView={(view) => navigate("manifest", { manifestSection: view })}
             onLibrary={() => openTool("affirmations")}
+            onAudioLibrary={() => navigate("library", { libraryView: "audio", librarySection: "all" })}
+            onListen={id => { selectHomePlaylist(id); navigate("home"); }}
             onOpenPractice={openManifest}
             onPlaylists={() => navigate("library", { librarySection: "playlists" })}
           />
         )}
         {(tab === "explore" || tab === "studio") && (
-          <div className="segmented" aria-label="Sound workspace">
-            <button
-              aria-pressed={tab === "explore" && (exploreView === "sounds" || exploreView === "nature")}
-              onClick={() => navigate("explore", { exploreView: "sounds" })}
-            >
-              Explore
-            </button>
+          <div className="segmented sound-workspace-nav" aria-label="Sound workspace">
+            <button aria-pressed={tab === "explore" && exploreView === "nature"}
+              onClick={() => navigate("explore", { exploreView: "nature" })}>Nature</button>
+            <button aria-pressed={tab === "explore" && exploreView === "sounds"}
+              onClick={() => navigate("explore", { exploreView: "sounds" })}>Catalog</button>
             <button
               aria-pressed={tab === "studio"}
               onClick={() => navigate("studio")}
@@ -1096,16 +1106,6 @@ export default function App() {
               </p>}
             </div>
             </>}
-            {(exploreView === "sounds" || exploreView === "nature") && <div className="segmented" aria-label="Explore collection">
-              <button
-                aria-pressed={exploreView === "sounds"}
-                onClick={() => navigate("explore", { exploreView: "sounds" })}
-              >
-                Sounds
-              </button>
-
-              <button aria-pressed={exploreView === "nature"} onClick={()=>navigate("explore",{exploreView:"nature"})}>Nature library</button>
-            </div>}
             {exploreView === "tracks" ? <SoundTracks defaultOpen/> : exploreView === "packs" ? (
               <PacksPanel online={online} />
             ) : exploreView === "nature" ? (

@@ -8,7 +8,10 @@ if [[ $# -gt 2 || ( $# -eq 2 && $2 != --android ) ]]; then
 fi
 health=$(curl -fsS --max-time 15 "$origin/health.json")
 python3 -c 'import json,sys; h=json.load(sys.stdin); sys.exit(0 if h.get("status")=="ok" and h.get("version")==sys.argv[1] else "Unexpected health or version")' "$expected" <<< "$health"
-echo "Verified Core-aura $expected at $origin"
+page=$(curl -fsS --max-time 15 "$origin/")
+entry=$(python3 -c 'import re,sys; match=re.search(r"<script\b[^>]*\bsrc=\"(/assets/[A-Za-z0-9_.-]+\.js)\"", sys.stdin.read()); print(match[1] if match else ""); sys.exit(0 if match else "App entry script is missing")' <<< "$page")
+curl -fsS --max-time 20 "$origin$entry" -o /dev/null
+echo "Verified Core-aura $expected and app entry at $origin"
 if [[ ${2:-} == --android ]]; then
   manifest=$(curl -fsS --max-time 15 "$origin/android/latest.json")
   url=$(python3 -c '

@@ -1,11 +1,13 @@
-import { verifyPractice } from "../playlists/readiness";
-import { confirmSourceDeletion } from "../playlists/store";
+import { playbackReadiness, usePlaybackInventory, verifyPractice } from "../playlists/readiness";
+import { resolveItems } from "../playlists/model";
+import { confirmSourceDeletion, playlistStore } from "../playlists/store";
 import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
 import {Presets} from "../workbench/Presets";
 import {HistoryPanel} from "../workbench/HistoryPanel";
 import type { Track } from "../tracks/storage";
 import { PracticeLayers } from "./PracticeLayers";
+import { AffirmationPicker } from "./AffirmationPicker";
 import { Session } from "../model";
 import { Download, Ellipsis, Mic, Pause, Pencil, Play, Plus, Square, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
@@ -16,7 +18,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { confirmDraftReplacement, isPreview, practiceActive } from "./flow";
+import { confirmDraftReplacement, draftChanged, isPreview, practiceActive } from "./flow";
 import { affirmationLibrary } from "./library";
 import { LibraryEditor, EditLibrary } from "./LibraryEditor";
 import { manifestationStore as store } from "./store";
@@ -88,6 +90,8 @@ function NumberField({
 export function Manifestation({
   queueActive = false,
   onLibrary,
+  onAudioLibrary,
+  onListen,
   onOpenPractice,
   onPlaylists,
   sessions = [],
@@ -96,6 +100,8 @@ export function Manifestation({
   onView,
 }: {
   onLibrary: () => void;
+  onAudioLibrary: () => void;
+  onListen: (playlistId: string) => void;
   onOpenPractice: (id: string) => void;
   onPlaylists: () => void;
   sessions?: Session[];
@@ -127,6 +133,12 @@ export function Manifestation({
   const [selectedLines,setSelectedLines]=useState<string[]>([]);
   const [selectSentences, setSelectSentences] = useState(false);
   const [writeAffirmation, setWriteAffirmation] = useState(false);
+  const [choosingAffirmations, setChoosingAffirmations] = useState(false);
+  const [playlistTarget, setPlaylistTarget] = useState("");
+  const [playlistName, setPlaylistName] = useState("");
+  const [addedPlaylist, setAddedPlaylist] = useState<{ id: string; name: string }>();
+  const { data: playlists, error: playlistError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
+  const { inventory, online } = usePlaybackInventory();
   const dock = useRef<HTMLElement>(null);
   useEffect(() => {
     const element = dock.current;
@@ -148,6 +160,11 @@ export function Manifestation({
   useEffect(() => {
     setSelectSentences(false);
     setSelectedLines([]);
+    setChoosingAffirmations(false);
+    setWriteAffirmation(false);
+    setAddedPlaylist(undefined);
+    setPlaylistTarget("");
+    setPlaylistName("");
   }, [p.id]);
   function composer(value: string) {
     setCustom(value);
@@ -188,6 +205,65 @@ export function Manifestation({
     }
   }
   const canPlay = hasPracticeContent(p);
+  let readiness: ReturnType<typeof playbackReadiness> | undefined;
+  if (!active && canPlay && p.name.trim()) {
+    try {
+      readiness = playbackReadiness(resolveItems([{ kind: "practice", id: p.id }], [p], sessions, tracks), inventory);
+    } catch (error) {
+      readiness = { status: "repair", message: (error as Error).message };
+    }
+  }
+  const savedPractice = data.plans.find(plan => plan.id === p.id);
+  const unsaved = active || !savedPractice || draftChanged(p, data.plans);
+  const needsRepair = readiness?.status === "repair";
+  const offlineBlocked = !online && readiness?.status === "connection";
+  const pickerAvailable = !active && !queueActive;
+  const auditionId = "preview-audition-" + p.id.slice(0, 80);
+  const auditioning = state.plan?.id === auditionId && state.status === "playing";
+  const auditionRequest = useRef(0);
+  const [checkingAudition, setCheckingAudition] = useState(false);
+  useEffect(() => () => {
+    auditionRequest.current++;
+    if (manifestPlayer.snapshot().plan?.id === auditionId) manifestPlayer.endPreview();
+  }, [auditionId, view]);
+  async function audition() {
+    if (auditioning) { manifestPlayer.endPreview(); return; }
+    const request = ++auditionRequest.current;
+    setCheckingAudition(true);
+    setMessage("");
+    try {
+      await verifyPractice(p);
+      if (request !== auditionRequest.current) return;
+      manifestPlayer.preview({ ...p, id: auditionId, seconds: Math.min(p.seconds, 60), repeats: 1,
+        lines: p.lines.slice(0, 1) });
+    } catch (error) {
+      if (request === auditionRequest.current) setMessage((error as Error).message);
+    } finally {
+      setCheckingAudition(false);
+    }
+  }
+  function addToPlaylist(event: FormEvent) {
+    event.preventDefault();
+    if (unsaved || !savedPractice) return;
+    try {
+      const currentLists = playlistStore.snapshot().data.playlists;
+      const existing = currentLists.find(item => item.id === playlistTarget);
+      if (playlistTarget && !existing) throw Error("Choose an available playlist.");
+      if (existing?.items.some(item => item.kind === "practice" && item.id === savedPractice.id)) {
+        setAddedPlaylist(existing);
+        setMessage("This practice is already in “" + existing.name + "”.");
+        return;
+      }
+      const target = existing ?? { id: crypto.randomUUID(), name: playlistName.trim(), items: [] };
+      playlistStore.save({ ...target, items: [...target.items, { kind: "practice", id: savedPractice.id }] });
+      setAddedPlaylist(target);
+      setPlaylistTarget(target.id);
+      setPlaylistName("");
+      setMessage("Practice added to “" + target.name + "”.");
+    } catch (error) {
+      setMessage((error as Error).message);
+    }
+  }
   const current =
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
@@ -311,7 +387,7 @@ export function Manifestation({
                       }}>{selectSentences ? "Done" : "Select sentences"}</button>}
                   </div>
                   <div className="practice-source-actions">
-                    <button disabled={active || p.lines.length >= 50} onClick={onLibrary}>Choose affirmations</button>
+                    <button disabled={!pickerAvailable || p.lines.length >= 50} onClick={() => setChoosingAffirmations(true)}>Choose affirmations</button>
                     <button type="button" aria-expanded={writeAffirmation} aria-controls="practice-composer"
                       disabled={active || p.lines.length >= 50} onClick={() => setWriteAffirmation(!writeAffirmation)}>
                       Write your own affirmation
@@ -492,13 +568,29 @@ export function Manifestation({
                 </details>
               </section>
               <PracticeLayers key={p.id} plan={p} sessions={sessions} tracks={tracks} active={active}
-                onChange={change} onBackgroundChange={patch => {
+                onAudioLibrary={onAudioLibrary} queueActive={queueActive} onChange={change} onBackgroundChange={patch => {
                   try {
                     if (active) manifestPlayer.updateBackground(patch);
                     else return change(patch);
                   }
                   catch (error) { setMessage((error as Error).message); return false; }
                 }} />
+              {canPlay && <div className="practice-review" aria-label="Playback review">
+                <div>
+                  <strong>Playback review</strong>
+                  <small>{p.mode === "read" && p.lines.length ? "Silent reading" : p.lines.length ? "Spoken affirmations" : "Audio and sound layers"}
+                    {" · "}{p.seconds / 60} min maximum</small>
+                </div>
+                <button type="button" disabled={!pickerAvailable || needsRepair || offlineBlocked || !p.name.trim() || checkingAudition}
+                  onClick={() => void audition()}>
+                  {auditioning ? <Square size={14} aria-hidden="true" /> : <Play size={15} aria-hidden="true" />}
+                  {auditioning ? "Stop audition" : checkingAudition ? "Checking audio…" : "Audition practice"}
+                </button>
+                {state.plan?.id === auditionId && state.error && <p role="status">{state.error}</p>}
+                {p.mode === "read" && p.lines.some(line => line.audioAffirmation) &&
+                  <p className="content-note">Silent reading skips recorded affirmations. Choose Spoken voice to hear them.</p>}
+                {readiness && <p className="content-note" role={needsRepair || offlineBlocked ? "status" : undefined}>{readiness.message}</p>}
+              </div>}
               <div className="practice-footer">
                 <button
                   className="primary"
@@ -514,6 +606,26 @@ export function Manifestation({
                 >
                   Save practice
                 </button>
+                <details className="practice-more">
+                  <summary>Playlist</summary>
+                  {unsaved ? <p className="content-note">Save this practice before adding it.</p> :
+                    <form className="playlist-add-practice" onSubmit={addToPlaylist}>
+                      <label>Playlist
+                        <select value={playlistTarget} onChange={event => { setPlaylistTarget(event.target.value); setAddedPlaylist(undefined); }}>
+                          <option value="">Create a playlist</option>
+                          {playlists.playlists.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      </label>
+                      {!playlistTarget && <label>Playlist name
+                        <input required maxLength={80} value={playlistName} onChange={event => setPlaylistName(event.target.value)} />
+                      </label>}
+                      <div className="home-actions">
+                        <button type="submit" disabled={Boolean(playlistError) || (!playlistTarget && !playlistName.trim())}>Add to playlist</button>
+                        {addedPlaylist && <button type="button" onClick={() => onListen(addedPlaylist.id)}>Open on Home</button>}
+                      </div>
+                      {playlistError && <p role="status">{playlistError}</p>}
+                    </form>}
+                </details>
                 <details className="practice-more">
                   <summary>More practice actions</summary>
                   <div className="home-actions">
@@ -543,6 +655,17 @@ export function Manifestation({
           }}
         />
       )}
+      {view === "practice" && choosingAffirmations && pickerAvailable && <AffirmationPicker
+        lines={p.lines} onClose={() => setChoosingAffirmations(false)} onManage={onLibrary}
+        onAdd={items => {
+          const ids = new Set(p.lines.map(line => line.id));
+          const selected = items.map(line => {
+            const id = ids.has(line.id) ? crypto.randomUUID() : line.id;
+            ids.add(id);
+            return { ...line, id };
+          });
+          return change({ lines: [...p.lines, ...selected] });
+        }} />}
       {recordLine && (
         <RecordSentence
           line={recordLine}
@@ -572,7 +695,7 @@ export function Manifestation({
         <div className="transport">
           <button
             className="primary"
-            disabled={(!canPlay || !p.name.trim()) && !active}
+            disabled={(!canPlay || !p.name.trim() || needsRepair || offlineBlocked) && !active}
             onClick={start}
           >
             {active && state.status === "playing" ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
@@ -1115,7 +1238,7 @@ function Schedules({ onCreate }: { onCreate: () => void }) {
               checked={autoStart}
               onChange={(e) => setAutoStart(e.target.checked)}
             />
-            <span>Auto-start while this app is visible and idle</span>
+            <span>Auto-play while the app is open and idle</span>
           </label>
           <p className="content-note">
             Automatic start does not interrupt other audio or unsaved edits.

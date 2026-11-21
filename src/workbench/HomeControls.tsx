@@ -14,6 +14,8 @@ import { playbackReadiness, usePlaybackInventory, type Readiness } from "../play
 import { queuePlayer, startQueue } from "../playlists/runtime";
 
 type Props = {
+  playlistId: string;
+  onPlaylistChange: (id: string) => void;
   sessions: Session[];
   tracks: Track[];
   onPractice: (id: string) => unknown;
@@ -81,7 +83,7 @@ function SavedPicker({ id, name, choices, selectedId, onSelect, onPlay, onEdit }
   );
 }
 
-export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools, onDownloads }: Props) {
+export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, tools, onDownloads, playlistId, onPlaylistChange }: Props) {
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
   const { data: lists, error: listError } = useSyncExternalStore(playlistStore.subscribe, playlistStore.snapshot);
   const { value: prefs, error } = useSyncExternalStore(preferences.subscribe, preferences.snapshot);
@@ -90,7 +92,6 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
   const [practiceId, setPracticeId] = useState("");
   const [soundId, setSoundId] = useState("");
   const [chakraId, setChakraId] = useState("");
-  const [playlistId, setPlaylistId] = useState("");
   const [message, setMessage] = useState("");
   const [now, setNow] = useState(() => new Date());
 
@@ -250,7 +251,7 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
               onClick={() => void play(playlist.items, playlist.name)}>
               <Play size={16} aria-hidden="true" /> Play playlist
             </button>
-            <select aria-label="Home playlist" value={playlist.id} onChange={(event) => setPlaylistId(event.target.value)}>
+            <select aria-label="Home playlist" value={playlist.id} onChange={(event) => onPlaylistChange(event.target.value)}>
               {lists.playlists.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </div>
@@ -273,8 +274,25 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
         </section>
       )}
 
-      <section className="home-saved" aria-labelledby="home-saved-title">
-        <h2 id="home-saved-title">Saved sessions</h2>
+      {playlist && (
+        <section className="home-queue-card" aria-label="In this playlist">
+          <h2>In this playlist</h2>
+          <ol>
+            {playlistEntries?.map((item, index) => <li key={index}>
+              <strong>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</strong>
+              <small>{!item ? "Replace in Library" : "title" in item ? "Audio file" : "channels" in item
+                ? item.kind === "chakras" ? "Chakra session" : "Sound mix" : "Manifestation"}</small>
+            </li>)}
+          </ol>
+          <button className="text-button" onClick={() => onOpen("library")}>
+            Manage playlists <ArrowRight size={14} aria-hidden="true" />
+          </button>
+        </section>
+      )}
+
+      <details className="home-saved-drawer">
+        <summary>Saved sessions and tools</summary>
+        <div className="home-saved">
         {prefs.order.map((id) => {
           const { icon: Icon, title } = sections[id];
           const collapsed = prefs.collapsed.includes(id);
@@ -296,23 +314,8 @@ export function HomeControls({ sessions, tracks, onPractice, onSession, onOpen, 
             </details>
           );
         })}
-      </section>
-      {playlist && (
-        <section className="home-queue-card" aria-label="In this playlist">
-          <h2>In this playlist</h2>
-          <ol>
-            {playlistEntries?.map((item, index) => <li key={index}>
-              <strong>{(item && ("title" in item ? item.title : item.name)) || "Unavailable item"}</strong>
-              <small>{!item ? "Replace in Library" : "title" in item ? "Audio file" : "channels" in item
-                ? item.kind === "chakras" ? "Chakra session" : "Sound mix" : "Manifestation"}</small>
-            </li>)}
-          </ol>
-          <button className="text-button" onClick={() => onOpen("library")}>
-            Manage playlists <ArrowRight size={14} aria-hidden="true" />
-          </button>
-        </section>
-      )}
-
+        </div>
+      </details>
       <section className="home-offline-card" aria-label="Offline library">
         <h2>Offline library</h2>
         <button className="text-button" onClick={onDownloads}><Download size={16} aria-hidden="true" /> View downloads</button>

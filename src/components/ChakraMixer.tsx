@@ -64,6 +64,7 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
       </div>
       <p className="content-note">Stop the channels to change sound or timer. Selection changes apply on the next group Play. Group Stop reaches every chakra.</p>
     </details>
+    <SequenceSetup showTransport={false} channels={channels.filter(c=>target==="all"||selected.includes(c.id))}/>
     <div className="chakra-list chakra-console">
       {chakras.map((c,index)=>{
         const value=channels.find(row=>row.id===c.id)!;
@@ -93,7 +94,6 @@ export function ChakraMixer({ channels, states, selected, target, seconds, maste
         </article>;
       })}
     </div>
-    <SequenceSetup showTransport={false} channels={channels.filter(c=>target==="all"||selected.includes(c.id))}/>
     <details className="info-panel"><summary>About these frequencies</summary><p>396, 417, 528, 639, 741, 852 and 963 Hz use a modern Solfeggio meditation mapping. These are spiritual listening associations, not established medical treatment frequencies. A pure tone contains one frequency; instruments include harmonics or resonant partials. Start at a comfortable low volume.</p></details>
   </section>;
 }

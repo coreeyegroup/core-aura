@@ -48,7 +48,20 @@ self.addEventListener('notificationclick',event=>{
 self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(event.request.method!=='GET'||url.origin!==self.location.origin||!assets.includes(url.pathname)) return;
-  event.respondWith(caches.open(key).then(async cache=>await cache.match(url.pathname)||fetch(event.request)));
+  event.respondWith(caches.open(key).then(async cache=>{
+    if(event.request.mode==='navigate') {
+      try {
+        const response=await fetch(event.request,{cache:'no-cache'});
+        if(response.ok) return response;
+        return (await cache.match(url.pathname)) || response;
+      } catch(error) {
+        const fallback=await cache.match(url.pathname);
+        if(fallback) return fallback;
+        throw error;
+      }
+    }
+    return (await cache.match(url.pathname)) || fetch(event.request);
+  }));
 });
 `;
 await writeFile("dist/sw.js", worker);
