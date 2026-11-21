@@ -80,6 +80,18 @@ export function createGroupVoice(channel, index, count) {
     headroom: Math.max(0.58, 1 / Math.sqrt(count)),
   };
 }
+export function groupVoiceVolume(voice, voices) {
+  if (voice.headroom === undefined || voice.muted || voice.volume === 0) return voice.volume;
+  let neighbourLevel = 0;
+  for (const neighbour of voices) {
+    if (neighbour.headroom === undefined || neighbour.muted || neighbour.status !== "playing") continue;
+    const gap = voice.hz - neighbour.hz;
+    if (gap > 0 && gap <= 30 && gap <= neighbour.hz * .08)
+      neighbourLevel = Math.max(neighbourLevel, neighbour.volume);
+  }
+  // Keep the lower pitch as the anchor when a close pair beats, with both frequencies unchanged.
+  return voice.volume - .55 * Math.min(voice.volume, neighbourLevel);
+}
 function partials(phase, hz, rate, modes, age = 0) {
   let result = 0;
   for (const [ratio, level, decay] of modes) {

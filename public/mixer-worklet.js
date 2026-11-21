@@ -1,4 +1,4 @@
-import { createGroupVoice, createState, sample } from "./dsp.js";
+import { createGroupVoice, createState, groupVoiceVolume, sample } from "./dsp.js";
 class CoreAuraMixer extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -34,13 +34,18 @@ class CoreAuraMixer extends AudioWorkletProcessor {
     const [out, right] = outputs[0];
     if (!out) return true;
     let weight = 0;
-    for (const c of this.channels.values()) weight += c.muted || c.status === "paused" ? 0 : c.volume;
+    for (const c of this.channels.values()) {
+      weight += c.muted || c.status === "paused" ? 0 : c.volume;
+      c.targetGain = groupVoiceVolume(c, this.channels.values());
+    }
+    const smoothing = Math.min(1, 1 / (sampleRate * .04));
     const scale = (this.master * 0.65) / Math.max(1, weight);
     for (let i = 0; i < out.length; i++) {
       let leftSum = 0, rightSum = 0;
       for (const c of this.channels.values()) {
         const value = sample(c, sampleRate);
-        c.mixGain = (c.mixGain ?? c.volume) + (c.volume - (c.mixGain ?? c.volume)) * Math.min(1, 1 / (sampleRate * .04));
+        c.mixGain ??= c.targetGain;
+        c.mixGain += (c.targetGain - c.mixGain) * smoothing;
         if (!c.muted) {
           const level = value * c.mixGain * (c.headroom ?? 1);
           leftSum += level * (c.left ?? 1);

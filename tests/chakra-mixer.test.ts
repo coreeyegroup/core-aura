@@ -52,3 +52,51 @@ it("starts the seven frequencies on one clock and softens a layered strike", asy
   expect(groupPeak).toBeGreaterThan(0);
   expect(groupPeak).toBeLessThan(plainPeak * .7);
 });
+
+it("keeps Sacral at 417 Hz and softens its beat against Root in Together playback", async () => {
+  let Mixer: any;
+  const rate = 48000;
+  vi.resetModules();
+  vi.stubGlobal("sampleRate", rate);
+  vi.stubGlobal("AudioWorkletProcessor", class {
+    port = { onmessage: undefined as any, postMessage: vi.fn() };
+  });
+  vi.stubGlobal("registerProcessor", (_: string, processor: unknown) => { Mixer = processor; });
+  try {
+    // @ts-expect-error Shared browser worklet.
+    await import("../public/mixer-worklet.js");
+    const mixer = new Mixer();
+    const send = (data: unknown) => mixer.port.onmessage({ data });
+    send({ type: "start-group", channels: chakras.map(({ id, hz }) => ({
+      id, hz, sound: "sine", volume: .25, muted: false, seconds: 6,
+    })) });
+    const renderSecond = () => {
+      const samples = new Float32Array(rate);
+      for (let start = 0; start < rate; start += 128)
+        mixer.process([], [[samples.subarray(start, start + 128)]]);
+      return samples;
+    };
+    const magnitude = (samples: Float32Array, hz: number) => {
+      let sine = 0, cosine = 0;
+      samples.forEach((value, i) => {
+        const angle = 2 * Math.PI * hz * i / rate;
+        sine += value * Math.sin(angle);
+        cosine += value * Math.cos(angle);
+      });
+      return Math.hypot(sine, cosine);
+    };
+    renderSecond(); // Let the shared fade-in settle.
+    const together = renderSecond();
+    const balance = magnitude(together, 417) / magnitude(together, 396);
+    expect(balance).toBeGreaterThan(.25);
+    expect(balance).toBeLessThan(.55);
+    send({ type: "patch", id: "root", patch: { muted: true } });
+    renderSecond();
+    const withoutRoot = renderSecond();
+    const restored = magnitude(withoutRoot, 417) / magnitude(withoutRoot, 528);
+    expect(restored).toBeGreaterThan(.9);
+    expect(restored).toBeLessThan(1.1);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
