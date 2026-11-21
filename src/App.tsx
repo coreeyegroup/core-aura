@@ -31,6 +31,9 @@ import {
   ArrowRight,
   WifiOff,
   Sparkles,
+  Play,
+  Pause,
+  Square,
 } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import { deliverFile, cleanupExports, fileSharing } from "./files/deliver";
@@ -886,9 +889,7 @@ export default function App() {
         }
       >
         {practiceBusy
-          ? isPreview(practice)
-            ? "Sentence preview"
-            : practice.plan?.name
+          ? practice.plan?.name
           : ["playing","paused"].includes(sequence.status)?"Chakra sequence · "+(sequence.index+1)+"/"+sequence.channels.length
           : soundStates.some((s) => s.id.startsWith("nature:"))
             ? "Nature mix"
@@ -915,6 +916,9 @@ export default function App() {
             : void toggleSoundPlayback()
         }
       >
+        {(practiceBusy ? practice.status === "playing" : playingSounds)
+          ? <Pause size={16} aria-hidden="true" />
+          : <Play size={16} aria-hidden="true" />}
         {practiceBusy
           ? practice.status === "playing"
             ? "Pause practice"
@@ -929,9 +933,9 @@ export default function App() {
           engine.stopAll();
         }}
       >
-        {practiceBusy ? "Stop practice" : "Stop all"}
+        <Square size={14} aria-hidden="true" /> {practiceBusy ? "Stop practice" : "Stop all"}
       </button>
-      {tab !== "library" && <details className="global-levels"><summary>Levels</summary><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Player sound output" type="range" min="0" max="100" value={master*100} onChange={e=>setMaster(Number(e.target.value)/100)}/></label>{practiceBusy&&practice.plan&&<><label className="range-label">Voice · next sentence <output>{Math.round(practice.plan.volume*100)}%</output><input aria-label="Player voice level" type="range" min="0" max="100" value={practice.plan.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><BackgroundControls plan={practice.plan} sessions={sessions} active onChange={patch=>manifestPlayer.updateBackground(patch)}/></>}<p className="content-note">{soundStates.length} sound sources · Open player for individual controls.</p><button onClick={()=>{manifestPlayer.stop();engine.stopAll();}}>Stop all audio</button></details>}
+      {tab !== "library" && <details className="global-levels"><summary>Levels</summary><label className="range-label">Sound output <output>{Math.round(master*100)}%</output><input aria-label="Player sound output" type="range" min="0" max="100" value={master*100} onChange={e=>setMaster(Number(e.target.value)/100)}/></label>{practiceBusy&&practice.plan&&<><label className="range-label">Voice · next sentence <output>{Math.round(practice.plan.volume*100)}%</output><input aria-label="Player voice level" type="range" min="0" max="100" value={practice.plan.volume*100} onChange={e=>manifestPlayer.setVoiceLevel(Number(e.target.value)/100)}/></label><BackgroundControls plan={practice.plan} sessions={sessions} active onChange={patch=>manifestPlayer.updateBackground(patch)}/></>}<p className="content-note">{soundStates.length} sound sources · Open player for individual controls.</p><button onClick={()=>{manifestPlayer.stop();engine.stopAll();}}><Square size={14} aria-hidden="true" /> Stop all audio</button></details>}
     </div>
   );
   const natureLibrary = (
@@ -1060,7 +1064,6 @@ export default function App() {
             onLibrary={() => openTool("affirmations")}
             onOpenPractice={openManifest}
             onPlaylists={() => navigate("library", { librarySection: "playlists" })}
-            onBackgrounds={() => navigate("library", { libraryView: "backgrounds", librarySection: "all" })}
           />
         )}
         {(tab === "explore" || tab === "studio") && (
@@ -1800,7 +1803,7 @@ export default function App() {
                 setUpdateStatus("All audio stopped.");
               }}
             >
-              Stop all audio
+              <Square size={14} aria-hidden="true" /> Stop all audio
             </button>
             <details className="info-panel">
               <summary>Display information</summary>

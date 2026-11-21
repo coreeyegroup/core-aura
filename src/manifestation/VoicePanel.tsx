@@ -68,9 +68,9 @@ export function VoicePanel() {
   const visible = voices.filter((v) => !language || v.lang === language),
     selected = voices.find((v) => v.voiceURI === p.voice);
   return (
-    <details className="voice-panel" aria-label="Voice and playback">
+    <details className="voice-panel">
       <summary>
-        Voice &amp; playback{" "}
+        Voice settings{" "}
         <span className="voice-summary-note">
           {selected?.name || "Device default"}
         </span>
@@ -153,7 +153,7 @@ export function VoicePanel() {
         </p>
       )}
       <details>
-        <summary>Voice settings &amp; recordings</summary>
+        <summary>Speed, volume and recordings</summary>
         <fieldset disabled={active}>
           <label className="check">
             <input

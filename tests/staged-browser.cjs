@@ -366,15 +366,34 @@ function testAudio(name) {
     assert.equal(await starters.count(), 0);
     await page.getByRole("button", { name: "New practice", exact: true }).click();
     await page.getByRole("textbox", { name: "Practice name" }).fill("Rain without narration");
+    assert.deepEqual(await page.locator(".practice-editor h2, .practice-editor h3").allTextContents(), [
+      "2. Sentences or audio 0/50", "2.1 Choose from library", "2.2 Playback options", "3. Audio, sounds and backgrounds",
+    ]);
+    assert.equal(await page.getByRole("button", { name: "Manage background library", exact: true }).count(), 0);
     await page.getByRole("button", { name: "Add background", exact: true }).click();
-    await page.getByLabel("Layer 1 background sound", { exact: true }).selectOption("stream");
+    await page.getByLabel("New layer background sound", { exact: true }).selectOption("stream");
+    assert.equal(await page.locator("#practice-layer-picker").isVisible(), false);
+    await page.getByText("Gentle stream · 1000 Hz filter · 20%", { exact: true }).waitFor();
+    assert.equal(await page.getByLabel("Layer 1 background sound", { exact: true }).isVisible(), false);
     await page.getByRole("button", { name: "Add sound", exact: true }).click();
-    await page.getByLabel("Layer 2 extra sound", { exact: true }).selectOption("sine");
+    await page.getByLabel("New layer extra sound", { exact: true }).selectOption("sine");
+    const toneRow = page.locator(".practice-layer").filter({ hasText: "Pure tone" });
+    await toneRow.locator("summary").click();
     const layerFrequency = page.getByLabel("Layer 2 extra sound frequency (Hz)", { exact: true });
     await layerFrequency.fill("528");
     await layerFrequency.press("Tab");
+    await toneRow.locator("summary").click();
+    const layerPreview = toneRow.getByRole("button", { name: /^Test play:/ });
+    assert.equal(await layerPreview.isVisible(), true);
+    await layerPreview.click();
+    await toneRow.getByRole("button", { name: /^Stop preview:/ }).click();
+    await layerPreview.waitFor();
     await page.getByRole("button", { name: "Add audio", exact: true }).click();
-    await page.getByLabel("Layer 3 audio file", { exact: true }).selectOption({ label: "Ambient layer" });
+    await page.getByLabel("New layer audio file", { exact: true }).selectOption({ label: "Ambient layer" });
+    await page.getByRole("button", { name: "Test play: Ambient layer", exact: true }).click();
+    await page.waitForFunction(() => window.testMediaElements.some(audio => audio.loop && !audio.paused));
+    await page.getByRole("button", { name: "Stop preview: Ambient layer", exact: true }).click();
+    await page.waitForFunction(() => window.testMediaElements.every(audio => audio.paused));
     await page.getByRole("button", { name: "Save practice", exact: true }).click();
     const practiceData = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")));
     const layeredPractice = practiceData.plans.find(plan => plan.name === "Rain without narration");
@@ -388,7 +407,8 @@ function testAudio(name) {
     await page.goto(origin + "/#library/practices");
     const layeredCard = page.locator(".saved-card").filter({ has: page.getByRole("heading", { name: "Rain without narration", exact: true }) });
     await layeredCard.getByRole("button", { name: "Edit practice", exact: true }).click();
-    await page.getByRole("button", { name: "Remove layer", exact: true }).last().click();
+    await page.locator(".practice-layer").filter({ hasText: "Ambient layer" }).locator("summary").click();
+    await page.getByRole("button", { name: "Remove layer", exact: true }).click();
     await page.getByRole("button", { name: "Save practice", exact: true }).click();
     await page.goto(origin + "/#library/practices");
     const updated = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")).plans.find(plan => plan.name === "Rain without narration"));
@@ -452,9 +472,23 @@ function testAudio(name) {
     const practiceCard = page.locator(".saved-card").filter({ has: page.getByRole("heading", {name:"Saved practice", exact:true}) });
     await practiceCard.getByRole("button", { name: "Edit practice", exact: true }).click();
     await page.getByRole("button", { name: "Add sound", exact: true }).click();
+    await page.getByLabel("New layer extra sound", { exact: true }).selectOption("bell");
     await page.getByRole("button", { name: "Add background", exact: true }).click();
+    await page.getByLabel("New layer background sound", { exact: true }).selectOption("rain");
     await page.getByRole("button", { name: "Add audio", exact: true }).click();
-    await page.getByLabel("Layer 3 audio file", { exact: true }).selectOption({label: "Ambient layer"});
+    await page.getByLabel("New layer audio file", { exact: true }).selectOption({label: "Ambient layer"});
+    await page.getByText("Bell · 432 Hz · 20%", { exact: true }).waitFor();
+    const authored = "I make steady progress in my own time.";
+    await page.getByText("Write your own affirmation", { exact: true }).click();
+    await page.getByLabel("Your own sentence", { exact: true }).fill(authored);
+    await page.getByRole("button", { name: "Add sentence", exact: true }).click();
+    await page.locator(".manifest-line").getByText(authored, { exact: true }).waitFor();
+    assert.equal(await page.evaluate(text => JSON.parse(localStorage.getItem("core-aura.affirmation-library.v1"))
+      .affirmations.filter(item => item.text === text).length, authored), 1);
+    await page.getByLabel("Your own sentence", { exact: true }).fill(authored);
+    await page.getByRole("button", { name: "Add sentence", exact: true }).click();
+    assert.equal(await page.evaluate(text => JSON.parse(localStorage.getItem("core-aura.affirmation-library.v1"))
+      .affirmations.filter(item => item.text === text).length, authored), 1);
     const manifestPreset = await page.evaluate(() => JSON.parse(localStorage.getItem("core-aura.manifestation.v1")).draft);
     assert.equal(manifestPreset.additionalLayers[0].tone.sound, "bell");
     assert.equal(manifestPreset.additionalLayers[1].ambience.sound, "rain");

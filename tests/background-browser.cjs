@@ -12,7 +12,7 @@ const {chromium}=require('playwright'),assert=require('node:assert/strict'),fs=r
   const original=AudioContext.prototype.createAnalyser;AudioContext.prototype.createAnalyser=function(){const a=original.call(this);window.__bgAnalyser=a;return a;};
  });
  await p.goto('http://localhost:8089/#manifest');await p.getByRole('heading',{name:'Manifestation',exact:true}).waitFor();
- const panel=p.locator('.manifest-background-controls');await panel.locator('summary').click();await p.getByLabel('Background sound',{exact:true}).selectOption('saved');assert.equal(await p.getByLabel('Background level',{exact:true}).inputValue(),'40');await p.getByRole('button',{name:'Save practice',exact:true}).click();
+ const panel=p.locator('.manifest-background-controls');await panel.locator('summary').click();await p.getByLabel('Background sound',{exact:true}).selectOption('saved');assert.equal(await panel.evaluate(el=>el.open),false);await panel.locator('summary').click();assert.equal(await p.getByLabel('Background level',{exact:true}).inputValue(),'40');await p.getByRole('button',{name:'Save practice',exact:true}).click();
  let data=await p.evaluate(()=>JSON.parse(localStorage.getItem('core-aura.manifestation.v1')));assert.equal(data.plans[0].backgroundMix.channels.length,2);assert.equal(data.plans[0].backgroundMix.channels[0].focusQ,2);
  const dock=p.locator('.manifest-player-dock');await dock.getByRole('button',{name:'Play practice',exact:true}).click();
  await p.waitForFunction(()=>window.__bgStates.filter(s=>s.id.startsWith('manifest-background:')&&s.status==='playing').length===2);

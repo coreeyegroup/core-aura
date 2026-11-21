@@ -51,7 +51,7 @@ export function PreviewButton({
         aria-label={
           label
             ? playing
-              ? label.replace(/^Test play/, "Stop test")
+              ? label.startsWith("Test play") ? label.replace(/^Test play/, "Stop test") : "Stop voice test"
               : label
             : `${playing ? "Stop preview" : "Play preview"}: ${line.text}`
         }
@@ -73,6 +73,7 @@ export function PreviewButton({
                 background: null,
                 backgroundMix: null,
                 accompaniment: undefined,
+                additionalLayers: undefined,
                 useRecordings: recorded,
               });
           } catch (e) {

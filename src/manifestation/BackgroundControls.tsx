@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { ChevronDown } from "lucide-react";
 import { Plan } from "./model";
 import { Session, sounds } from "../model";
 import { attachMix } from "./background";
@@ -9,21 +10,31 @@ function BackgroundFrequency({value,min,max,disabled,onChange}:{value:number;min
   return <input aria-label="Background frequency (Hz)" type="number" inputMode="decimal" min={min} max={max} step=".1" disabled={disabled} value={text} onChange={e=>{setText(e.target.value);const hz=e.target.valueAsNumber;if(Number.isFinite(hz)&&hz>=min&&hz<=max)onChange(hz);}} onBlur={()=>setText(String(value))}/>;
 }
 
-export function BackgroundControls({plan:p,sessions,active,onChange}:{plan:Plan;sessions:Session[];active:boolean;onChange:(patch:Partial<Plan>)=>unknown}) {
+export function BackgroundControls({plan:p,sessions,active,onChange,summary}:{plan:Plan;sessions:Session[];active:boolean;onChange:(patch:Partial<Plan>)=>unknown;summary?:ReactNode}) {
   const mixes=sessions.filter(s=>s.channels.length<=8);
   const source=p.backgroundMix?"saved":p.background?.sound??"none";
   const enabled=!!(p.background||p.backgroundMix),level=p.backgroundMix?.volume??p.background?.volume??0;
   const setLevel=(volume:number)=>onChange(p.backgroundMix?{backgroundMix:{...p.backgroundMix,volume}}:{background:{...p.background!,volume}});
   const silent=p.backgroundMix && (p.backgroundMix.master===0 || p.backgroundMix.channels.every(c=>c.muted||c.volume===0));
+  function selectBackground(select: HTMLSelectElement, patch: Partial<Plan>) {
+    if (onChange(patch) === false || !summary) return;
+    const details = select.closest("details");
+    if (details) {
+      details.open = false;
+      details.querySelector("summary")?.focus();
+    }
+  }
   return <details className="manifest-background-controls">
-    <summary>Background sound <span className="content-note">{p.backgroundMix?.name??(p.background?sounds[p.background.sound].name:"None")}{enabled?(p.backgroundMuted?" · Muted":" · "+Math.round(level*100)+"%") : ""}</span></summary>
+    <summary>{summary ? <><ChevronDown size={15} aria-hidden="true" /><span>{summary}</span></> :
+      <>Background sound <span className="content-note">{p.backgroundMix?.name??(p.background?sounds[p.background.sound].name:"None")}{enabled?(p.backgroundMuted?" · Muted":" · "+Math.round(level*100)+"%") : ""}</span></>}
+    </summary>
     <div className="fields">
       <label>Background sound<select aria-label="Background sound" disabled={active} value={source} onChange={e=>{
         const value=e.target.value;
-        if(value==="saved"){if(mixes[0])onChange({background:null,backgroundMix:attachMix(mixes[0])});}
-        else onChange({backgroundMix:null,background:value==="none"?null:{sound:value as "sine"|"bowl"|"tanpura",hz:value==="tanpura"?216:432,volume:.12}});
+        if(value==="saved"){if(mixes[0])selectBackground(e.currentTarget,{background:null,backgroundMix:attachMix(mixes[0])});}
+        else selectBackground(e.currentTarget,{backgroundMix:null,background:value==="none"?null:{sound:value as "sine"|"bowl"|"tanpura",hz:value==="tanpura"?216:432,volume:.12}});
       }}><option value="none">None</option><option value="saved" disabled={!mixes.length&&!p.backgroundMix}>Saved sound mix</option><option value="sine">Pure tone</option><option value="bowl">Singing bowl</option><option value="tanpura">Tanpura drone</option></select></label>
-      {p.backgroundMix?<label>Saved sound mix<select aria-label="Saved sound mix" disabled={active} value="attached" onChange={e=>{const found=mixes.find(s=>s.id===e.target.value);if(found)onChange({background:null,backgroundMix:attachMix(found)});}}><option value="attached">Attached: {p.backgroundMix.name}</option>{mixes.map(s=><option key={s.id} value={s.id}>{s.name} · {s.channels.length} layers</option>)}</select></label>:p.background?<label>Background frequency (Hz)<BackgroundFrequency min={sounds[p.background.sound].min} max={sounds[p.background.sound].max} disabled={active} value={p.background.hz} onChange={hz=>onChange({background:{...p.background!,hz}})}/></label>:null}
+      {p.backgroundMix?<label>Saved sound mix<select aria-label="Saved sound mix" disabled={active} value="attached" onChange={e=>{const found=mixes.find(s=>s.id===e.target.value);if(found)selectBackground(e.currentTarget,{background:null,backgroundMix:attachMix(found)});}}><option value="attached">Attached: {p.backgroundMix.name}</option>{mixes.map(s=><option key={s.id} value={s.id}>{s.name} · {s.channels.length} layers</option>)}</select></label>:p.background?<label>Background frequency (Hz)<BackgroundFrequency min={sounds[p.background.sound].min} max={sounds[p.background.sound].max} disabled={active} value={p.background.hz} onChange={hz=>onChange({background:{...p.background!,hz}})}/></label>:null}
     </div>
     {!enabled&&!mixes.length&&<p className="content-note">Save a generated mix in Sounds → Nature library or Studio, then attach it here.</p>}
     {enabled&&<>

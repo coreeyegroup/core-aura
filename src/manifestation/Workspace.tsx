@@ -4,11 +4,10 @@ import {LibraryLabels,matchesItem} from "../workbench/LibraryLabels";
 import {PinButton} from "../workbench/PinButton";
 import {Presets} from "../workbench/Presets";
 import {HistoryPanel} from "../workbench/HistoryPanel";
-import { LibraryLayers } from "../components/LibraryLayers";
 import type { Track } from "../tracks/storage";
-import { BackgroundControls } from "./BackgroundControls";
+import { PracticeLayers } from "./PracticeLayers";
 import { Session } from "../model";
-import { BookOpen, Download, Mic, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Download, Mic, Pause, Pencil, Play, Plus, Square, Trash2, Upload } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
 import {
   FormEvent,
@@ -24,7 +23,6 @@ import { manifestationStore as store } from "./store";
 import {
   Line,
   hasPracticeContent,
-  practiceLayerLimit,
   nextOccurrence,
   parsePlan,
   Plan,
@@ -92,7 +90,6 @@ export function Manifestation({
   onLibrary,
   onOpenPractice,
   onPlaylists,
-  onBackgrounds,
   sessions = [],
   tracks = [],
   initialView = "practice",
@@ -101,7 +98,6 @@ export function Manifestation({
   onLibrary: () => void;
   onOpenPractice: (id: string) => void;
   onPlaylists: () => void;
-  onBackgrounds: () => void;
   sessions?: Session[];
   tracks?: Track[];
   queueActive?: boolean;
@@ -167,8 +163,25 @@ export function Manifestation({
       return false;
     }
   };
+  function addSentence() {
+    const text = custom.trim();
+    if (active || !text || p.lines.length >= 50) return;
+    const { affirmations } = affirmationLibrary.snapshot().data;
+    const existing = affirmations.find(item => item.text.trim().toLowerCase() === text.toLowerCase());
+    try {
+      if (!existing) affirmationLibrary.saveText(crypto.randomUUID(), text);
+    } catch (error) {
+      setMessage((error as Error).message);
+      return;
+    }
+    if (change({ lines: [...p.lines, { id: crypto.randomUUID(), text }] })) {
+      composer("");
+      setMessage("Affirmation added to the practice and library.");
+    } else {
+      setMessage("The affirmation is in your library. The practice draft could not be updated. Check device storage and try again.");
+    }
+  }
   const canPlay = hasPracticeContent(p);
-  const additionalLayers = p.additionalLayers ?? [];
   const current =
     state.plan && state.plan.lines.length
       ? position(state.plan, state.step)
@@ -270,8 +283,7 @@ export function Manifestation({
               {state.error && <p role="status">{state.error}</p>}
             </div>
           )}
-          <div className="practice-grid">
-            <div className="practice-editor">
+          <div className="practice-editor">
               <fieldset className="manifest-fields">
                 <legend>1. Practice details</legend>
                 <label>Practice name
@@ -279,284 +291,250 @@ export function Manifestation({
                     onChange={event => change({ name: event.target.value })} />
                 </label>
               </fieldset>
-              <details className="manifest-fields sentence-fields" open={p.lines.length ? true : undefined}>
-                <summary>2. Sentences or recorded affirmations ({p.lines.length}/50)</summary>
-                <button onClick={onLibrary}>Choose affirmations</button>
-                <details className="custom-sentence">
-                  <summary>Write your own affirmation</summary>
-                  <label>
-                    Your own sentence
-                    <textarea
-                      aria-label="Your own sentence"
-                      disabled={active}
-                      rows={2}
-                      value={custom}
-                      maxLength={300}
-                      placeholder="Write the words you want to repeat"
-                      onChange={(e) => composer(e.target.value)}
-                    />
-                  </label>
-                  <div className="admin-actions">
-                    <button
-                      disabled={
-                        active || !custom.trim() || p.lines.length >= 50
-                      }
-                      onClick={() => {
-                        const added = change({
-                          lines: [
-                            ...p.lines,
-                            { id: crypto.randomUUID(), text: custom.trim() },
-                          ],
-                        });
-                        if (added) composer("");
-                      }}
-                    >
-                      Add sentence
-                    </button>
+              <section className="manifest-fields sentence-fields" aria-labelledby="practice-sentences">
+                <h2 id="practice-sentences">2. Sentences or audio <small>{p.lines.length}/50</small></h2>
+                <div className="practice-sentences">
+                  <h3>2.1 Choose from library</h3>
+                  <div className="home-actions">
+                    <button disabled={active || p.lines.length >= 50} onClick={onLibrary}>Choose affirmations</button>
                   </div>
-                </details>
-                <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>
-                <div className="manifest-lines">
-                  {p.lines.map((line, i) => (
-                    <article className="manifest-line" key={line.id}>
-                      <div className="sentence-queue-head">
-                        <input aria-label={"Select sentence "+(i+1)} type="checkbox" disabled={active} checked={selectedLines.includes(line.id)} onChange={e=>setSelectedLines(e.target.checked?[...selectedLines,line.id]:selectedLines.filter(id=>id!==line.id))}/>
-                        <span className="queue-index">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <div className="queue-copy">
-                          <p>{line.text}</p>
-                          <small>
-                            {line.audioAffirmation ? "Audio affirmation" : line.recordingId
-                              ? "Personal voice"
-                              : "Selected voice"}
-                          </small>
-                        </div>
-                        <PreviewButton
-                          line={line}
-                          id={line.id}
-                          recorded={p.useRecordings}
-                        />
-                      </div>
-                      <details className="sentence-editor">
-                        <summary
-                          aria-label={"Edit sentence " + (i + 1)}
-                          title={"Edit sentence " + (i + 1)}
-                        >
-                          <Pencil size={16} />
-                        </summary>
-                        <label>
-                          Sentence {i + 1}
-                          <textarea
-                            rows={2}
-                            aria-label={"Sentence " + (i + 1)}
-                            disabled={active || !!line.audioAffirmation}
-                            value={line.text}
-                            maxLength={300}
-                            onChange={(e) =>
-                              change({
-                                lines: p.lines.map((l, n) =>
-                                  n === i
-                                    ? { id: l.id, text: e.target.value }
-                                    : l,
-                                ),
-                              })
-                            }
-                          />
-                        </label>
-                        <div className="line-actions">
-                          {!line.audioAffirmation && <button
-                            disabled={active || !line.text.trim()}
-                            onClick={() => setRecordLine(line)}
-                          >
-                            {line.recordingId ? "Record again" : "Record voice"}
-                          </button>}
-                          {line.recordingId && !line.audioAffirmation && (
-                            <span className="content-note">
-                              Personal voice saved
-                            </span>
-                          )}
-                          <button
-                            disabled={active || i === 0}
-                            aria-label={"Move sentence " + (i + 1) + " up"}
-                            onClick={() => {
-                              const lines = [...p.lines];
-                              [lines[i - 1], lines[i]] = [
-                                lines[i],
-                                lines[i - 1],
-                              ];
-                              change({ lines });
-                            }}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            disabled={active || i === p.lines.length - 1}
-                            aria-label={"Move sentence " + (i + 1) + " down"}
-                            onClick={() => {
-                              const lines = [...p.lines];
-                              [lines[i + 1], lines[i]] = [
-                                lines[i],
-                                lines[i + 1],
-                              ];
-                              change({ lines });
-                            }}
-                          >
-                            ↓
-                          </button>
-                          <button
-                            disabled={active}
-                            aria-label={"Remove sentence " + (i + 1)}
-                            onClick={() =>
-                              change({
-                                lines: p.lines.filter((_, n) => n !== i),
-                              })
-                            }
-                          >
-                            Remove
-                          </button>
-                          <button disabled={active||p.lines.length>=50} aria-label={"Duplicate sentence "+(i+1)} onClick={()=>change({lines:[...p.lines.slice(0,i+1),{...line,id:crypto.randomUUID()},...p.lines.slice(i+1)]})}>Duplicate sentence</button>
-                        </div>
-                      </details>
-                    </article>
-                  ))}
-                </div>
-                {!p.lines.length && (
-                  <div className="queue-empty">
-                    <BookOpen size={21} />
-                    <p>
-                      Choose affirmations from the library or write your own.
-                    </p>
-                  </div>
-                )}
-              </details>
-            </div>
-            <div className="practice-settings">
-              <section className="manifest-fields" aria-label="Optional practice audio layers">
-                <h2>3. Audio, sounds and backgrounds</h2>
-                <p className="content-note">Choose any layers you want. Generated sounds use frequency, and nature backgrounds use a frequency filter. Imported files keep their original pitch.</p>
-                {(p.accompaniment?.tone || p.accompaniment?.ambience || p.accompaniment?.audio) && (
-                  <LibraryLayers prefix="Manifest" tracks={tracks} value={p.accompaniment} disabled={active}
-                    onChange={accompaniment => change({ accompaniment })} />
-                )}
-                <div className="admin-actions">
-                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
-                    change({ additionalLayers: [...additionalLayers, { tone: { sound: "bell", hz: 432, volume: .2 } }] })}>Add sound</button>
-                  <button disabled={active || additionalLayers.length >= practiceLayerLimit} onClick={() =>
-                    change({ additionalLayers: [...additionalLayers, { ambience: { sound: "rain", hz: 1000, volume: .2 } }] })}>Add background</button>
-                  <button disabled={active || !tracks.length || additionalLayers.length >= practiceLayerLimit} onClick={() =>
-                    change({ additionalLayers: [...additionalLayers, { audio: { id: tracks[0].id, volume: .35, loop: true } }] })}>Add audio</button>
-                </div>
-                {additionalLayers.map((layer, index) => {
-                  const remove = () => change({ additionalLayers: additionalLayers.filter((_, i) => index !== i) });
-                  return <LibraryLayers key={index} prefix={"Layer " + (index + 1)} only={layer.tone ? "tone" : layer.ambience ? "ambience" : "audio"}
-                    tracks={tracks} value={layer} disabled={active} onRemove={remove} onChange={next => {
-                      if (!next.tone && !next.ambience && !next.audio) { remove(); return; }
-                      change({ additionalLayers: additionalLayers.map((original, i) => i === index ? next : original) });
-                    }} />;
-                })}
-              </section>
-              <fieldset
-                disabled={active}
-                className="manifest-fields repeat-fields"
-              >
-                <legend>Playback options</legend>
-                {p.lines.length > 0 && <>
-                <div className="practice-mode">
-                  <label>
-                    Practice mode
-                    <select
-                      aria-label="Practice mode"
-                      value={p.mode}
-                      onChange={(e) =>
-                        change({ mode: e.target.value as Plan["mode"] })
-                      }
-                    >
-                      <option value="speech">Spoken voice</option>
-                      <option value="read">Silent reading</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="fields">
-                  <label>
-                    Repeat order
-                    <select
-                      aria-label="Repeat order"
-                      value={p.order}
-                      onChange={(e) =>
-                        change({ order: e.target.value as Plan["order"] })
-                      }
-                    >
-                      <option value="sequence">Whole sequence</option>
-                      <option value="each">Each sentence</option>
-                    </select>
-                  </label>
-                  <label>
-                    Repetitions
-                    <NumberField
-                      integer
-                      min={1}
-                      max={108}
-                      value={p.repeats}
-                      onValue={(repeats) => change({ repeats })}
-                    />
-                  </label>
-                </div>
-                <p className="content-note">
-                  {p.order === "sequence"
-                    ? "Repeat all selected sentences in order, then begin the next round."
-                    : "Repeat each sentence the chosen number of times before moving to the next."}
-                </p>
-                </>}
-                <div className="fields">
-                  <label>
-                    Maximum session
-                    <select
-                      aria-label="Maximum session"
-                      value={p.seconds}
-                      onChange={(e) =>
-                        change({ seconds: Number(e.target.value) })
-                      }
-                    >
-                      {[...new Set([p.seconds, 60, 300, 600, 900, 1800, 3600])]
-                        .sort((a, b) => a - b)
-                        .map((n) => (
-                          <option value={n} key={n}>
-                            {n / 60} min
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                </div>
-                {p.lines.length > 0 && <div className="fields">
-                  <label>
-                    Gap between sentences (sec)
-                    <NumberField
-                      min={0}
-                      max={30}
-                      value={p.gap}
-                      onValue={(gap) => change({ gap })}
-                    />
-                  </label>
-                  {p.mode === "read" && (
+                  <details className="custom-sentence">
+                    <summary>Write your own affirmation</summary>
                     <label>
-                      Reading time (sec)
-                      <NumberField
-                        min={2}
-                        max={30}
-                        value={p.readSeconds}
-                        onValue={(readSeconds) => change({ readSeconds })}
+                      Your own sentence
+                      <textarea
+                        aria-label="Your own sentence"
+                        disabled={active}
+                        rows={2}
+                        value={custom}
+                        maxLength={300}
+                        placeholder="Write the words you want to repeat"
+                        onChange={(e) => composer(e.target.value)}
                       />
                     </label>
-                  )}
-                </div>}
-              </fieldset>
-              {p.lines.length > 0 && <VoicePanel />}
-              <BackgroundControls plan={p} sessions={sessions} active={active} onChange={patch=>{
-                try { if(active) manifestPlayer.updateBackground(patch); else change(patch); }
-                catch(error){setMessage((error as Error).message);}
-              }}/>
-              <button className="text-button" onClick={onBackgrounds}>Manage background library</button>
+                    <div className="admin-actions">
+                      <button
+                        disabled={
+                          active || !custom.trim() || p.lines.length >= 50
+                        }
+                        onClick={addSentence}
+                      >
+                        Add sentence
+                      </button>
+                      <span className="content-note">Also saved to your affirmation library.</span>
+                    </div>
+                  </details>
+                  {p.lines.length > 0 && <details className="bulk-sentences"><summary>Sentence selection tools</summary><div className="home-actions"><button disabled={active} onClick={()=>setSelectedLines(p.lines.map(l=>l.id))}>Select all sentences</button><button onClick={()=>setSelectedLines([])}>Clear sentence selection</button><button disabled={active||!selectedLines.length} onClick={()=>{if(confirm("Remove selected sentences?")){change({lines:p.lines.filter(l=>!selectedLines.includes(l.id))});setSelectedLines([]);}}}>Remove selected sentences</button></div></details>}
+                  <div className="manifest-lines">
+                    {p.lines.map((line, i) => (
+                      <article className="manifest-line" key={line.id}>
+                        <div className="sentence-queue-head">
+                          <input aria-label={"Select sentence "+(i+1)} type="checkbox" disabled={active} checked={selectedLines.includes(line.id)} onChange={e=>setSelectedLines(e.target.checked?[...selectedLines,line.id]:selectedLines.filter(id=>id!==line.id))}/>
+                          <span className="queue-index">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <div className="queue-copy">
+                            <p>{line.text}</p>
+                            <small>
+                              {line.audioAffirmation ? "Audio affirmation" : line.recordingId
+                                ? "Personal voice"
+                                : "Selected voice"}
+                            </small>
+                          </div>
+                          <PreviewButton
+                            line={line}
+                            id={line.id}
+                            recorded={p.useRecordings}
+                          />
+                        </div>
+                        <details className="sentence-editor">
+                          <summary
+                            aria-label={"Edit sentence " + (i + 1)}
+                            title={"Edit sentence " + (i + 1)}
+                          >
+                            <Pencil size={16} />
+                          </summary>
+                          <label>
+                            Sentence {i + 1}
+                            <textarea
+                              rows={2}
+                              aria-label={"Sentence " + (i + 1)}
+                              disabled={active || !!line.audioAffirmation}
+                              value={line.text}
+                              maxLength={300}
+                              onChange={(e) =>
+                                change({
+                                  lines: p.lines.map((l, n) =>
+                                    n === i
+                                      ? { id: l.id, text: e.target.value }
+                                      : l,
+                                  ),
+                                })
+                              }
+                            />
+                          </label>
+                          <div className="line-actions">
+                            {!line.audioAffirmation && <button
+                              disabled={active || !line.text.trim()}
+                              onClick={() => setRecordLine(line)}
+                            >
+                              {line.recordingId ? "Record again" : "Record voice"}
+                            </button>}
+                            {line.recordingId && !line.audioAffirmation && (
+                              <span className="content-note">
+                                Personal voice saved
+                              </span>
+                            )}
+                            <button
+                              disabled={active || i === 0}
+                              aria-label={"Move sentence " + (i + 1) + " up"}
+                              onClick={() => {
+                                const lines = [...p.lines];
+                                [lines[i - 1], lines[i]] = [
+                                  lines[i],
+                                  lines[i - 1],
+                                ];
+                                change({ lines });
+                              }}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              disabled={active || i === p.lines.length - 1}
+                              aria-label={"Move sentence " + (i + 1) + " down"}
+                              onClick={() => {
+                                const lines = [...p.lines];
+                                [lines[i + 1], lines[i]] = [
+                                  lines[i],
+                                  lines[i + 1],
+                                ];
+                                change({ lines });
+                              }}
+                            >
+                              ↓
+                            </button>
+                            <button
+                              disabled={active}
+                              aria-label={"Remove sentence " + (i + 1)}
+                              onClick={() =>
+                                change({
+                                  lines: p.lines.filter((_, n) => n !== i),
+                                })
+                              }
+                            >
+                              Remove
+                            </button>
+                            <button disabled={active||p.lines.length>=50} aria-label={"Duplicate sentence "+(i+1)} onClick={()=>change({lines:[...p.lines.slice(0,i+1),{...line,id:crypto.randomUUID()},...p.lines.slice(i+1)]})}>Duplicate sentence</button>
+                          </div>
+                        </details>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+                <section className="repeat-fields" aria-labelledby="practice-playback">
+                  <h3 id="practice-playback">2.2 Playback options</h3>
+                  <fieldset disabled={active} aria-labelledby="practice-playback">
+                    {p.lines.length > 0 && <>
+                    <div className="practice-mode">
+                      <label>
+                        Practice mode
+                        <select
+                          aria-label="Practice mode"
+                          value={p.mode}
+                          onChange={(e) =>
+                            change({ mode: e.target.value as Plan["mode"] })
+                          }
+                        >
+                          <option value="speech">Spoken voice</option>
+                          <option value="read">Silent reading</option>
+                        </select>
+                      </label>
+                    </div>
+                    <div className="fields">
+                      <label>
+                        Repeat order
+                        <select
+                          aria-label="Repeat order"
+                          value={p.order}
+                          onChange={(e) =>
+                            change({ order: e.target.value as Plan["order"] })
+                          }
+                        >
+                          <option value="sequence">Whole sequence</option>
+                          <option value="each">Each sentence</option>
+                        </select>
+                      </label>
+                      <label>
+                        Repetitions
+                        <NumberField
+                          integer
+                          min={1}
+                          max={108}
+                          value={p.repeats}
+                          onValue={(repeats) => change({ repeats })}
+                        />
+                      </label>
+                    </div>
+                    <p className="content-note">
+                      {p.order === "sequence"
+                        ? "Repeat all selected sentences in order, then begin the next round."
+                        : "Repeat each sentence the chosen number of times before moving to the next."}
+                    </p>
+                    </>}
+                    <div className="fields">
+                      <label>
+                        Maximum session
+                        <select
+                          aria-label="Maximum session"
+                          value={p.seconds}
+                          onChange={(e) =>
+                            change({ seconds: Number(e.target.value) })
+                          }
+                        >
+                          {[...new Set([p.seconds, 60, 300, 600, 900, 1800, 3600])]
+                            .sort((a, b) => a - b)
+                            .map((n) => (
+                              <option value={n} key={n}>
+                                {n / 60} min
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </div>
+                    {p.lines.length > 0 && <div className="fields">
+                      <label>
+                        Gap between sentences (sec)
+                        <NumberField
+                          min={0}
+                          max={30}
+                          value={p.gap}
+                          onValue={(gap) => change({ gap })}
+                        />
+                      </label>
+                      {p.mode === "read" && (
+                        <label>
+                          Reading time (sec)
+                          <NumberField
+                            min={2}
+                            max={30}
+                            value={p.readSeconds}
+                            onValue={(readSeconds) => change({ readSeconds })}
+                          />
+                        </label>
+                      )}
+                    </div>}
+                  </fieldset>
+                  {p.lines.length > 0 && <VoicePanel />}
+                </section>
+              </section>
+              <PracticeLayers key={p.id} plan={p} sessions={sessions} tracks={tracks} active={active}
+                onChange={change} onBackgroundChange={patch => {
+                  try {
+                    if (active) manifestPlayer.updateBackground(patch);
+                    else return change(patch);
+                  }
+                  catch (error) { setMessage((error as Error).message); return false; }
+                }} />
               <Presets onOpen={()=>{setView("practice");onView?.("practice");}}/>
               <details className="workbench-panel practice-summary">
                 <summary>Practice summary</summary>
@@ -582,7 +560,6 @@ export function Manifestation({
             </div>
           </div>
               </details>
-            </div>
           </div>
               <div className="admin-actions practice-actions">
                 <button
@@ -659,6 +636,7 @@ export function Manifestation({
             disabled={(!canPlay || !p.name.trim()) && !active}
             onClick={start}
           >
+            {active && state.status === "playing" ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
             {active && state.status === "playing"
               ? "Pause"
               : active && state.status === "paused"
@@ -666,7 +644,7 @@ export function Manifestation({
                 : "Play practice"}
           </button>
           <button disabled={!active} onClick={() => manifestPlayer.stop()}>
-            Stop practice
+            <Square size={14} aria-hidden="true" /> Stop practice
           </button>
         </div>
         {state.status === "paused" && (

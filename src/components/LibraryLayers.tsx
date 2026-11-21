@@ -26,20 +26,24 @@ export function FrequencyField({ value, sound, label, disabled, onChange }: {
 }
 
 export type LayerKind = "tone" | "ambience" | "audio";
-export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, only, onRemove }: {
+export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, only, onRemove, inline = false, onSourceChange }: {
   value?: Accompaniment; tracks: Track[]; disabled: boolean; prefix: string;
-  onChange: (value: Accompaniment) => void;
+  onChange: (value: Accompaniment) => void | boolean;
+  onSourceChange?: (select: HTMLSelectElement) => void;
   only?: LayerKind;
   onRemove?: () => void;
+  inline?: boolean;
 }) {
   function editSource(key: "tone" | "ambience", patch: Partial<GeneratedLayer>) {
     const source = value[key];
     if (source) onChange({ ...value, [key]: { ...source, ...patch } });
   }
 
-  return <details className="library-mix-settings" open={only ? true : undefined}>
-    <summary><SlidersHorizontal size={16} aria-hidden="true" /> {only === "tone" ? "Sound layer" : only === "ambience" ? "Background layer" : only === "audio" ? "Audio layer" : "Library layers"}</summary>
-    <fieldset disabled={disabled} className="fields">
+  function selectSource(next: Accompaniment, select: HTMLSelectElement) {
+    if (onChange(next) !== false) onSourceChange?.(select);
+  }
+
+  const fields = <fieldset disabled={disabled} className="fields">
       {(["tone", "ambience"] as const).filter(key => !only || key === only).map(key => {
         const ambient = key === "ambience";
         const source = value[key];
@@ -50,8 +54,8 @@ export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, 
               const id = event.target.value as Sound;
               if (!id) { onChange({ ...value, [key]: undefined }); return; }
               const { min, max } = sounds[id];
-              onChange({ ...value, [key]: { sound: id,
-                hz: Math.min(max, Math.max(min, source?.hz ?? (ambient ? 1000 : 432))), volume: source?.volume ?? .2 } });
+              selectSource({ ...value, [key]: { sound: id,
+                hz: Math.min(max, Math.max(min, source?.hz ?? (ambient ? 1000 : 432))), volume: source?.volume ?? .2 } }, event.currentTarget);
             }}>
               <option value="">None</option>
               {(ambient ? ambientSounds : rawSounds).map(id => <option value={id} key={id}>{sounds[id].name}</option>)}
@@ -72,7 +76,7 @@ export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, 
         <label>Audio file
           <select aria-label={prefix + " audio file"} value={value.audio?.id ?? ""} onChange={event => {
             const id = event.target.value;
-            onChange({ ...value, audio: id ? { id, volume: value.audio?.volume ?? .35, loop: value.audio?.loop ?? true } : undefined });
+            selectSource({ ...value, audio: id ? { id, volume: value.audio?.volume ?? .35, loop: value.audio?.loop ?? true } : undefined }, event.currentTarget);
           }}>
             <option value="">None</option>
             {value.audio && !tracks.some(track => track.id === value.audio?.id) && (
@@ -99,6 +103,10 @@ export function LibraryLayers({ value = {}, tracks, disabled, prefix, onChange, 
         </>}
       </div>}
       {onRemove && <button type="button" onClick={onRemove}>Remove layer</button>}
-    </fieldset>
+    </fieldset>;
+  if (inline) return fields;
+  return <details className="library-mix-settings" open={only ? true : undefined}>
+    <summary><SlidersHorizontal size={16} aria-hidden="true" /> {only === "tone" ? "Sound layer" : only === "ambience" ? "Background layer" : only === "audio" ? "Audio layer" : "Library layers"}</summary>
+    {fields}
   </details>;
 }
