@@ -6,11 +6,12 @@ import json
 import os
 import re
 import time
+from typing import Literal
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi import APIRouter, Header, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from sqlalchemy import delete, func, select
 from .database import SessionLocal
 from .models import ReminderDevice, ReminderDelivery, ReminderWorker
@@ -73,6 +74,29 @@ class Schedule(BaseModel):
     days: list[int] = Field(min_length=1, max_length=7)
     oneOff: str | None = Field(default=None, max_length=60)
     skipDates: list[str] = Field(default_factory=list, max_length=30)
+    frequency: Literal["daily", "weekly", "monthly"] | None = None
+    times: list[str] | None = Field(default=None, min_length=1, max_length=8)
+    monthDay: int | None = Field(default=None, ge=1, le=31)
+    skipOccurrences: list[str] | None = Field(default=None, max_length=30)
+
+    @model_validator(mode="after")
+    def valid_recurrence(self):
+        from datetime import datetime
+        if self.frequency == "monthly" and self.monthDay is None:
+            raise ValueError("Choose a monthly date")
+        if self.oneOff is not None and (self.frequency is not None or self.times is not None):
+            raise ValueError("A one-time reminder cannot repeat")
+        if self.times is not None and (
+            self.times != sorted(set(self.times)) or self.times[0] != self.time or
+            any(not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value) for value in self.times)
+        ):
+            raise ValueError("Choose unique reminder times in chronological order")
+        for value in self.skipOccurrences or []:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", value) or (
+                datetime.fromisoformat(value).isoformat(timespec="minutes") != value
+            ):
+                raise ValueError("Invalid skipped time")
+        return self
 
     @field_validator("oneOff")
     @classmethod
@@ -156,7 +180,11 @@ def register(
         raise HTTPException(503, "Reminder worker is unavailable. Try again later.")
     if len({s.id for s in data.schedules}) != len(data.schedules):
         raise HTTPException(422, "Duplicate schedules")
-    schedules = [s.model_dump() for s in data.schedules]
+    schedules = [
+        s.model_dump(exclude={field for field in ("frequency", "times", "monthDay", "skipOccurrences")
+                              if getattr(s, field) is None})
+        for s in data.schedules
+    ]
     with SessionLocal() as db:
         device = db.get(ReminderDevice, key)
         endpoint = data.subscription.endpoint

@@ -1,3 +1,5 @@
+import { dayNames, RecurrenceFields } from "../scheduling/RecurrenceFields";
+import { scheduleClock, scheduleDate, scheduleFrequency, scheduleTimePattern, scheduleTimes, type Frequency } from "../scheduling/recurrence";
 import { playbackReadiness, usePlaybackInventory, verifyPractice } from "../playlists/readiness";
 import { resolveItems } from "../playlists/model";
 import { confirmSourceDeletion, playlistStore } from "../playlists/store";
@@ -133,6 +135,7 @@ export function Manifestation({
   const [selectedLines,setSelectedLines]=useState<string[]>([]);
   const [selectSentences, setSelectSentences] = useState(false);
   const [writeAffirmation, setWriteAffirmation] = useState(false);
+  const [sentencesOpen, setSentencesOpen] = useState(true);
   const [choosingAffirmations, setChoosingAffirmations] = useState(false);
   const [playlistTarget, setPlaylistTarget] = useState("");
   const [playlistName, setPlaylistName] = useState("");
@@ -376,7 +379,14 @@ export function Manifestation({
                 <div className="practice-step-heading">
                   <h2 id="practice-sentences">2. Sentences or audio</h2>
                   <small aria-label={p.lines.length + " of 50 items"}>{p.lines.length}/50</small>
+                  <button type="button" className="icon-button sentence-disclosure"
+                    aria-controls="practice-sentence-content" aria-expanded={sentencesOpen}
+                    aria-label={sentencesOpen ? "Minimise sentences or audio" : "Expand sentences or audio"}
+                    onClick={() => setSentencesOpen(open => !open)}>
+                    {sentencesOpen ? "−" : "+"}
+                  </button>
                 </div>
+                <div id="practice-sentence-content" hidden={!sentencesOpen}>
                 <div className="practice-sentences">
                   <div className="practice-step-heading">
                     <h3>2.1 Choose from library</h3>
@@ -566,6 +576,7 @@ export function Manifestation({
                   </fieldset>
                   {p.lines.length > 0 && <VoicePanel />}
                 </details>
+                </div>
               </section>
               <PracticeLayers key={p.id} plan={p} sessions={sessions} tracks={tracks} active={active}
                 onAudioLibrary={onAudioLibrary} queueActive={queueActive} onChange={change} onBackgroundChange={patch => {
@@ -1073,250 +1084,184 @@ export function ManifestLibrary({
   );
 }
 function Schedules({ onCreate }: { onCreate: () => void }) {
-  const pushMessage = useSyncExternalStore(
-    pushStatus.subscribe,
-    pushStatus.snapshot,
-  );
+  const pushMessage = useSyncExternalStore(pushStatus.subscribe, pushStatus.snapshot);
   const { data } = useSyncExternalStore(store.subscribe, store.snapshot);
-  const [planId, setPlanId] = useState(
-      data.plans.find((plan) => plan.id === data.draft.id)?.id ||
-        data.plans[0]?.id ||
-        "",
-    ),
-    [time, setTime] = useState("07:00"),
-    [days, setDays] = useState([0, 1, 2, 3, 4, 5, 6]),
-    [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+  const [planId, setPlanId] = useState(data.plans.find(plan => plan.id === data.draft.id)?.id ?? data.plans[0]?.id ?? "");
+  const [frequency, setFrequency] = useState<Frequency | "once">("daily");
+  const [times, setTimes] = useState(["07:00"]);
+  const [days, setDays] = useState([1]);
+  const [monthDay, setMonthDay] = useState(1);
+  const [date, setDate] = useState(() => scheduleDate(new Date()));
   const [autoStart, setAutoStart] = useState(false);
-  const [editingId,setEditingId]=useState<string|null>(null);
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  async function update(rows: Reminder[]) {
+  const [editing, setEditing] = useState<Reminder>();
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  const native = Capacitor.isNativePlatform();
+  const freeSlot = () => Array.from({ length: 8 }, (_, i) => i)
+    .find(slot => !store.snapshot().data.reminders.some(row => row.slot === slot));
+
+  async function run(action: () => Promise<string>) {
     setBusy(true);
-    try {
-      store.reminders(rows);
-      setMessage(await syncPhoneReminders());
-    } catch (e) {
-      setMessage((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    try { setMessage(await action()); }
+    catch (error) { setMessage((error as Error).message); }
+    finally { setBusy(false); }
   }
+
+  function update(rows: Reminder[]) {
+    return run(async () => {
+      store.reminders(rows);
+      return syncPhoneReminders();
+    });
+  }
+
   function add(event: FormEvent) {
     event.preventDefault();
-    const slot = editingId ? data.reminders.find(r=>r.id===editingId)?.slot : Array.from({ length: 8 }, (_, i) => i).find(
-      (n) => !data.reminders.some((r) => r.slot === n),
-    );
-    if (slot === undefined) {
-      setMessage("Up to eight schedules are supported.");
+    setMessage("");
+    const slot = editing?.slot ?? freeSlot();
+    if (slot === undefined) { setMessage("Up to eight schedules are supported."); return; }
+    const sorted = (frequency === "once" ? times.slice(0, 1) : [...times]).sort();
+    if (sorted.some(time => !scheduleTimePattern.test(time)) || new Set(sorted).size !== sorted.length) {
+      setMessage("Enter a different time for each reminder.");
       return;
     }
-    void update([
-      ...data.reminders.filter(r=>r.id!==editingId),
-      {
-        id: editingId??crypto.randomUUID(),
-        slot,
-        planId,
-        time,
-        days,
-        enabled: true,
-        autoStart,
-      },
-    ]);
-    setEditingId(null);
+    const [time] = sorted;
+    const previousOnce = editing?.oneOff ? new Date(editing.oneOff) : undefined;
+    const unchangedOnce = previousOnce && scheduleDate(previousOnce) === date && scheduleClock(previousOnce) === time;
+    const once = frequency === "once" ? unchangedOnce ? previousOnce : new Date(date + "T" + time + ":00") : undefined;
+    if (once && (!Number.isFinite(+once) || (+once <= Date.now() && !unchangedOnce) || scheduleClock(once) !== time)) {
+      setMessage("Choose a valid future date and time.");
+      return;
+    }
+    const row: Reminder = {
+      id: editing?.id ?? crypto.randomUUID(), slot, planId, time,
+      days: frequency === "weekly" ? days : [0, 1, 2, 3, 4, 5, 6],
+      enabled: editing?.enabled ?? true, autoStart,
+      ...(once ? { oneOff: once.toISOString() } : {
+        frequency: frequency as Frequency, times: sorted,
+        ...(frequency === "monthly" ? { monthDay } : {}),
+        skipDates: editing?.skipDates, skipOccurrences: editing?.skipOccurrences,
+      }),
+    };
+    void run(async () => {
+      store.reminders([...store.snapshot().data.reminders.filter(item => item.id !== row.id), row]);
+      setEditing(undefined);
+      return syncPhoneReminders();
+    });
   }
-  return (
-    <section
-      className="manifest-workspace"
-      aria-label="Manifestation schedules"
-    >
-      <h2>Schedule your practice</h2>
-      {!data.plans.length && (
-        <div className="notice">
-          <span>Save a practice before adding a reminder.</span>
-          <button onClick={onCreate}>Create a practice</button>
+
+  function edit(rule: Reminder) {
+    setEditing(rule);
+    setPlanId(rule.planId);
+    setFrequency(scheduleFrequency(rule));
+    setTimes([...scheduleTimes(rule)]);
+    setDays([...rule.days]);
+    setMonthDay(rule.monthDay ?? 1);
+    if (rule.oneOff) {
+      const occurrence = new Date(rule.oneOff);
+      setDate(scheduleDate(occurrence));
+      setTimes([scheduleClock(occurrence)]);
+    }
+    setAutoStart(!!rule.autoStart);
+    form.current?.scrollIntoView({ block: "start" });
+    form.current?.querySelector("select")?.focus({ preventScroll: true });
+  }
+
+  function copy(rule: Reminder, quick = false) {
+    const slot = freeSlot();
+    if (slot === undefined) return;
+    const at = new Date(Date.now() + 600000);
+    const shared = { id: crypto.randomUUID(), slot, planId: rule.planId };
+    void update([...data.reminders, quick ? {
+      ...shared, time: scheduleClock(at), days: [at.getDay()], enabled: true, oneOff: at.toISOString(),
+    } : { ...rule, ...shared, enabled: false }]);
+  }
+
+  function describe(rule: Reminder) {
+    switch (scheduleFrequency(rule)) {
+      case "daily": return "Daily";
+      case "monthly": return "Monthly on day " + rule.monthDay;
+      case "once": return "One time · " + new Date(rule.oneOff!).toLocaleDateString();
+      case "weekly": return "Weekly · " + rule.days.map(day => dayNames[day]).join(", ");
+    }
+  }
+
+  return <section className="manifest-workspace schedule-workspace" aria-label="Manifestation schedules">
+    <div className="section-heading"><h2>Schedule your practice</h2></div>
+    {!data.plans.length && <div className="notice">
+      <span>Save a practice before adding a reminder.</span><button onClick={onCreate}>Create a practice</button>
+    </div>}
+    {data.plans.length > 0 && <form ref={form} className="manifest-fields schedule-form" onSubmit={add}>
+      <div className="fields">
+        <label>Saved practice
+          <select required value={planId} onChange={event => setPlanId(event.target.value)}>
+            <option value="" disabled>Choose a practice</option>
+            {data.plans.map(plan => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
+          </select>
+        </label>
+        <RecurrenceFields frequency={frequency} setFrequency={setFrequency}
+          days={days} setDays={setDays} times={times} setTimes={setTimes}
+          monthDay={monthDay} setMonthDay={setMonthDay} date={date} setDate={setDate} />
+      </div>
+      <small>Device time · {Intl.DateTimeFormat().resolvedOptions().timeZone}</small>
+      <label>When due
+        <select value={autoStart ? "play" : "notify"} onChange={event => setAutoStart(event.target.value === "play")}>
+          <option value="notify">Remind me</option><option value="play">Auto-play while open and idle</option>
+        </select>
+      </label>
+      {autoStart && <small>While the app is closed, locked, or busy, you’ll receive a reminder if notifications are enabled.</small>}
+      <div className="home-actions">
+        <button className="primary" disabled={busy || !planId || frequency === "weekly" && !days.length}>
+          {editing ? "Save schedule" : "Add schedule"}
+        </button>
+        {editing && <button type="button" onClick={() => setEditing(undefined)}>Cancel editing</button>}
+      </div>
+    </form>}
+    {message && <p role="status" className="notice">{message}</p>}
+    {data.reminders.map(rule => {
+      const name = data.plans.find(plan => plan.id === rule.planId)?.name ?? "Practice";
+      const next = nextOccurrence(rule, new Date());
+      return <article className="saved-card schedule-card" key={rule.id}>
+        <div><h3>{name}</h3><p>{describe(rule)} · {scheduleTimes(rule).join(", ")}</p>
+          <p>{next ? "Next " + next.toLocaleString() : rule.enabled ? "No upcoming occurrence" : "Paused"}</p>
         </div>
-      )}
-      {!Capacitor.isNativePlatform() && (
-        <>
-          <p role="status" className="content-note">
-            {pushMessage}
-          </p>
-          <button
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              void disablePushReminders()
-                .then(setMessage)
-                .finally(() => setBusy(false));
-            }}
-          >
-            Disable closed-app reminders
-          </button>
-        </>
-      )}
-      <p className="content-note">
-        Times follow this device’s timezone:{" "}
-        {Intl.DateTimeFormat().resolvedOptions().timeZone}. Choose a reminder or
-        opt into automatic start while the app is visible and idle.
-      </p>
-      <p className="content-note">
-        Enable closed-app reminders to receive web/PWA notifications while away.
-        Internet and browser permission are required. On iPhone, use the
-        installed Home Screen app. Native builds use device notifications.
-        Delivery timing depends on device settings.
-      </p>
-      <button
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          void enableReminders()
-            .then(setMessage)
-            .catch((e) =>
-              setMessage(
-                e instanceof Error
-                  ? e.message
-                  : "Notifications could not be enabled. Check device permissions.",
-              ),
-            )
-            .finally(() => setBusy(false));
-        }}
-      >
-        Enable reminders
-      </button>
-      {data.plans.length > 0 && (
-        <form onSubmit={add} className="manifest-fields">
-          <div className="fields">
-            <label>
-              Saved practice
-              <select
-                required
-                aria-label="Saved practice"
-                value={planId}
-                onChange={(e) => setPlanId(e.target.value)}
-              >
-                <option value="" disabled>
-                  Choose a practice
-                </option>
-                {data.plans.map((p) => (
-                  <option value={p.id} key={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Reminder time
-              <input
-                type="time"
-                required
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-              />
-            </label>
-          </div>
-          <div className="day-choices" aria-label="Days of week">
-            {dayNames.map((d, i) => (
-              <label key={d}>
-                <input
-                  type="checkbox"
-                  checked={days.includes(i)}
-                  onChange={(e) =>
-                    setDays(
-                      e.target.checked
-                        ? [...days, i].sort()
-                        : days.filter((day) => day !== i),
-                    )
-                  }
-                />
-                {d}
-              </label>
-            ))}
-          </div>
-          <label className="affirmation-choice">
-            <input
-              type="checkbox"
-              checked={autoStart}
-              onChange={(e) => setAutoStart(e.target.checked)}
-            />
-            <span>Auto-play while the app is open and idle</span>
-          </label>
-          <p className="content-note">
-            Automatic start does not interrupt other audio or unsaved edits.
-            Closed/locked apps and missed times use a reminder; browser speech
-            may still require a tap.
-          </p>
-          <button
-            className="primary"
-            disabled={busy || !days.length || !planId}
-          >
-            {editingId?"Save schedule":"Add schedule"}
-          </button>
-          {editingId&&<button type="button" onClick={()=>setEditingId(null)}>Cancel editing</button>}
-        </form>
-      )}
-      {data.reminders.map((r) => {
-        const name =
-            data.plans.find((p) => p.id === r.planId)?.name || "Practice",
-          next = nextOccurrence(r, new Date());
-        return (
-          <article className="saved-card" key={r.id}>
-            <div>
-              <h3>
-                {name} · {r.time}
-              </h3>
-              <p>
-                {r.days.map((d) => dayNames[d]).join(", ")}
-                {next ? " · Next " + next.toLocaleString() : " · Disabled"}
-              </p>
-            </div>
-            <button
-              disabled={busy}
-              aria-pressed={r.enabled}
-              onClick={() =>
-                void update(
-                  data.reminders.map((row) =>
-                    row.id === r.id ? { ...row, enabled: !row.enabled } : row,
-                  ),
-                )
+        <button disabled={busy} aria-pressed={rule.enabled} onClick={() =>
+          void update(data.reminders.map(item => item.id === rule.id ? { ...item, enabled: !item.enabled } : item))}>
+          {rule.enabled ? "Pause" : "Enable"}
+        </button>
+        <details className="practice-actions">
+          <summary>Schedule actions</summary>
+          <div className="saved-actions">
+            <button disabled={busy} onClick={() => edit(rule)}>Edit schedule</button>
+            <button disabled={busy || data.reminders.length >= 8} onClick={() => copy(rule)}>Duplicate schedule</button>
+            <button disabled={busy || data.reminders.length >= 8} onClick={() => copy(rule, true)}>Remind in 10 min</button>
+            <button disabled={busy || !next || native || !!rule.oneOff} onClick={() => {
+              if (!next) return;
+              const key = scheduleDate(next) + "T" + scheduleClock(next);
+              const skipOccurrences = [...(rule.skipOccurrences ?? []).filter(value => value >= scheduleDate(new Date())), key].slice(-30);
+              void update(data.reminders.map(item => item.id === rule.id ? { ...item, skipOccurrences } : item));
+            }}>Skip next</button>
+            <button disabled={busy} onClick={() => void run(async () =>
+              download(calendarFile(rule, name), "core-aura-reminder.ics", "text/calendar"))}>Export calendar reminder</button>
+            <button disabled={busy} onClick={() => {
+              if (confirm("Delete this schedule?")) {
+                void update(data.reminders.filter(item => item.id !== rule.id));
+                if (editing?.id === rule.id) setEditing(undefined);
               }
-            >
-              {r.enabled ? "Disable" : "Enable"}
-            </button>
-            <div className="saved-actions">
-              <button disabled={busy} onClick={()=>{setEditingId(r.id);setPlanId(r.planId);setTime(r.time);setDays([...r.days]);setAutoStart(!!r.autoStart);document.querySelector('[aria-label="Saved practice"]')?.scrollIntoView({block:"center"});}}>Edit schedule</button>
-              <button disabled={busy||data.reminders.length>=8} onClick={()=>{const slot=Array.from({length:8},(_,i)=>i).find(i=>!data.reminders.some(r=>r.slot===i));if(slot!==undefined)void update([...data.reminders,{...r,id:crypto.randomUUID(),slot,enabled:false}]);}}>Duplicate schedule</button>
-              <button disabled={busy||data.reminders.length>=8} onClick={()=>{const slot=Array.from({length:8},(_,i)=>i).find(i=>!data.reminders.some(r=>r.slot===i)),date=new Date(Date.now()+600000);if(slot!==undefined)void update([...data.reminders,{id:crypto.randomUUID(),slot,planId:r.planId,time:date.toTimeString().slice(0,5),days:[date.getDay()],enabled:true,oneOff:date.toISOString()}]);}}>Remind in 10 min</button>
-              <button disabled={busy||!next||Capacitor.isNativePlatform()||!!r.oneOff} title={Capacitor.isNativePlatform()?"Skip-next exceptions are supported by in-app/web push; disable the native schedule instead.":undefined} onClick={()=>{if(!next)return;const date=next.getFullYear()+"-"+String(next.getMonth()+1).padStart(2,"0")+"-"+String(next.getDate()).padStart(2,"0");void update(data.reminders.map(v=>v.id===r.id?{...v,skipDates:[...(v.skipDates??[]).filter(d=>d>=date),date].slice(-30)}:v));}}>Skip next</button>
-              <button
-                onClick={() =>
-                  download(
-                    calendarFile(r, name),
-                    "core-aura-reminder.ics",
-                    "text/calendar",
-                  )
-                    .then(setMessage)
-                    .catch((e) => setMessage(e.message))
-                }
-              >
-                Export calendar reminder
-              </button>
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void update(data.reminders.filter((row) => row.id !== r.id))
-                }
-              >
-                Delete schedule
-              </button>
-            </div>
-          </article>
-        );
-      })}
-      {message && (
-        <p role="status" className="notice">
-          {message}
-        </p>
-      )}
-    </section>
-  );
+            }}>Delete schedule</button>
+          </div>
+        </details>
+      </article>;
+    })}
+    <details className="workbench-panel">
+      <summary>Notification delivery</summary>
+      {!native && <p role="status">{pushMessage}</p>}
+      <p className="content-note">{native ? "Device permissions and power settings affect notification delivery." :
+        "Closed-app notifications require internet and browser permission. On iPhone, open Core-aura from the Home Screen."}</p>
+      <div className="home-actions">
+        <button disabled={busy} onClick={() => void run(enableReminders)}>Enable reminders</button>
+        {!native && <button disabled={busy} onClick={() => void run(disablePushReminders)}>Disable closed-app reminders</button>}
+      </div>
+    </details>
+  </section>;
 }

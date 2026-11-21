@@ -77,7 +77,11 @@ function rows() {
     .flatMap((r) => {
       const p = plans.find((p) => p.id === r.planId);
       return p
-        ? [{ id: r.id, planId: p.id, name: p.name, time: r.time, days: r.days, ...(r.oneOff?{oneOff:r.oneOff}:{}), ...(r.skipDates?{skipDates:r.skipDates}:{}) }]
+        ? [{
+          id: r.id, planId: p.id, name: p.name, time: r.time, days: r.days,
+          oneOff: r.oneOff, skipDates: r.skipDates, frequency: r.frequency,
+          times: r.times, monthDay: r.monthDay, skipOccurrences: r.skipOccurrences,
+        }]
         : [];
     });
 }

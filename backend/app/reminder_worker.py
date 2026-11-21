@@ -34,28 +34,29 @@ def due(device, now):
                     if 0 <= now-stamp < 900:
                         yield digest([device.token_hash,row["id"],row["oneOff"]]), {**row,"timezone":device.timezone}, stamp+900
                 continue
-            if (date.weekday() + 1) % 7 not in row["days"] or date.isoformat() in row.get("skipDates", []):
+            frequency = row.get("frequency")
+            if date.isoformat() in row.get("skipDates", []):
                 continue
-            hour, minute = map(int, row["time"].split(":"))
-            when = datetime(
-                date.year,
-                date.month,
-                date.day,
-                hour,
-                minute,
-                tzinfo=local.tzinfo,
-                fold=0,
-            )
-            stamp = when.timestamp()
-            # Skip nonexistent DST wall times; repeated hours deliver only the first occurrence.
-            if datetime.fromtimestamp(stamp, local.tzinfo).replace(
-                tzinfo=None
-            ) != when.replace(tzinfo=None):
+            if frequency == "monthly":
+                if date.day != row.get("monthDay"):
+                    continue
+            elif frequency != "daily" and (date.weekday() + 1) % 7 not in row["days"]:
                 continue
-            if 0 <= now - stamp < 900:
-                yield digest(
-                    [device.token_hash, row["id"], date.isoformat(), row["time"]]
-                ), {**row, "timezone": device.timezone}, stamp + 900
+            for clock in row.get("times") or [row["time"]]:
+                if date.isoformat() + "T" + clock in (row.get("skipOccurrences") or []):
+                    continue
+                hour, minute = map(int, clock.split(":"))
+                when = datetime(date.year, date.month, date.day, hour, minute,
+                                tzinfo=local.tzinfo, fold=0)
+                stamp = when.timestamp()
+                # Skip nonexistent DST wall times and use the first occurrence of a repeated hour.
+                if datetime.fromtimestamp(stamp, local.tzinfo).replace(tzinfo=None) != when.replace(tzinfo=None):
+                    continue
+                if 0 <= now - stamp < 900:
+                    yield digest([device.token_hash, row["id"], date.isoformat(), clock]), {
+                        **row, "timezone": device.timezone
+                    }, stamp + 900
+
 
 
 class NoRedirects(requests.Session):

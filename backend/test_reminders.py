@@ -16,7 +16,7 @@ from app.database import Base, engine, SessionLocal
 from app.main import app
 from app.models import ReminderDevice, ReminderDelivery, ReminderWorker
 from app.reminder_worker import tick, due, send, NoRedirects
-from app.push import device_key
+from app.push import Schedule, device_key
 from requests import Response
 from pywebpush import WebPushException
 
@@ -26,6 +26,22 @@ def enc(v):
 
 
 class ReminderTests(unittest.TestCase):
+    def test_monthly_schedule_multiple_times_and_single_skip(self):
+        from types import SimpleNamespace
+        from pydantic import ValidationError
+        row = dict(id="monthly", planId="p", name="Practice", time="07:00", days=[1],
+                   frequency="monthly", monthDay=31, times=["07:00", "07:10"],
+                   skipOccurrences=["2027-03-31T07:00"])
+        parsed = Schedule.model_validate(row).model_dump()
+        device = SimpleNamespace(timezone="Asia/Kolkata", token_hash="x", schedules=[parsed])
+        close = datetime(2027, 3, 31, 1, 41, tzinfo=timezone.utc).timestamp()
+        self.assertEqual(len(list(due(device, close))), 1)
+        self.assertEqual(list(due(device, datetime(2027, 2, 28, 1, 41, tzinfo=timezone.utc).timestamp())), [])
+        device.schedules[0]["skipOccurrences"] = []
+        self.assertEqual(len({key for key, _, _ in due(device, close)}), 2)
+        with self.assertRaises(ValidationError):
+            Schedule.model_validate({**row, "times": ["07:00", "07:00"]})
+
     def setUp(self):
         Base.metadata.create_all(engine)
         with engine.begin() as db:

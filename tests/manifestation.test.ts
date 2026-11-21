@@ -76,6 +76,27 @@ describe("manifestation practices and reminders", () => {
     expect(ics).toContain("BEGIN:VALARM");
     expect(ics).toContain("RRULE:FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH,FR,SA");
   });
+  it("uses every daily slot and skips only the selected occurrence", () => {
+    const r = parseReminders([{
+      id: "daily", slot: 0, planId: "p", time: "07:00", days: [1], enabled: true,
+      frequency: "daily", times: ["07:00", "18:30"], skipOccurrences: ["2026-11-22T07:00"],
+    }], [{ ...plan(), id: "p" }])[0];
+    expect(nextOccurrence(r, new Date(2026, 10, 22, 6))).toEqual(new Date(2026, 10, 22, 18, 30));
+    expect(occurrence(r, new Date(2026, 10, 22, 18, 31))?.key).toBe("daily|2026-11-22|18:30");
+    const calendar = calendarFile(r, "Daily practice", new Date(2026, 10, 21, 6));
+    expect(calendar.match(/RRULE:FREQ=DAILY/g)).toHaveLength(2);
+    expect(calendar).toContain("EXDATE:20261122T070000");
+  });
+  it("skips short months and exports one-time schedules without a recurrence rule", () => {
+    const base = { id: "r", slot: 0, planId: "p", time: "07:00", days: [1], enabled: true };
+    const monthly = { ...base, frequency: "monthly" as const, monthDay: 31 };
+    expect(nextOccurrence(monthly, new Date(2027, 0, 31, 9))).toEqual(new Date(2027, 2, 31, 7));
+    expect(occurrence(monthly, new Date(2027, 1, 28, 7, 1))).toBeNull();
+    expect(calendarFile(monthly, "Monthly", new Date(2027, 0, 31, 9))).toContain("RRULE:FREQ=MONTHLY;BYMONTHDAY=31");
+    const once = { ...base, oneOff: "2027-03-31T07:00:00.000Z" };
+    expect(calendarFile(once, "Once")).toContain("DTSTART:20270331T070000Z");
+    expect(calendarFile(once, "Once")).not.toContain("RRULE");
+  });
   it("plays all sentences, pauses without advancing, repeats the current sentence on resume and cancels late completions", async () => {
     vi.useFakeTimers();
     const spoken: string[] = [],

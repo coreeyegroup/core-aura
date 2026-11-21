@@ -1,3 +1,4 @@
+import { maxScheduleTimes, recentOccurrences, scheduleClock, scheduleTimePattern, upcomingOccurrences, type ScheduleTiming } from "../scheduling/recurrence";
 import { Channel, validChannel, validAccompaniment, type Accompaniment } from "../model";
 export type Category =
   | "Health"
@@ -114,16 +115,11 @@ export type Plan = {
     volume: number;
   };
 };
-export type Reminder = {
+export type Reminder = ScheduleTiming & {
   id: string;
   slot: number;
   planId: string;
-  time: string;
-  days: number[];
-  enabled: boolean;
   autoStart?: boolean;
-  oneOff?: string;
-  skipDates?: string[];
 };
 export function newPlan(): Plan {
   let defaults={voice:"",rate:.9,volume:.7};try{const d=JSON.parse(localStorage.getItem("core-aura.voice-defaults.v1")||"null");if(d&&typeof d.voice==="string"&&d.voice.length<=300&&Number.isFinite(d.rate)&&d.rate>=.5&&d.rate<=1.5&&Number.isFinite(d.volume)&&d.volume>=0&&d.volume<=1)defaults=d;}catch{}
@@ -262,6 +258,14 @@ export function parseReminders(value: unknown, plans: Plan[]): Reminder[] {
         !plans.some((p) => p.id === r.planId) ||
         !/^([01]\d|2[0-3]):[0-5]\d$/.test(r.time) ||
         typeof r.enabled !== "boolean" ||
+        (r.frequency !== undefined && !["daily", "weekly", "monthly"].includes(r.frequency)) ||
+        (r.frequency === "monthly" && (!Number.isInteger(r.monthDay) || r.monthDay! < 1 || r.monthDay! > 31)) ||
+        (r.oneOff !== undefined && (r.frequency !== undefined || r.times !== undefined)) ||
+        (r.times !== undefined && (!Array.isArray(r.times) || r.times.length < 1 || r.times.length > maxScheduleTimes ||
+          r.time !== r.times[0] || r.times.some((time, i) => typeof time !== "string" || !scheduleTimePattern.test(time) ||
+            (i > 0 && r.times![i - 1] >= time)))) ||
+        (r.skipOccurrences !== undefined && (!Array.isArray(r.skipOccurrences) || r.skipOccurrences.length > 30 ||
+          r.skipOccurrences.some(value => typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(value)))) ||
         (r.autoStart !== undefined && typeof r.autoStart !== "boolean") ||
         (r.oneOff!==undefined && (typeof r.oneOff!=="string"||!Number.isFinite(Date.parse(r.oneOff)))) ||
         (r.skipDates!==undefined && (!Array.isArray(r.skipDates)||r.skipDates.length>30||r.skipDates.some(d=>!/^\d{4}-\d{2}-\d{2}$/.test(d)))) ||
@@ -286,40 +290,16 @@ export function position(plan: Plan, step: number) {
         repeat: (step % plan.repeats) + 1,
       };
 }
-export function occurrence(reminder: Reminder, now: Date) {
-  if(!reminder.enabled)return null;
-  if(reminder.oneOff){const due=new Date(reminder.oneOff),age=+now-+due;return age>=0&&age<=900000?{key:reminder.id+"|"+reminder.oneOff,due}:null;}
-  const dateKey=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
-  if(!reminder.days.includes(now.getDay())||reminder.skipDates?.includes(dateKey))return null;
-  const [h, m] = reminder.time.split(":").map(Number),
-    due = new Date(now);
-  due.setHours(h, m, 0, 0);
-  const age = now.getTime() - due.getTime();
-  if (age < 0 || age > 15 * 60000) return null;
-  return {
-    key:
-      reminder.id +
-      "|" +
-      now.getFullYear() +
-      "-" +
-      (now.getMonth() + 1) +
-      "-" +
-      now.getDate() +
-      "|" +
-      reminder.time,
+export function dueOccurrences(reminder: Reminder, now: Date) {
+  return recentOccurrences(reminder, now).map(due => ({
+    key: reminder.oneOff ? reminder.id + "|" + reminder.oneOff :
+      [reminder.id, due.getFullYear() + "-" + (due.getMonth() + 1) + "-" + due.getDate(), scheduleClock(due)].join("|"),
     due,
-  };
+  }));
+}
+export function occurrence(reminder: Reminder, now: Date) {
+  return dueOccurrences(reminder, now).at(-1) ?? null;
 }
 export function nextOccurrence(reminder: Reminder, now: Date) {
-  if (!reminder.enabled) return null;
-  if(reminder.oneOff){const date=new Date(reminder.oneOff);return date>now?date:null;}
-  for (let offset = 0; offset < 40; offset++) {
-    const date = new Date(now);
-    date.setDate(date.getDate() + offset);
-    const [h, m] = reminder.time.split(":").map(Number);
-    date.setHours(h, m, 0, 0);
-    const key=date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");
-    if (reminder.days.includes(date.getDay()) && date > now && !reminder.skipDates?.includes(key)) return date;
-  }
-  return null;
+  return upcomingOccurrences(reminder, now)[0] ?? null;
 }

@@ -4,49 +4,81 @@ import {
   LocalNotificationSchema,
 } from "@capacitor/local-notifications";
 import { manifestationStore } from "./store";
-import { occurrence, Reminder } from "./model";
+import { dueOccurrences, nextOccurrence, Reminder } from "./model";
+import { scheduleClock, scheduleFrequency, scheduleTimes, upcomingOccurrences } from "../scheduling/recurrence";
 import {enablePushReminders,remoteRemindersEnabled,syncPushReminders} from "./push";
 const base = 310000;
 export function notificationIds(r: Reminder) {
   return r.days.map((day) => base + r.slot * 7 + day);
 }
-export async function syncPhoneReminders(requestPermission = false) {
-  if (!Capacitor.isNativePlatform()){await syncPushReminders(true);return remoteRemindersEnabled()?"Schedules saved; check the closed-app reminder status below.":"Schedule saved. Enable closed-app reminders or export a calendar reminder.";}
-  const permission = requestPermission
-    ? await LocalNotifications.requestPermissions()
-    : await LocalNotifications.checkPermissions();
-  const pending = await LocalNotifications.getPending();
-  const own = pending.notifications.filter(
-    (n) => n.id >= base && n.id < base + 56,
-  );
-  if (own.length)
-    await LocalNotifications.cancel({
-      notifications: own.map((n) => ({ id: n.id })),
-    });
-  if (permission.display !== "granted")
-    return "Schedule saved. Enable phone reminders to receive native notifications.";
-  const { plans, reminders } = manifestationStore.snapshot().data;
-  const notifications: LocalNotificationSchema[] = [];
-  for (const r of reminders.filter((r) => r.enabled)) {
-    const p = plans.find((p) => p.id === r.planId);
-    if (!p) continue;
-    if(r.oneOff){if(new Date(r.oneOff)>new Date())notifications.push({id:base+r.slot*7,title:"Manifestation practice",body:p.name,schedule:{at:new Date(r.oneOff),allowWhileIdle:true},extra:{planId:p.id,scheduleId:r.id}});continue;}
-    const [hour, minute] = r.time.split(":").map(Number);
-    for (const day of r.days)
-      notifications.push({
-        id: base + r.slot * 7 + day,
-        title: "Manifestation practice",
-        body: p.name,
-        schedule: {
-          on: { weekday: (day + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7, hour, minute },
-          repeats: true,
-        },
-        extra: { planId: p.id, scheduleId: r.id },
-      });
-  }
-  if (notifications.length)
-    await LocalNotifications.schedule({ notifications });
-  return "Phone reminders scheduled. Delivery timing depends on device permissions and power settings; tap the notification to open your practice.";
+const expandedBase = 320000;
+let reconciliation = Promise.resolve("");
+
+export function syncPhoneReminders(requestPermission = false): Promise<string> {
+  // Request permission from the gesture, then serialize reconciliation.
+  const permission = Capacitor.isNativePlatform() && requestPermission
+    ? LocalNotifications.requestPermissions() : undefined;
+  reconciliation = reconciliation.catch(() => "").then(async () => {
+    if (!Capacitor.isNativePlatform()) {
+      await syncPushReminders(true);
+      return remoteRemindersEnabled() ? "Schedules saved. See notification status." :
+        "Schedules saved. Enable closed-app reminders or export to your calendar.";
+    }
+    const access = await (permission ?? LocalNotifications.checkPermissions());
+    const { plans, reminders } = manifestationStore.snapshot().data;
+    const now = new Date();
+    const android = Capacitor.getPlatform?.() === "android";
+    const notifications: LocalNotificationSchema[] = [];
+    let finiteMonthly = false;
+    if (access.display === "granted") {
+      for (const rule of reminders.filter(item => item.enabled)) {
+        const plan = plans.find(item => item.id === rule.planId);
+        if (!plan) continue;
+        const frequency = scheduleFrequency(rule);
+        const add = (id: number, schedule: NonNullable<LocalNotificationSchema["schedule"]>) => notifications.push({
+          id, title: "Manifestation practice", body: plan.name, schedule,
+          extra: { planId: plan.id, scheduleId: rule.id },
+        });
+        if (rule.oneOff) {
+          const at = nextOccurrence(rule, now);
+          if (at) add(base + rule.slot * 7, { at, allowWhileIdle: true });
+        } else if (frequency === "monthly" && android && rule.monthDay! > 28) {
+          // Android Calendar can roll an absent day into the following month.
+          finiteMonthly = true;
+          for (const [index, at] of upcomingOccurrences(rule, now, scheduleTimes(rule).length * 3).entries())
+            add(expandedBase + rule.slot * 100 + 70 + index, { at, allowWhileIdle: true });
+        } else {
+          for (const [index, time] of scheduleTimes(rule).entries()) {
+            const [hour, minute] = time.split(":").map(Number);
+            if (rule.frequency === undefined || frequency === "weekly") {
+              for (const day of rule.days) {
+                const id = index === 0 ? base + rule.slot * 7 + day : expandedBase + rule.slot * 100 + index * 7 + day;
+                add(id, { on: { weekday: (day + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7, hour, minute, second: 0 }, repeats: true });
+              }
+            } else {
+              add(expandedBase + rule.slot * 100 + index, {
+                on: { hour, minute, second: 0, ...(frequency === "monthly" ? { day: rule.monthDay } : {}) },
+                repeats: true,
+              });
+            }
+          }
+        }
+      }
+    }
+    const pending = await LocalNotifications.getPending();
+    const own = pending.notifications.filter(({ id }) => id >= base && id < base + 56 ||
+      id >= expandedBase && id < expandedBase + 800);
+    if (Capacitor.getPlatform?.() === "ios" && notifications.length + pending.notifications.length - own.length > 64)
+      throw Error("Schedules saved, but they exceed this iPhone’s notification limit. Disable a schedule or remove times, then enable reminders again.");
+    if (own.length)
+      await LocalNotifications.cancel({ notifications: own.map(({ id }) => ({ id })) });
+    if (access.display !== "granted")
+      return "Schedules saved. Enable phone reminders to receive notifications.";
+    if (notifications.length) await LocalNotifications.schedule({ notifications });
+    return finiteMonthly ? "Phone reminders scheduled. For days 29–31, Android queues the next three eligible months. Reopen Core-aura to refresh them." :
+      "Phone reminders scheduled. Delivery timing depends on your device settings.";
+  });
+  return reconciliation;
 }
 export type Due = {
   id: string;
@@ -75,17 +107,19 @@ export function observeReminders(
       } catch {}
       const { plans, reminders } = manifestationStore.snapshot().data;
       const now = new Date();
-      for (const r of reminders) {
-        const due = occurrence(r, now),
-          p = plans.find((p) => p.id === r.planId);
+      const scheduleIds = new Set(reminders.map(rule => rule.id));
+      delivered = Object.fromEntries(Object.entries(delivered).filter(([key]) => scheduleIds.has(key.split("|")[0])));
+      for (const r of reminders) for (const due of dueOccurrences(r, now)) {
+        const p = plans.find(plan => plan.id === r.planId);
+        const slot = r.id + "|" + scheduleClock(due.due);
         if (
           !due ||
           !p ||
-          delivered[r.id] === due.key ||
+          (delivered[slot] === due.key || delivered[r.id] === due.key) ||
           remembered.has(due.key)
         )
           continue;
-        delivered[r.id] = due.key;
+        delivered[slot] = due.key;
         remembered.add(due.key);
         try {
           localStorage.setItem(
@@ -98,7 +132,7 @@ export function observeReminders(
           id: due.key,
           planId: p.id,
           name: p.name,
-          time: r.time,
+          time: scheduleClock(due.due),
           autoStart:
             Boolean(r.autoStart) && now.getTime() - due.due.getTime() < 60000,
         });
@@ -144,12 +178,16 @@ export function observeReminders(
   if ("serviceWorker" in navigator)
     navigator.serviceWorker.addEventListener("message", openFromWorker);
   const visibility = () => {
-    if (document.visibilityState === "visible") void tick();
+    if (document.visibilityState !== "visible") return;
+    void tick();
+    if (Capacitor.getPlatform?.() === "android" && manifestationStore.snapshot().data.reminders.some(rule =>
+      rule.enabled && rule.frequency === "monthly" && rule.monthDay! > 28)) void syncPhoneReminders().catch(() => {});
+
   };
   addEventListener("pageshow", visibility);
   document.addEventListener("visibilitychange", visibility);
   const timer = setInterval(() => void tick(), 15000);
-  void tick();
+  visibility();
   if (Capacitor.isNativePlatform())
     void LocalNotifications.addListener(
       "localNotificationActionPerformed",
@@ -176,12 +214,7 @@ export async function enableReminders() {
   return enablePushReminders();
 }
 export function calendarFile(r: Reminder, name: string, now = new Date()) {
-  if (!r.days.length) throw Error("Choose at least one reminder day.");
-  const [h, m] = r.time.split(":").map(Number);
-  const start = new Date(now);
-  start.setHours(h, m, 0, 0);
-  if (start <= now) start.setDate(start.getDate() + 1);
-  while (!r.days.includes(start.getDay())) start.setDate(start.getDate() + 1);
+  const frequency = scheduleFrequency(r);
   const pad = (n: number) => String(n).padStart(2, "0");
   const local = (d: Date) =>
     d.getFullYear() +
@@ -197,40 +230,36 @@ export function calendarFile(r: Reminder, name: string, now = new Date()) {
       .replace(/\r\n|\r|\n/g, "\\n")
       .replace(/;/g, "\\;")
       .replace(/,/g, "\\,");
-  const lines = [
-    "BEGIN:VCALENDAR",
-    "VERSION:2.0",
-    "PRODID:-//Core-aura//Manifestation//EN",
-    "BEGIN:VEVENT",
-    "UID:" + escape(r.id) + "@core-aura",
-    "DTSTAMP:" +
-      now
-        .toISOString()
-        .replace(/[-:]/g, "")
-        .replace(/\.\d{3}Z/, "Z"),
-    "DTSTART:" + local(start),
-    "DURATION:PT10M",
-    "RRULE:FREQ=WEEKLY;BYDAY=" +
-      r.days
-        .map((d) => ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][d])
-        .join(","),
-    "SUMMARY:" + escape(name),
-    "DESCRIPTION:Open Core-aura and tap Play for your saved practice.",
-    "URL:" +
-      (typeof location === "undefined"
-        ? "https://core-aura.coreeye.in"
-        : location.origin) +
-      "/?manifestPlan=" +
-      encodeURIComponent(r.planId) +
-      "#manifest",
-    "BEGIN:VALARM",
-    "TRIGGER:PT0M",
-    "ACTION:DISPLAY",
-    "DESCRIPTION:Manifestation practice",
-    "END:VALARM",
-    "END:VEVENT",
-    "END:VCALENDAR",
-  ];
+  const utc = (value: Date) => value.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  const rule = r.frequency === "daily" ? "FREQ=DAILY" : frequency === "monthly" ? "FREQ=MONTHLY;BYMONTHDAY=" + r.monthDay :
+    "FREQ=WEEKLY;BYDAY=" + r.days.map(day => ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][day]).join(",");
+  const events = (r.oneOff ? [r.time] : scheduleTimes(r)).flatMap((time, index) => {
+    const start = r.oneOff ? new Date(r.oneOff) : nextOccurrence({ ...r, enabled: true, time, times: [time] }, now);
+    if (!start) return [];
+    const exceptions = [...(r.skipDates ?? []).map(date => date + "T" + time),
+      ...(r.skipOccurrences ?? []).filter(value => value.endsWith("T" + time))];
+    return [
+      "BEGIN:VEVENT",
+      "UID:" + escape(r.id) + (index ? "-" + time.replace(":", "") : "") + "@core-aura",
+      "DTSTAMP:" + utc(now),
+      "DTSTART:" + (r.oneOff ? utc(start) : local(start)),
+      "DURATION:PT10M",
+      ...(r.oneOff ? [] : ["RRULE:" + rule]),
+      ...(!r.oneOff && exceptions.length ? ["EXDATE:" + [...new Set(exceptions)].map(value => value.replace(/[-:]/g, "") + "00").join(",")] : []),
+      "SUMMARY:" + escape(name),
+      "DESCRIPTION:Open Core-aura and tap Play for your saved practice.",
+      "URL:" + (typeof location === "undefined" ? "https://core-aura.coreeye.in" : location.origin) +
+        "/?manifestPlan=" + encodeURIComponent(r.planId) + "#manifest",
+      "BEGIN:VALARM",
+      "TRIGGER:PT0M",
+      "ACTION:DISPLAY",
+      "DESCRIPTION:Manifestation practice",
+      "END:VALARM",
+      "END:VEVENT",
+    ];
+  });
+  if (!events.length) throw Error("This schedule has no upcoming dates.");
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Core-aura//Manifestation//EN", ...events, "END:VCALENDAR"];
   return (
     lines
       .map((line) => {
