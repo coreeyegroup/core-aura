@@ -23,6 +23,8 @@ export function ChakraMixer({ channels, states, selected, target, mode, sequence
   const paused = active.filter(s => s.status === "paused").length;
   const scope = target === "all" ? channels.map(channel => channel.id) : selected;
   const selectedChannels = channels.filter(channel => scope.includes(channel.id));
+  const rootAndSacral = [["root", 396], ["sacral", 417]].every(([id, hz]) =>
+    selectedChannels.some(channel => channel.id === id && channel.hz === hz && !channel.muted && channel.volume > 0));
   const timingLocked = active.length > 0 || sequenceActive;
   const changeSelection = (ids:string[]) => { onTarget("selected"); onSelect(ids); };
   useEffect(() => {
@@ -79,6 +81,7 @@ export function ChakraMixer({ channels, states, selected, target, mode, sequence
             onChange={event => onMaster(Number(event.target.value) / 100)} />
         </label>
       </div>
+      {mode === "together" && rootAndSacral && <small className="chakra-meter">Root and Sacral take turns every 3 seconds to keep the mix smooth.</small>}
       {mode === "sequence" && <SequenceSetup channels={selectedChannels} disabled={timingLocked} onError={onError} />}
     </section>
     <div className="chakra-meter" role="status">

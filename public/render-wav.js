@@ -1,4 +1,4 @@
-import { createGroupVoice, createState, groupVoiceVolume, sample } from "./dsp.js";
+import { createGroupVoice, createState, groupVoiceVolume, rootSacralEnvelope, rootSacralPair, sample } from "./dsp.js";
 export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap, additionalLayers = [], balancedGroup = false) {
   if (
     !Array.isArray(channels) ||
@@ -59,7 +59,8 @@ export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap,
     const weight = sequenceGap === undefined ? states.reduce(
       (n, c) => n + (c.muted || c.status === "ended" ? 0 : c.volume), 0,
     ) : 1;
-    const levels = states.map(state => groupVoiceVolume(state, states));
+    const pair = balancedGroup ? rootSacralPair(states) : undefined;
+    const levels = states.map(state => state === pair?.sacral ? state.volume : groupVoiceVolume(state, states));
     const scale = (master * 0.65) / Math.max(1, weight);
     for (let i = start; i < Math.min(start + 8192, frames); i++) {
       let sum = 0;
@@ -67,7 +68,8 @@ export function* renderWav(channels, master, seconds, rate = 44100, sequenceGap,
         if (i < starts[index]) continue;
         const state = states[index];
         const value = sample(state, rate);
-        if (!state.muted) sum += value * levels[index] * (state.headroom ?? 1) * ((state.left ?? 1) + (state.right ?? 1)) / 2;
+        if (!state.muted) sum += value * levels[index] * rootSacralEnvelope(state, pair, (i - start) / rate) *
+          (state.headroom ?? 1) * ((state.left ?? 1) + (state.right ?? 1)) / 2;
       }
       const value = Math.max(-0.95, Math.min(0.95, sum * scale));
       view.setInt16(44 + i * 2, Math.round(value * 32767), true);

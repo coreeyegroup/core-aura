@@ -92,6 +92,27 @@ export function groupVoiceVolume(voice, voices) {
   // Keep the lower pitch as the anchor when a close pair beats, with both frequencies unchanged.
   return voice.volume - .55 * Math.min(voice.volume, neighbourLevel);
 }
+export function rootSacralPair(voices) {
+  let root, sacral;
+  for (const voice of voices) {
+    if (voice.status !== "playing" || voice.muted || voice.volume <= 0 || voice.time >= voice.seconds) continue;
+    if (voice.hz === 396 && (voice.id === "root" || voice.headroom !== undefined)) root = voice;
+    if (voice.hz === 417 && (voice.id === "sacral" || voice.headroom !== undefined)) sacral = voice;
+  }
+  return root && sacral ? { root, sacral, time: root.time } : undefined;
+}
+
+export function rootSacralEnvelope(voice, pair, elapsed) {
+  if (!pair || (voice !== pair.root && voice !== pair.sacral)) return 1;
+  // Trade places every three seconds on Root's clock. Each tone reaches zero
+  // before the other fades in, so the 21 Hz beat cannot build up, even in mono.
+  const time = pair.time + elapsed;
+  const phase = time % 6;
+  const progress = phase % 3;
+  if (voice !== (phase < 3 ? pair.root : pair.sacral)) return 0;
+  const ramp = Math.min(1, time < .1 ? 1 : progress / .1, (3 - progress) / .1);
+  return Math.sin(ramp * Math.PI / 2) ** 2;
+}
 function partials(phase, hz, rate, modes, age = 0) {
   let result = 0;
   for (const [ratio, level, decay] of modes) {

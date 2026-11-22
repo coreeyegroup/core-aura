@@ -53,7 +53,7 @@ it("starts the seven frequencies on one clock and softens a layered strike", asy
   expect(groupPeak).toBeLessThan(plainPeak * .7);
 });
 
-it("keeps Sacral at 417 Hz and softens its beat against Root in Together playback", async () => {
+it.each([2, 7])("hands off between Root and Sacral without a steady beat (%i chakras)", async count => {
   let Mixer: any;
   const rate = 48000;
   vi.resetModules();
@@ -67,8 +67,8 @@ it("keeps Sacral at 417 Hz and softens its beat against Root in Together playbac
     await import("../public/mixer-worklet.js");
     const mixer = new Mixer();
     const send = (data: unknown) => mixer.port.onmessage({ data });
-    send({ type: "start-group", channels: chakras.map(({ id, hz }) => ({
-      id, hz, sound: "sine", volume: .25, muted: false, seconds: 6,
+    send({ type: "start-group", channels: chakras.slice(0, count).map(({ id, hz }) => ({
+      id, hz, sound: "sine", volume: .25, muted: false, seconds: 12,
     })) });
     const renderSecond = () => {
       const samples = new Float32Array(rate);
@@ -86,14 +86,21 @@ it("keeps Sacral at 417 Hz and softens its beat against Root in Together playbac
       return Math.hypot(sine, cosine);
     };
     renderSecond(); // Let the shared fade-in settle.
-    const together = renderSecond();
-    const balance = magnitude(together, 417) / magnitude(together, 396);
-    expect(balance).toBeGreaterThan(.25);
-    expect(balance).toBeLessThan(.55);
+    const root = renderSecond();
+    expect(magnitude(root, 396)).toBeGreaterThan(100);
+    expect(magnitude(root, 417)).toBeLessThan(magnitude(root, 396) * .01);
+    renderSecond(); // Handoff at three seconds.
+    renderSecond();
+    const sacral = renderSecond();
+    expect(magnitude(sacral, 417)).toBeGreaterThan(100);
+    expect(magnitude(sacral, 396)).toBeLessThan(magnitude(sacral, 417) * .01);
+    if (count === 7) expect(magnitude(sacral, 528)).toBeCloseTo(magnitude(root, 528), 3);
+    renderSecond();
     send({ type: "patch", id: "root", patch: { muted: true } });
     renderSecond();
     const withoutRoot = renderSecond();
-    const restored = magnitude(withoutRoot, 417) / magnitude(withoutRoot, 528);
+    const restored = count === 7 ? magnitude(withoutRoot, 417) / magnitude(withoutRoot, 528)
+      : magnitude(withoutRoot, 417) / magnitude(sacral, 417);
     expect(restored).toBeGreaterThan(.9);
     expect(restored).toBeLessThan(1.1);
   } finally {

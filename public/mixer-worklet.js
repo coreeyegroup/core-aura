@@ -1,4 +1,4 @@
-import { createGroupVoice, createState, groupVoiceVolume, sample } from "./dsp.js";
+import { createGroupVoice, createState, groupVoiceVolume, rootSacralEnvelope, rootSacralPair, sample } from "./dsp.js";
 class CoreAuraMixer extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -33,10 +33,11 @@ class CoreAuraMixer extends AudioWorkletProcessor {
   process(_, outputs) {
     const [out, right] = outputs[0];
     if (!out) return true;
+    const pair = rootSacralPair(this.channels.values());
     let weight = 0;
     for (const c of this.channels.values()) {
       weight += c.muted || c.status === "paused" ? 0 : c.volume;
-      c.targetGain = groupVoiceVolume(c, this.channels.values());
+      c.targetGain = c === pair?.sacral ? c.volume : groupVoiceVolume(c, this.channels.values());
     }
     const smoothing = Math.min(1, 1 / (sampleRate * .04));
     const scale = (this.master * 0.65) / Math.max(1, weight);
@@ -47,7 +48,10 @@ class CoreAuraMixer extends AudioWorkletProcessor {
         c.mixGain ??= c.targetGain;
         c.mixGain += (c.targetGain - c.mixGain) * smoothing;
         if (!c.muted) {
-          const level = value * c.mixGain * (c.headroom ?? 1);
+          const envelope = rootSacralEnvelope(c, pair, i / sampleRate);
+          if (pair && (c === pair.root || c === pair.sacral)) c.handoffGain = envelope;
+          else if (c.handoffGain !== undefined) c.handoffGain += (1 - c.handoffGain) * smoothing;
+          const level = value * c.mixGain * (c.headroom ?? 1) * (c.handoffGain ?? 1);
           leftSum += level * (c.left ?? 1);
           rightSum += level * (c.right ?? 1);
         }
