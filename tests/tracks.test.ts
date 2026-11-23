@@ -75,3 +75,26 @@ it("bounds concurrent tracks and cancels an import load when Stop all is used", 
     await pending;
     expect(p.snapshot()).toEqual([]);
 });
+
+it("normalizes YouTube video links and rejects lookalike hosts, playlists and duplicate bookmarks", async () => {
+    const { parseYouTubeLinks, youtubeVideoId } = await import("../src/tracks/youtube");
+    const id = "abcdefghijk";
+    for (const value of [
+        "https://youtu.be/abcdefghijk?si=tracking",
+        "https://www.youtube.com/watch?v=abcdefghijk&list=other",
+        "https://music.youtube.com/watch?v=abcdefghijk",
+        "https://m.youtube.com/shorts/abcdefghijk",
+        "https://youtube.com/live/abcdefghijk",
+    ]) expect(youtubeVideoId(value)).toBe(id);
+    for (const value of [
+        "https://youtube.com.evil.test/watch?v=abcdefghijk",
+        "https://youtube.com@evil.test/watch?v=abcdefghijk",
+        "https://youtube.com/playlist?list=abcdefghijk",
+        "https://youtu.be/invalid",
+        "javascript:alert(1)",
+    ]) expect(() => youtubeVideoId(value)).toThrow();
+    const row = { id, title: " Evening audio ", trackId: "track:" + "a".repeat(64) };
+    expect(parseYouTubeLinks([row])).toEqual([{ ...row, title: "Evening audio" }]);
+    expect(() => parseYouTubeLinks([row, row])).toThrow();
+    expect(() => parseYouTubeLinks([{ ...row, trackId: "https://example.com/file" }])).toThrow();
+});

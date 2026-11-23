@@ -226,6 +226,24 @@ function testAudio(name) {
     await page.getByRole("button", { name: "Export Quiet audio" }).click();
     assert.equal((await audioExport).suggestedFilename(), "Quiet-audio.wav");
 
+    const youtube = page.getByRole("region", { name: /YouTube links/ });
+    await youtube.getByRole("button", { name: "Add link" }).click();
+    await youtube.getByLabel("YouTube link", { exact: true }).fill("https://youtu.be/abcdefghijk?si=example");
+    await youtube.getByLabel("Title (optional)").fill("Quiet source");
+    await youtube.getByRole("button", { name: "Save link" }).click();
+    assert.equal(await youtube.getByRole("link", { name: "Open in YouTube" }).getAttribute("href"),
+      "https://www.youtube.com/watch?v=abcdefghijk");
+    await youtube.getByText("Link offline audio", { exact: true }).click();
+    await youtube.getByLabel("Imported audio for Quiet source").selectOption({ label: "Quiet audio" });
+    await page.reload();
+    await youtube.getByText("Offline audio linked · Quiet audio", { exact: true }).waitFor();
+    await youtube.getByRole("button", { name: "Go to offline player" }).click();
+    assert.match(await page.evaluate(() => document.activeElement.getAttribute("aria-label")), /Quiet audio$/);
+    await youtube.getByRole("button", { name: "Add link" }).click();
+    await youtube.getByLabel("YouTube link", { exact: true }).fill("https://www.youtube.com/watch?v=abcdefghijk");
+    await youtube.getByRole("button", { name: "Save link" }).click();
+    await youtube.getByText("This video is already saved.", { exact: true }).waitFor();
+
     await page.goto(origin + "/#library/affirmations");
     assert.equal(await page.getByLabel("Category", { exact: true }).count(), 0);
     assert.ok(await page.locator(".affirmation-row").count() > 5);

@@ -58,6 +58,7 @@ import { ChannelEditor, Transport } from "./components/Controls";
 import { LibraryStarters } from "./components/LibraryStarters";
 import { collections, LibraryOverview } from "./components/LibraryOverview";
 import { ChakraMixer } from "./components/ChakraMixer";
+import { YouTubeLinks } from "./tracks/YouTubeLinks";
 import { SoundTracks } from "./tracks/SoundTracks";
 import { AndroidUpdates } from "./android/AndroidUpdates";
 import { ConnectionPanel } from "./components/ConnectionPanel";
@@ -1475,6 +1476,7 @@ export default function App() {
                 </div>
               </header>
             ) : <LibraryOverview onOpen={route => navigate("library", route)} />}
+            {libraryView === "audio" && <YouTubeLinks tracks={localTracks.filter(track => trackCollection(track) === "audio")} />}
             {(libraryView === "sounds" || backgroundsView || libraryView === "audio") && (
               <SoundTracks key={"imports-" + libraryView} collection={backgroundsView ? "backgrounds" : libraryView === "sounds" ? "sounds" : "audio"}>
                 {libraryView !== "audio" && <LibrarySounds
