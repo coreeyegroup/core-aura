@@ -231,8 +231,21 @@ function testAudio(name) {
     await youtube.getByLabel("YouTube link", { exact: true }).fill("https://youtu.be/abcdefghijk?si=example");
     await youtube.getByLabel("Title (optional)").fill("Quiet source");
     await youtube.getByRole("button", { name: "Save link" }).click();
-    assert.equal(await youtube.getByRole("link", { name: "Open in YouTube" }).getAttribute("href"),
+    await page.route("https://www.youtube-nocookie.com/embed/**", route =>
+      route.fulfill({ contentType: "text/html", body: "<button>Mock YouTube play</button>" }));
+    assert.equal(await youtube.locator("iframe").count(), 0);
+    await youtube.getByRole("button", { name: "Play here" }).click();
+    const embed = youtube.locator("iframe[title='YouTube player for Quiet source']");
+    await embed.waitFor();
+    assert.equal(await embed.getAttribute("src"), "https://www.youtube-nocookie.com/embed/abcdefghijk?playsinline=1");
+    assert.equal(await youtube.getByRole("link", { name: "open it in YouTube" }).getAttribute("href"),
       "https://www.youtube.com/watch?v=abcdefghijk");
+    await embed.contentFrame().getByRole("button", { name: "Mock YouTube play" }).click();
+    assert.ok(page.url().endsWith("/#library/audio"));
+    const size = await embed.boundingBox();
+    assert.ok(size.width >= 200 && size.height >= 200);
+    await youtube.getByRole("button", { name: "Close player" }).click();
+    assert.equal(await youtube.locator("iframe").count(), 0);
     await youtube.getByText("Link offline audio", { exact: true }).click();
     await youtube.getByLabel("Imported audio for Quiet source").selectOption({ label: "Quiet audio" });
     await page.reload();

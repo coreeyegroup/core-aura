@@ -2011,6 +2011,16 @@ progress {
 .track-toolbar button { flex:1 1 auto;font-size:calc(13px * var(--text-scale)); }
 .track-list { display:grid;gap:0; }
 .soundtrack-row { min-width:0;border-top:1px solid var(--line);padding:5px 0; }
+.youtube-player-frame {
+  display: block;
+  width: 100%;
+  min-width: 200px;
+  min-height: 200px;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: var(--radius);
+  background: #000;
+}
 .track-head { display:flex;align-items:center;gap:5px; }
 .track-head > div { flex:1;min-width:0; }
 .track-head strong { font-size:calc(14px * var(--text-scale));display:block;overflow-wrap:anywhere; }
