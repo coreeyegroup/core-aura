@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { ExternalLink, Link2, Play, Plus, Trash2, X } from "lucide-react";
-import type { Track } from "./storage";
+import { Download, ExternalLink, Link2, Play, Plus, Trash2 } from "lucide-react";
+import { deliverFile } from "../files/deliver";
+import { trackBlob, type Track } from "./storage";
+import { YouTubePlayer } from "./YouTubePlayer";
 import { parseYouTubeLinks, youtubeLinkLimit, youtubeLinksKey, youtubeVideoId, type YouTubeLink } from "./youtube";
 
 function readLinks() {
@@ -13,6 +15,7 @@ export function YouTubeLinks({ tracks }: { tracks: Track[] }) {
     catch { return { rows: [] as YouTubeLink[], error: "Saved links could not be read. Your original data was kept." }; }
   });
   const [playerId, setPlayerId] = useState<string>();
+  const [downloading, setDownloading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -62,7 +65,7 @@ export function YouTubeLinks({ tracks }: { tracks: Track[] }) {
       <button type="button" aria-expanded={adding} aria-controls="youtube-link-form" disabled={!!library.error || library.rows.length >= youtubeLinkLimit}
         onClick={() => setAdding(!adding)}><Plus size={16} aria-hidden="true" /> Add link</button>
     </div>
-    <p className="content-note">Play saved links here with the YouTube player. Streaming requires internet. For offline playback in Core-aura, link an imported audio file.</p>
+    <p className="content-note">Play one stream at a time. YouTube streams need internet. Link an imported audio file to listen offline or save a copy to your device.</p>
     <form id="youtube-link-form" hidden={!adding} onSubmit={save}>
       <div className="fields">
         <label>YouTube link<input type="url" required maxLength={2048} value={url} onChange={event => setUrl(event.target.value)} placeholder="https://youtu.be/…" /></label>
@@ -86,25 +89,29 @@ export function YouTubeLinks({ tracks }: { tracks: Track[] }) {
           }}><Trash2 size={16} aria-hidden="true" /></button>
         </div>
         <div className="home-actions">
-          <button className={playerOpen ? undefined : "primary"} type="button" aria-expanded={playerOpen}
-            aria-controls={playerPanel} onClick={() => setPlayerId(current => current === row.id ? undefined : row.id)}>
-            {playerOpen ? <X size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
-            {playerOpen ? "Close player" : "Play here"}
-          </button>
-          {audio && <button type="button" onClick={() => {
-            setPlayerId(undefined);
-            document.getElementById("local-player-" + audio.id)?.focus();
-          }}>Go to offline player</button>}
+          {!playerOpen && <button className="primary" type="button"
+            aria-controls={playerPanel} onClick={() => setPlayerId(row.id)}>
+            <Play size={16} aria-hidden="true" /> Play here
+          </button>}
+          <a href={"https://www.youtube.com/watch?v=" + row.id} target="_blank" rel="noopener noreferrer">
+            Open on YouTube <ExternalLink size={14} aria-hidden="true" />
+          </a>
+          {audio && <>
+            <button type="button" onClick={() => {
+              setPlayerId(undefined);
+              document.getElementById("local-player-" + audio.id)?.focus();
+            }}>Go to offline player</button>
+            <button type="button" disabled={downloading} onClick={async () => {
+              setDownloading(true);
+              setMessage("");
+              try { setMessage(await deliverFile(await trackBlob(audio.id), audio.filename)); }
+              catch (error) { setMessage((error as Error).message); }
+              finally { setDownloading(false); }
+            }}><Download size={16} aria-hidden="true" /> Download linked audio</button>
+          </>}
         </div>
         <div id={playerPanel} hidden={!playerOpen}>
-          {playerOpen && <>
-            <iframe className="youtube-player-frame" title={"YouTube player for " + row.title}
-              src={"https://www.youtube-nocookie.com/embed/" + row.id + "?playsinline=1"}
-              referrerPolicy="strict-origin-when-cross-origin" allow="encrypted-media; picture-in-picture"
-              allowFullScreen />
-            <p className="content-note">If the video can’t play here, <a href={"https://www.youtube.com/watch?v=" + row.id}
-              target="_blank" rel="noopener noreferrer">open it in YouTube <ExternalLink size={14} aria-hidden="true" /></a>.</p>
-          </>}
+          {playerOpen && <YouTubePlayer id={row.id} title={row.title} onStop={() => setPlayerId(undefined)} />}
         </div>
         {(tracks.length > 0 || row.trackId) && <details className="track-options">
           <summary>Link offline audio</summary>

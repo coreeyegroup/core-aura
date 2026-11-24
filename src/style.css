@@ -2011,6 +2011,7 @@ progress {
 .track-toolbar button { flex:1 1 auto;font-size:calc(13px * var(--text-scale)); }
 .track-list { display:grid;gap:0; }
 .soundtrack-row { min-width:0;border-top:1px solid var(--line);padding:5px 0; }
+.youtube-player-compact { max-width: 356px; }
 .youtube-player-frame {
   display: block;
   width: 100%;
